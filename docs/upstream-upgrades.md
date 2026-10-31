@@ -12,7 +12,7 @@
 
 1. 阅读上游发布说明及服务接口变化，重点检查 agent、session、流式帧、commands、preset、审批问答和 profile/bundle 装配。
 2. 一起更新目标 dsh 及直接使用的官方包版本，重新生成锁文件。必要时更新框架依赖；不扩大历史版本支持范围。
-3. 先修适配层和 bundle；上游未改变用户能力时，不修改界面。只有客户端确实需要新增数据或操作时才调整 `app` 契约。
+3. 先修适配层和 bundle；上游未改变用户能力时，不修改界面。只有客户端确实需要新增数据或操作时才调整功能模块的 `contracts.ts`。
 4. 更新 `verify-upstream-contract.ts` 中明确验证的版本断言，执行 `pnpm build`、相关专项及 `pnpm verify`。消息翻译与投影 golden 发生变化时，先说明语义原因，不直接覆盖预期。
 5. 运行 `pnpm pack`，在没有全局 dsh/pnpm 的隔离环境使用 npm 安装 tarball；确认首次启动、帮助、退出、再次启动和升级后的 profile 链接。检查窄 TTY、会话恢复、配置保留及终端模式恢复。
 

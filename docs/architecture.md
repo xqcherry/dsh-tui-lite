@@ -1,62 +1,50 @@
 # 客户端架构
 
-本项目是完整 dsh 终端客户端，以 Cordis 插件形式加载。一个 npm 包同时安装客户端和经过验证的内核；用户执行 `dsh-tui` 即可启动。本轮整理结构与启动流程，后续在这些边界上补充产品能力。
+项目是一个 npm 包，以 Cordis 插件形式在随包安装的 dsh 进程中运行。dsh 负责 agent、模型、工具、会话持久化和策略；客户端负责输入、展示和交互。
 
-## 目录与职责
+## 从哪里开始读
 
-| 位置 | 职责 |
-| --- | --- |
-| `bin/` | npm 命令入口，调用编译后的启动器 |
-| `src/dsh-adapter/` | dsh 接入、宿主服务、事件翻译、profile 启动与插件装配 |
-| `src/app/` | 客户端契约、可写状态、消息投影、输入流程、问答存储、配置向导和偏好 |
-| `src/tui/` | 页面、组件、主题、终端文本排版与界面退出清理 |
-| `src/ink/`、`src/native-ts/` | 已有终端渲染器和布局实现 |
-| `src/utils/` | 文本、文件、剪贴板和图像等基础工具 |
+| 想理解的功能 | 入口 | 内部职责 |
+| --- | --- | --- |
+| 输入 | `src/modules/composer/index.ts` | 草稿编辑、撤销、历史、图片、补全、提交、键盘与布局 |
+| 消息 | `src/modules/transcript/index.ts` | 事件投影、用量、历史窗口、行签名与具体消息渲染 |
+| 会话 | `src/modules/sessions/index.ts` | 会话操作契约、占用账本、恢复标记与投影重置 |
+| 设置 | `src/modules/settings/index.ts` | 模型操作、偏好、服务商向导；添加、编辑、发现与认证分开 |
+| 审批问答 | `src/modules/decisions/index.ts` | 问题队列、回答取消、审批面板 |
+| 任务与子代理 | `src/modules/activity/index.ts` | 任务卡片、分组、子代理展示与数据契约 |
+| 聊天主界面 | `src/modules/workbench/index.ts` | 页面、菜单、焦点、通知与命令协调 |
 
-`app/contracts/client.ts` 汇总客户端读状态、输入、会话、模型和服务接口。展示数据按消息、子代理、后台任务、输入、模型和会话拆分。适配层使用这些类型，不向界面转导出官方类型。
+每个模块的 `contracts.ts` 是公开类型入口，`index.ts` 是公开运行时入口；`model/` 放不依赖 React、终端或 dsh 的逻辑，`ui/` 放界面和控制器。跨模块不得访问私有文件。
 
-```mermaid
-flowchart TD
-    Command[npm 命令] --> Launcher[dsh-adapter 启动器]
-    Launcher --> Host[随包安装的 dsh / profile]
-    Host --> Plugin[插件装配入口]
-    Plugin --> Adapter[dsh 服务接入与事件翻译]
-    Plugin --> UI[tui 页面与交互]
-    Adapter --> App[app 契约、状态与投影]
-    UI --> App
-    UI --> Renderer[ink / native-ts 渲染基础设施]
-```
+例如理解输入，先看 `contracts.ts` 的 `ComposerPort`，再看输入组件与 `ui/controllers/` 下的提交、历史、附件和撤销控制器；编辑和图片 token 的纯规则在 `model/`。不必先读终端渲染器。
 
-## 运行链路
+## 基础设施与宿主接入
 
-1. 启动器从自身依赖定位 dsh CLI，以当前 Node 运行它，不搜索全局 PATH。
-2. 专用 profile 组合官方 `dsh-base` 与当前 TUI bundle。profile 中本包的链接始终指向当前 npm 安装，不复制安装另一份 TUI。
-3. bundle 只做终端 surface 所需装配：关闭 HMR、声明宿主 preset 服务、装载认证及 TUI。用户 profile patch 位于 bundle 之后。
-4. `dsh-adapter/plugin.ts` 负责装配。`agent-lifecycle.ts` 通过官方服务创建或恢复 agent；频道模块桥接宿主能力；`backend/session.ts` 翻译持久化事件和实时帧。
-5. `app` 将规范化事件投影为客户端状态，`tui` 订阅状态并发起操作。状态初始化、重置、通知和输入取消/重新投递属于客户端。
-6. 退出策略区分用户退出与插件卸载。卸载释放当前实例；用户退出先恢复终端，再清理宿主。
+- `src/dsh-adapter/`：唯一允许导入官方包的目录，负责 profile、agent、宿主服务、持久化事件翻译与装配。
+- `src/shared/protocol/`：规范化事件和跨模块传输数据，不包含业务执行流程。
+- `src/shared/platform/`：文件、剪贴板、文本和图像等基础能力，不反向依赖功能模块或界面。
+- `src/shared/lifecycle/`、`src/shared/state/`：所有权、退出与只读投影的公共机制。
+- `src/ui/`：主题、Markdown、代码框、通用表单及展示工具，不依赖功能模块。
+- `src/ui/primitives.ts`：带主题的业务组件入口；`src/terminal/`：渲染、输入和终端恢复门面。
+- `src/ink/`、`src/native-ts/`：保留的终端渲染器与布局实现。本轮只调整基础工具的导入路径。
 
-## 依赖规则
+依赖检查覆盖静态导入、类型导入、动态导入和转导出，并检查功能模块之间无依赖环。功能 model 不得依赖 React 或渲染器。
 
-- `@deepseek-ai/*` 的静态、动态及类型导入仅允许出现在 `dsh-adapter`。
-- `app` 不依赖 `tui`、渲染器或适配实现；`tui` 只消费客户端接口，不调用适配实现。
-- 包的根入口是插件桥接入口；其余共享模块和渲染器不得反向导入适配层。
-- dsh 相关代码变动留在适配目录；客户端接口只表达终端实际需要的状态与操作。
-- `ChannelServices` 是装配时的内部接线对象，不能在启动后注册功能；它不是第三方 TUI 插件 API。
+## 启动与数据流
 
-`verify-boundaries.mjs` 通过 TypeScript AST 检查上述导入规则；不能通过转导出官方类型绕过边界。
+1. `bin/dsh-tui.js` 调用启动器，定位当前安装的 dsh，不搜索全局 PATH。
+2. 专用 profile 组合官方 `dsh-base` 与当前 TUI bundle，并链接到当前 npm 安装。用户 patch 继续保留。
+3. `dsh-adapter/plugin.ts` 创建或恢复 agent，装配宿主服务、审批问答与工作台。
+4. 工作台接收按输入、会话、设置、消息、页面服务分开的能力端口，不接收完整可写客户端对象。
+5. 输入经宿主服务送入 dsh；持久化事件和临时流式帧被翻译，再进入消息投影，通知界面渲染。
+6. 用户退出先恢复终端再清理宿主；插件卸载只释放当前实例。
 
-## 状态和生命周期
+持久化 transcript 始终是事实来源。事件顺序、序列锚点、工具调用 ID、绑定 generation、输入 FIFO 和释放事务继续保留。
 
-- agent、工具执行、权限策略和持久化由 dsh 负责。客户端不注册替代内核，也不自行维护另一份事实存储。
-- transcript 中的事件顺序、序列锚点和 tool call ID 必须保留。实时增量是临时展示，最终与持久化结算对齐。
-- 草稿、菜单、展开、通知等由客户端维护；消息投影与文件存储不混合。
-- 会话绑定以对象身份和递增 generation 隔离异步操作。切换或卸载后的回调不得写入新会话。
-- 资源清理通过统一 owner 注册；准备、采用和释放会话仍保留已有事务保护。
-- 其他 dsh 插件的普通工具结果通过通用工具展示路径呈现。暂无面板、快捷键等第三方界面扩展 API。
+## 当前迁移边界
 
-## 已移除的历史结构
+本批完成了功能目录、公开入口、组件端口以及输入、消息列表、服务商向导的主要拆分。旧 `src/app/`、`src/tui/`、`src/utils/` 实现已迁移，不保留另一套平行实现。
 
-多后端安装与注册契约、跨后端身份、通用 capability 转发、`native.dsh` 逃逸通道、第二套会话打开/历史恢复与活动投影、启动时下载安装副本、自更新和救援 profile 均已删除。现有消息与输入正确性保护、会话数据格式和渲染器主体保留。
+**完整重构计划仍未全部完成。** `dsh-adapter/runtime/` 内部仍保留装配用的聚合状态；频道仍承担部分会话、任务和子代理编排。下一阶段需要让各模块真正拥有独立状态和通知，再进一步收窄宿主接线。当前不能把目录迁移等同于状态所有权已全部解耦。
 
-新增功能时：先确认 dsh 是否已提供所需服务；适配调用放在 `dsh-adapter`，客户端流程与数据契约放在 `app`，显示和按键交互放在 `tui`。不为未出现的其他内核或界面插件建立通用框架。
+`pnpm verify` 默认串行运行检查，避免同时启动多个渲染和图片测试。涉及终端的改动还需窄 TTY 验证，打包另运行 `pnpm verify:package`。

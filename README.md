@@ -43,10 +43,13 @@ backup before linking the current installation. Other installed plugins remain.
 pnpm install --frozen-lockfile
 pnpm build
 pnpm verify
+node bin/dsh-tui.js
 ```
 
-Edit `src/`; `lib/` is generated. Tests include real kernel startup in a narrow
-POSIX PTY; these checks require Python 3 on macOS/Linux. Windows input protocol
+Edit `src/`; `lib/` is generated. Start with the feature entries under
+`src/modules/`; `contracts.ts` defines each module’s public types.
+`pnpm verify` runs checks sequentially to reduce CPU contention.
+Tests include real kernel startup in a narrow POSIX PTY; these checks require Python 3 on macOS/Linux. Windows input protocol
 checks run independently. Packaging runs the build automatically:
 
 ```sh
