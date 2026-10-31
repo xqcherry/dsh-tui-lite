@@ -24,7 +24,7 @@ function isTranscriptRow(value: object): boolean {
 
 type CopyEntry = { readonly value: object; readonly version: number; readonly dirtyRevision: number }
 
-export function createChannelReadView(check: (mutation: boolean) => void) {
+export function createChannelReadView(check: (mutation: boolean) => void, options: { trackedRows?: boolean } = {}) {
   let version = -1
   let copies = new WeakMap<object, CopyEntry>()
   function copy<T>(value: T, key = '', receiver?: object): T {
@@ -66,18 +66,19 @@ export function createChannelReadView(check: (mutation: boolean) => void) {
     // Transcript row identity is deliberately stable across unrelated channel
     // revisions. A dirty row gets a new detached copy; old snapshots remain
     // frozen and therefore cannot observe the backend mutation.
-    if (prior !== undefined && isTranscriptRow(value) && prior.dirtyRevision === dirtyRevision) return prior.value as T
+    if (options.trackedRows !== false && prior !== undefined && isTranscriptRow(value) && prior.dirtyRevision === dirtyRevision) return prior.value as T
     // The transcript container is marked on membership or row changes. When
     // no such mark occurred, activity/status versions retain the exact frozen
     // array rather than visiting historical rows again.
     if (
       prior !== undefined &&
+      options.trackedRows !== false &&
       Array.isArray(value) &&
       (value.length === 0 || (value[0] !== null && typeof value[0] === 'object' && isTranscriptRow(value[0]))) &&
       (prior.value as unknown[]).length === value.length &&
       prior.dirtyRevision === dirtyRevision
     ) return prior.value as T
-    if (prior !== undefined && !isTranscriptRow(value) && prior.version === version) return prior.value as T
+    if (prior !== undefined && (!isTranscriptRow(value) || options.trackedRows === false) && prior.version === version) return prior.value as T
     if (value instanceof Map) {
       const entries = new Map([...value].map(([k, v]) => [copy(k), copy(v)]))
       const view: ReadonlyMap<unknown, unknown> = Object.freeze({
