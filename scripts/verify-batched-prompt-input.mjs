@@ -14,8 +14,8 @@ import './lib/fake-home.mjs'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
 import xtermHeadless from '@xterm/headless'
-import { render } from '../lib/types/tui/primitives.js'
-import { PromptInput } from '../lib/types/tui/components/PromptInput.js'
+import { render } from '../lib/types/ui/primitives.js'
+import { PromptInput } from '../lib/types/modules/composer/ui/PromptInput.js'
 import { settled, sleep, viewportLines } from './lib/term-test.mjs'
 
 const { Terminal: XTerm } = xtermHeadless

@@ -38,8 +38,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
-import type { LocalCommand } from '../../app/commands/catalog.js'
-import type { AgentCapabilities, CommandCapability } from '../../app/contracts/channel-capabilities.js'
+import type { LocalCommand } from '../../shared/commands.js'
+import type { AgentCapabilities, CommandCapability } from '../../shared/protocol/agent-capabilities.js'
 import { presetHidesHostAskTool, runningPresetOf, serviceForAgent } from '../presets.js'
 
 /** The exact service surface `compaction` evidence requires. */

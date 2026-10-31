@@ -1,7 +1,7 @@
 import {
   type StreamChunk
 } from '@deepseek-ai/dsh-llm'
-import { emptyTokenUsage, estimateTokens } from '../../app/transcript/usage.js'
+import { emptyTokenUsage, estimateTokens } from '../../modules/transcript/index.js'
 
 // The neutral helpers live with the shared projector (src/channel/usage.ts);
 // re-exported here for the existing importers.

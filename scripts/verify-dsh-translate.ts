@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AgentEvent } from '../src/app/session/events.js'
+import type { AgentEvent } from '../src/shared/protocol/events.js'
 import { createDshTranslator, dshPricingWindow } from '../src/dsh-adapter/backend/translate.js'
 import { FIXTURE_DIR, buildFixtures } from './fixtures/dsh/generate.js'
 import { createProjectorHarness } from './lib/projector-harness.js'

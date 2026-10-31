@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { extname, isAbsolute, join } from 'node:path'
-import { extractMentions } from '../../utils/mentions.js'
+import { extractMentions } from '../../shared/platform/mentions.js'
 import { COMPOSER_IMAGE_TOKEN } from './composer-images.js'
 import { basename } from './paths.js'
 import type { MentionAttachments, MentionExpansion, MentionFs, MentionImageBlock, MentionImageMediaType, ResolvedMention } from './types.js'

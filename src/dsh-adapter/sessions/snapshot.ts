@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
-import { DATA_DIR } from '../../utils/paths.js'
+import { DATA_DIR } from '../../shared/platform/paths.js'
 import type { SessionSource } from './list.js'
 import type { SessionSummary } from './types.js'
 

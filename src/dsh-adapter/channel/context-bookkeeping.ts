@@ -1,4 +1,4 @@
-import type { ContextOccupancy } from '../../app/contracts/session-view.js'
+import type { ContextOccupancy } from '../../shared/protocol/session.js'
 import type { ComposerImageRef, PendingMessage } from './types.js'
 
 /** Small mutable cells for Channel-local warning and pending-message state. */

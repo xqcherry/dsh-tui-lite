@@ -68,16 +68,16 @@ if (process.env.DSH_VERIFY_IMAGE_SPLIT_SHARP === '1') {
     write(join(hostSession, 'package.json'), '{"name":"@deepseek-ai/dsh-session"}')
     mkdirSync(join(profile, 'node_modules/@deepseek-ai'), { recursive: true })
     symlinkSync(hostSession, join(profile, 'node_modules/@deepseek-ai/dsh-session'), 'junction')
-    for (const file of ['utils/sharp.ts', 'utils/imageResize.ts']) {
+    for (const file of ['shared/platform/sharp.ts', 'shared/platform/imageResize.ts']) {
       const target = join(profile, 'src', file)
       mkdirSync(dirname(target), { recursive: true })
       copyFileSync(new URL(`../src/${file}`, import.meta.url), target)
     }
-    const { loadSharp, sharpCandidatePaths } = await import(pathToFileURL(join(profile, 'src/utils/sharp.ts')).href)
+    const { loadSharp, sharpCandidatePaths } = await import(pathToFileURL(join(profile, 'src/shared/platform/sharp.ts')).href)
     assert.deepEqual(sharpCandidatePaths(), [host, profile].map(tree => join(tree, 'node_modules/sharp/index.js')))
     const shared = await loadSharp()
     assert.equal(typeof shared, 'function')
-    const { adaptImageForAdmission } = await import(pathToFileURL(join(profile, 'src/utils/imageResize.ts')).href)
+    const { adaptImageForAdmission } = await import(pathToFileURL(join(profile, 'src/shared/platform/imageResize.ts')).href)
     const outcomes = await Promise.all([
       adaptImageForAdmission(png, 'image/png', { maxImageDimension: 6, maxImagePixels: 24 }, ['image/png']),
       adaptImageForAdmission(png, 'image/png', { maxImageDimension: 12, maxImagePixels: 96 }, ['image/jpeg']),
@@ -105,9 +105,9 @@ if (NO_SHARP) {
   register(new URL('./verify-image-downsample-nosharp-hook.mjs', import.meta.url).href)
 }
 
-const { probeImageSize, adaptImageForAdmission } = await import('../src/utils/imageResize.js')
+const { probeImageSize, adaptImageForAdmission } = await import('../src/shared/platform/imageResize.js')
 const { createComposerImages } = await import('../src/dsh-adapter/channel/composer-images.js')
-import type { StagedImageHandle } from '../src/app/contracts/composer-view.js'
+import type { StagedImageHandle } from '../src/shared/protocol/composer.js'
 
 const LIMITS = { maxImageDimension: 1024, maxImagePixels: 1_048_576 }
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']

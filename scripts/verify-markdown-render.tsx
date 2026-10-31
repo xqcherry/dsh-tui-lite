@@ -26,12 +26,12 @@ const [
   import('react'),
   import('../src/ink/render-to-screen.js'),
   import('../src/ink/screen.js'),
-  import('../src/utils/stringWidth.js'),
+  import('../src/shared/platform/stringWidth.js'),
   import('../src/ink/components/TerminalSizeContext.js'),
-  import('../src/tui/primitives.js'),
-  import('../src/tui/components/Markdown.js'),
-  import('../src/tui/components/StreamingMarkdown.js'),
-  import('../src/tui/components/CodeBlockFrame.js'),
+  import('../src/ui/primitives.js'),
+  import('../src/ui/Markdown.js'),
+  import('../src/ui/StreamingMarkdown.js'),
+  import('../src/ui/CodeBlockFrame.js'),
   import('../src/ink/selection.js'),
 ])
 const assert = assertModule.default

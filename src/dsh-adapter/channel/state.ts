@@ -1,5 +1,5 @@
-import type { SessionModeSpec } from '../../app/session/modes.js'
-import type { ClientLaunchOptions } from '../../app/state/initial-state.js'
+import type { SessionModeSpec } from '../../modules/sessions/contracts.js'
+import type { ClientLaunchOptions } from '../runtime/initial-state.js'
 import type { ContextPressureSource } from '../context-occupancy.js'
 
 /** Launch configuration belongs to channel construction, not the composition root. */

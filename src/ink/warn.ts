@@ -1,4 +1,4 @@
-import { logForDebugging } from '../utils/debug.js'
+import { logForDebugging } from '../shared/platform/debug.js'
 
 /**
  * Log a warning when a value is present but not an integer.

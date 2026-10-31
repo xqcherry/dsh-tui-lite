@@ -1,5 +1,5 @@
-import type { SessionSummary, SessionTitle } from '../../app/contracts/channel-session.js'
-export type { PreviewEntry, SessionKind, SessionSummary, SessionTitle, TitleSource } from '../../app/contracts/channel-session.js'
+import type { SessionSummary, SessionTitle } from '../../shared/protocol/session-catalog.js'
+export type { PreviewEntry, SessionKind, SessionSummary, SessionTitle, TitleSource } from '../../shared/protocol/session-catalog.js'
 
 /**
  * Facts a bounded read can recover from one session log.

@@ -1,5 +1,5 @@
 import { isAbsolute, join } from 'node:path'
-import { extractMentions } from '../../utils/mentions.js'
+import { extractMentions } from '../../shared/platform/mentions.js'
 import { COMPOSER_IMAGE_TOKEN } from './composer-images.js'
 import {
   MENTION_MAX_DIR_ENTRIES,

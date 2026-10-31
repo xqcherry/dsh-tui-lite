@@ -29,9 +29,9 @@
  *     closed exactly once on every path.
  */
 import { SESSION_FORMAT_VERSION, type SessionEvent } from '@deepseek-ai/dsh-session'
-import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../app/session/capabilities.js'
-import type { AgentEvent, AgentEventOf } from '../../app/session/events.js'
-import { textOfBlocks } from '../../app/transcript/projection.js'
+import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../shared/protocol/session-capabilities.js'
+import type { AgentEvent, AgentEventOf } from '../../shared/protocol/events.js'
+import { textOfBlocks } from '../../modules/transcript/index.js'
 import type { DshTranslator } from '../backend/translate.js'
 import type { SubagentsServiceView } from './subagent-projection.js'
 import { toolErrorText } from './transcript.js'

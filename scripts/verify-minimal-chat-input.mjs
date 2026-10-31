@@ -10,11 +10,12 @@ import assert from 'node:assert/strict'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
 import xtermHeadless from '@xterm/headless'
-import { Chat } from '../src/tui/screens/Chat.js'
-import { QuestionStore } from '../src/app/interaction/questions.js'
-import { LOCAL_COMMANDS } from '../src/app/commands/catalog.js'
-import { appendHistory } from '../src/app/input/history.js'
-import { render } from '../src/tui/primitives.js'
+import { createWorkbenchPorts } from '../src/dsh-adapter/runtime/ports.js'
+import { Chat } from '../src/modules/workbench/ui/Chat.js'
+import { QuestionStore } from '../src/modules/decisions/model/questions.js'
+import { LOCAL_COMMANDS } from '../src/shared/commands.js'
+import { appendHistory } from '../src/modules/composer/model/history.js'
+import { render } from '../src/ui/primitives.js'
 import { settled, sleep, viewportLines } from './lib/term-test.mjs'
 
 const { Terminal: XTerm } = xtermHeadless
@@ -82,7 +83,7 @@ async function fixture(options = {}) {
     decide(outcome) { decisions.push(outcome); approval = null; for (const listener of approvals) listener() },
   }
   const instance = await render(React.createElement(Chat, {
-    channel, questionStore, approvalStore,
+    ports: createWorkbenchPorts(channel), questionStore, approvalStore,
     initialPrompt: options.initialPrompt,
     modelConfigured: () => configurationProbe(),
     onExit() { exits++ },

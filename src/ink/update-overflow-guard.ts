@@ -24,7 +24,7 @@
  * rethrow unchanged.
  */
 
-import { logError } from '../utils/log.js'
+import { logError } from '../shared/platform/log.js'
 
 /** Message fragments that identify the nested-update overflow error. */
 const OVERFLOW_MARKERS = ['Minified React error #185', 'Maximum update depth'] as const

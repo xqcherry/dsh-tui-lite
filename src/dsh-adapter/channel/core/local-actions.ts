@@ -7,9 +7,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-import { t } from '../../../app/i18n.js'
-import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
-import { markChannelReadDirty } from '../../../app/state/read-view.js'
+import { t } from '../../../shared/i18n.js'
+import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
+import { markChannelReadDirty } from '../../../shared/state/read-view.js'
 import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
 import type { ChannelBinding } from '../binding.js'
 import { LOCAL_OUTPUT_LIMIT, preview } from '../transcript.js'

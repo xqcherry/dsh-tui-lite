@@ -1,9 +1,9 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { markChannelReadDirty } from '../../app/state/read-view.js'
-import { ARGS_PREVIEW_LIMIT, LOCAL_OUTPUT_LIMIT, MAX_ROWS, preview, RESULT_PREVIEW_LIMIT } from '../../app/transcript/transcript.js'
+import { markChannelReadDirty } from '../../shared/state/read-view.js'
+import { ARGS_PREVIEW_LIMIT, LOCAL_OUTPUT_LIMIT, MAX_ROWS, preview, RESULT_PREVIEW_LIMIT } from '../../modules/transcript/index.js'
 import { toolResultPayload } from '../compat/messages.js'
 import type { ChatRow, ToolResultView, ToolViewPresenter } from './types.js'
-export { foldRows } from '../../app/transcript/window.js'
+export { foldRows } from '../../modules/transcript/index.js'
 export { ARGS_PREVIEW_LIMIT, LOCAL_OUTPUT_LIMIT, MAX_ROWS, preview, RESULT_PREVIEW_LIMIT }
 
 /**

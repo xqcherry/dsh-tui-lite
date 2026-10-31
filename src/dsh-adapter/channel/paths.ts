@@ -1,6 +1,6 @@
 import { join } from 'node:path'
-import { rankFileCandidates, type FileCandidate } from '../../utils/fileSuggestions.js'
-import { homeDir } from '../../utils/paths.js'
+import { rankFileCandidates, type FileCandidate } from '../../shared/platform/file-suggestions.js'
+import { homeDir } from '../../shared/platform/paths.js'
 import type { FileSuggestionFs } from './types.js'
 
 /** Trailing path segment (`C:/a/b` → `b`). */
@@ -74,7 +74,7 @@ export async function listPathCandidates(fs: FileSuggestionFs, cwd: string, quer
   // into `/` paths and makes completion mutate otherwise valid input.
   const rawSlash = Math.max(query.lastIndexOf('/'), query.lastIndexOf('\\'))
   // `.` / `..` without a trailing separator are whole-directory queries too.
-  const bareDir = slash < 0 && (normalized === '.' || normalized === '..' || normalized === '~')
+  const bareDir = slash < 0 && (normalized === '../channel.ts' || normalized === '..' || normalized === '~')
   const directoryPart = slash < 0 ? (bareDir ? `${normalized}/` : '') : normalized.slice(0, slash + 1)
   const displayDirectoryPart = rawSlash < 0 ? (bareDir ? `${query}/` : '') : query.slice(0, rawSlash + 1)
   const displaySeparator = displayDirectoryPart.endsWith('\\') ? '\\' : '/'
@@ -85,7 +85,7 @@ export async function listPathCandidates(fs: FileSuggestionFs, cwd: string, quer
     ? `${homeDir()}/`
     : directoryPart.startsWith('/') || /^[A-Za-z]:\//.test(directoryPart)
       ? directoryPart
-      : join(cwd, directoryPart || '.')
+      : join(cwd, directoryPart || '../channel.ts')
   try {
     if (signal?.aborted) return []
     const target = await fs.resolve(expanded)

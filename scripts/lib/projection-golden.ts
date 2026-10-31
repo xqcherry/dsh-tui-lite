@@ -38,9 +38,9 @@ const CLOCK_BASE = Date.UTC(2026, 0, 5, 0, 0, 0)
 let clock = CLOCK_BASE
 Date.now = () => clock++
 
-const { createChannelProjection } = await import('../../src/app/transcript/projection.js')
+const { createChannelProjection } = await import('../../src/modules/transcript/model/projection.js')
 const { createDshTranslator, dshPricingWindow } = await import('../../src/dsh-adapter/backend/translate.js')
-const { createInitialChannelView } = await import('../../src/app/state/initial-state.js')
+const { createInitialChannelView } = await import('../../src/dsh-adapter/runtime/initial-state.js')
 const { FIXTURE_DIR, buildFixtures, staleFixtureFiles } = await import('../fixtures/dsh/generate.js')
 
 type Translator = ReturnType<typeof createDshTranslator>

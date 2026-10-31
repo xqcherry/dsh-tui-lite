@@ -1,17 +1,18 @@
 import type { Context } from '@deepseek-ai/cordis'
 import React from 'react'
-import { createExitFunnel, runCrashExit } from '../app/lifecycle/exit.js'
-import { readEffortPref } from '../app/preferences/effortPrefs.js'
-import { readModelPref } from '../app/preferences/modelPrefs.js'
-import { resumeTargetFromArgv, writeResumeTarget } from '../app/session/sessionHistory.js'
-import { explicitModelRoute, resolveModelRoute } from '../app/settings/modelRoute.js'
+import { createExitFunnel, runCrashExit } from '../shared/lifecycle/exit.js'
+import { readEffortPref } from '../modules/settings/index.js'
+import { readModelPref } from '../modules/settings/index.js'
+import { resumeTargetFromArgv, writeResumeTarget } from '../modules/sessions/index.js'
+import { explicitModelRoute, resolveModelRoute } from '../modules/settings/index.js'
 import { registerProcessGuardFatalSink } from '../ink/update-overflow-guard.js'
-import { finishExit } from '../tui/lifecycle/shutdown.js'
-import { render } from '../tui/primitives.js'
-import { Chat } from '../tui/screens/Chat.js'
-import { appendCrashLog } from '../utils/crashDetail.js'
-import { logForDebugging } from '../utils/debug.js'
-import { resolveSessionCwd } from '../utils/workspaceRoot.js'
+import { finishExit } from '../terminal/shutdown.js'
+import { render } from '../terminal/index.js'
+import { createWorkbenchPorts } from './runtime/ports.js'
+import { Chat } from '../modules/workbench/index.js'
+import { appendCrashLog } from '../shared/platform/crashDetail.js'
+import { logForDebugging } from '../shared/platform/debug.js'
+import { resolveSessionCwd } from '../shared/platform/workspaceRoot.js'
 import { resolveAgent } from './agent-lifecycle.js'
 import { ApprovalStore } from './approvals.js'
 import { createDshSession } from './backend/session.js'
@@ -131,7 +132,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const prompt = initialPromptFromCmdlineArgs(args)
   const ready = prompt ? await modelConfigured().catch(() => false) : false
   const tree = React.createElement(Chat, {
-    channel,
+    ports: createWorkbenchPorts(channel),
     questionStore,
     approvalStore: approvals,
     modelConfigured,

@@ -1,9 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
-import type { ChannelSelection, SelectionAttachment } from '../../app/contracts/composer-view.js'
-import { t } from '../../app/i18n.js'
-import type { ChannelOwner } from '../../app/lifecycle/owner.js'
-import { logForDebugging } from '../../utils/debug.js'
+import type { ChannelSelection, SelectionAttachment } from '../../shared/protocol/composer.js'
+import { t } from '../../shared/i18n.js'
+import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
+import { logForDebugging } from '../../shared/platform/debug.js'
 import type { DshSession as AgentSession } from '../backend/session.js'
 import {
   firstStaleComposerToken,

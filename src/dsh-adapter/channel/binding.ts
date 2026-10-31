@@ -1,5 +1,5 @@
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
-import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from '../backend/session.js'
 
 export interface BindingCapture {

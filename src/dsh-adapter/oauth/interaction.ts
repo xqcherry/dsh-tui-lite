@@ -28,7 +28,7 @@
  */
 
 import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
-import { t } from '../../app/i18n.js'
+import { t } from '../../shared/i18n.js'
 import { copyToClipboard, openInBrowser } from './opener.js'
 import type { PiAiAuthEvent, PiAiAuthInteraction, PiAiAuthPrompt } from './pi-ai.js'
 

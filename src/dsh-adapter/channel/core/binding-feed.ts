@@ -1,9 +1,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { InputConvergence } from '../../../app/input/actions.js'
-import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
-import type { AgentEvent, AgentEventMeta, AgentEventOf } from '../../../app/session/events.js'
-import { createChannelProjection, type ChannelProjection, type ChannelProjectionDeps } from '../../../app/transcript/projection.js'
+import type { InputConvergence } from '../../../modules/composer/contracts.js'
+import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
+import type { AgentEvent, AgentEventMeta, AgentEventOf } from '../../../shared/protocol/events.js'
+import { createChannelProjection, type ChannelProjection, type ChannelProjectionDeps } from '../../../modules/transcript/index.js'
 import type { BindingCapture, ChannelBinding } from '../binding.js'
 import type { ChannelState } from '../types.js'
 

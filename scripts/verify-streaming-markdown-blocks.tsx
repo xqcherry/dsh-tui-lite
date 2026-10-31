@@ -12,10 +12,10 @@ import type { Frame } from '../src/ink/frame.js'
 import type { Screen } from '../src/ink/screen.js'
 
 const [React, { marked }, { Box, Text }, { Markdown }, { StreamingMarkdown }, { MarkdownTable }, { CodeBlockFrame }, { configureMarked, formatToken }, { renderToScreen }, { cellAtIndex }, { TerminalSizeContext }] = await Promise.all([
-  import('react'), import('marked'), import('../src/tui/primitives.js'),
-  import('../src/tui/components/Markdown.js'), import('../src/tui/components/StreamingMarkdown.js'),
-  import('../src/tui/components/MarkdownTable.js'), import('../src/tui/components/CodeBlockFrame.js'),
-  import('../src/tui/terminal-utils/markdown.js'),
+  import('react'), import('marked'), import('../src/ui/primitives.js'),
+  import('../src/ui/Markdown.js'), import('../src/ui/StreamingMarkdown.js'),
+  import('../src/ui/MarkdownTable.js'), import('../src/ui/CodeBlockFrame.js'),
+  import('../src/ui/text/markdown.js'),
   import('../src/ink/render-to-screen.js'), import('../src/ink/screen.js'),
   import('../src/ink/components/TerminalSizeContext.js'),
 ])
@@ -97,7 +97,7 @@ for (const width of [55, 100]) {
 }
 
 const [{ PassThrough, Writable }, { render }, { default: instances }, { settled }, { scanPositions }] = await Promise.all([
-  import('node:stream'), import('../src/tui/primitives.js'), import('../src/ink/instances.js'),
+  import('node:stream'), import('../src/ui/primitives.js'), import('../src/ink/instances.js'),
   import('./lib/term-test.mjs'), import('../src/ink/render-to-screen.js'),
 ])
 class Input extends PassThrough {

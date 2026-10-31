@@ -35,7 +35,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { ContextOccupancy } from '../app/contracts/session-view.js'
+import type { ContextOccupancy } from '../shared/protocol/session.js'
 // The registry duck type is declared beside the activity feed, which reads the
 // same host service; one structural declaration serves both readers.
 import type { ProjectionRegistryLike } from './activity-store.js'

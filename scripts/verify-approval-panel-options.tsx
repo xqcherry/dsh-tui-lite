@@ -38,12 +38,12 @@ const [
   import('node:stream'),
   import('react'),
   import('@xterm/headless'),
-  import('../src/tui/primitives.js'),
-  import('../src/tui/components/approvals/ApprovalPanel.js'),
+  import('../src/ui/primitives.js'),
+  import('../src/modules/decisions/ui/ApprovalPanel.js'),
   import('./lib/term-test.mjs'),
-  import('../src/app/i18n.js'),
+  import('../src/shared/i18n.js'),
 ])
-import type { PermissionPanelDecision, PermissionPanelOutcome, PermissionPanelSnapshot } from '../src/app/interaction/permissions.js'
+import type { PermissionPanelDecision, PermissionPanelOutcome, PermissionPanelSnapshot } from '../src/modules/decisions/model/permissions.js'
 
 let passed = 0
 const check = (label: string, ok: boolean, detail?: unknown): void => {

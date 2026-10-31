@@ -1,4 +1,4 @@
-import { completeTuiCommands, isCommandCompletionToken, type CommandCompletionNode } from '../../app/commands/catalog.js'
+import { completeTuiCommands, isCommandCompletionToken, type CommandCompletionNode } from '../../shared/commands.js'
 import type { ChannelState } from './types.js'
 
 /** Complete only supported chat controls and host commands. */

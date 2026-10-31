@@ -1,4 +1,4 @@
-import { t } from '../../app/i18n.js'
+import { t } from '../../shared/i18n.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { foldBack as FoldBack } from './transcript.js'
 import type { ChannelState, ToolViewPresenter } from './types.js'

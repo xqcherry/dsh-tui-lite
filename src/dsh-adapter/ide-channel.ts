@@ -35,8 +35,8 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { normalizeIdePath } from '../app/session/ide-path.js'
-import { DATA_DIR } from '../utils/paths.js'
+import { normalizeIdePath } from '../shared/platform/ide-path.js'
+import { DATA_DIR } from '../shared/platform/paths.js'
 
 /** Env var carrying the extension's loopback WS port (spawn-injected). */
 export const IDE_PORT_ENV = 'DSH_TUI_IDE_PORT'
@@ -156,7 +156,7 @@ export function parseHelloAck(message: unknown): {
  * case-insensitive (same semantics as channel.ts normalizeCwd — sessions.ts
  * precedent). Exported so verifiers can pin the Windows behavior.
  */
-export { normalizeIdePath } from '../app/session/ide-path.js'
+export { normalizeIdePath } from '../shared/platform/ide-path.js'
 
 function platformCaseInsensitive(): boolean {
   return process.platform === 'win32' || process.platform === 'darwin'

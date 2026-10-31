@@ -1,10 +1,10 @@
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
-import type { SubagentOutputKind, SubagentOutputLine, SubagentState, SubagentStatus, SubagentToolCall } from '../app/contracts/subagent-view.js'
-import type { CostTokenBuckets, SubagentCostEntry } from '../app/contracts/transcript-view.js'
-import { addUsageToCostBuckets, cloneCostBuckets, emptyCostBuckets, isDeepSeekOfficialProvider, isPeakHour, priceForModel } from '../app/transcript/pricing.js'
+import type { SubagentOutputKind, SubagentOutputLine, SubagentState, SubagentStatus, SubagentToolCall } from '../shared/protocol/subagents.js'
+import type { CostTokenBuckets, SubagentCostEntry } from '../shared/protocol/transcript.js'
+import { addUsageToCostBuckets, cloneCostBuckets, emptyCostBuckets, isDeepSeekOfficialProvider, isPeakHour, priceForModel } from '../modules/transcript/index.js'
 import { toolResultPayload } from './compat/messages.js'
-export type { SubagentOutputKind, SubagentOutputLine, SubagentState, SubagentStatus, SubagentTokenUsage, SubagentToolCall } from '../app/contracts/subagent-view.js'
-export type { SubagentCostEntry } from '../app/contracts/transcript-view.js'
+export type { SubagentOutputKind, SubagentOutputLine, SubagentState, SubagentStatus, SubagentTokenUsage, SubagentToolCall } from '../shared/protocol/subagents.js'
+export type { SubagentCostEntry } from '../shared/protocol/transcript.js'
 
 const MAX_OUTPUT_EVENTS = 160
 const MAX_OUTPUT_LINES = 160

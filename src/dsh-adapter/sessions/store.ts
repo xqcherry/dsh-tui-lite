@@ -29,7 +29,7 @@
  */
 import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DATA_DIR } from '../../utils/paths.js'
+import { DATA_DIR } from '../../shared/platform/paths.js'
 import type { TitleSource } from './types.js'
 
 /**

@@ -1,4 +1,4 @@
-import { stringWidth } from '../utils/stringWidth.js'
+import { stringWidth } from '../shared/platform/stringWidth.js'
 
 /**
  * Slice a string to at most `maxWidth` terminal cells, walking by code

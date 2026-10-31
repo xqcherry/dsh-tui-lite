@@ -8,8 +8,8 @@
  * completion lists them like any other entry.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { CommandCompletionNode } from '../../../app/commands/catalog.js'
-import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
+import type { CommandCompletionNode } from '../../../shared/commands.js'
+import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import type { ChannelBinding } from '../binding.js'
 import { createCommandCompletions } from '../command-completions.js'
 import { createFileActions } from '../file-actions.js'

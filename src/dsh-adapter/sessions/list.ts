@@ -18,7 +18,7 @@
  * @module @deepseek-harness-tui/dsh-tui/sessions/list
  */
 import { basename } from 'node:path'
-import { readLastUsed } from '../../app/session/sessionHistory.js'
+import { readLastUsed } from '../../modules/sessions/index.js'
 import { findSessionLogFile, resolveLocatedPath } from '../compat/sessionLog.js'
 import {
   digestAppendedSuffix,

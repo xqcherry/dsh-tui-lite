@@ -6,8 +6,8 @@
  */
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { t } from '../../../app/i18n.js'
-import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
+import { t } from '../../../shared/i18n.js'
+import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from '../../backend/session.js'
 import type { ChannelBinding } from '../binding.js'
 import type { ChannelState, ChatRow } from '../types.js'

@@ -1,13 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { isCommandCompletionToken } from '../../app/commands/catalog.js'
+import { isCommandCompletionToken } from '../../shared/commands.js'
 import {
   canonicalPresetFor,
   permissionCycleEntry,
   permissionModeSpec,
   stablePermissionRosterOrder,
   type SessionModeSpec,
-} from '../../app/session/modes.js'
+} from '../../modules/sessions/index.js'
 import {
   permissionBundlesFromService,
   permissionPresetSnapshotFromService,

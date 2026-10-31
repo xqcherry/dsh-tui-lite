@@ -32,9 +32,9 @@ const [{ default: React }, xtermModule, { render }, { PromptInput }, { t }] =
   await Promise.all([
     import('react'),
     import('@xterm/headless'),
-    import('../lib/types/tui/primitives.js'),
-    import('../lib/types/tui/components/PromptInput.js'),
-    import('../lib/types/app/i18n.js'),
+    import('../lib/types/ui/primitives.js'),
+    import('../lib/types/modules/composer/ui/PromptInput.js'),
+    import('../lib/types/shared/i18n.js'),
   ])
 const { Terminal: XTerm } = xtermModule.default ?? xtermModule
 

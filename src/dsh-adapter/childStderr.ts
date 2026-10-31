@@ -27,7 +27,7 @@
  */
 
 import childProcess from 'node:child_process'
-import { t } from '../app/i18n.js'
+import { t } from '../shared/i18n.js'
 
 /** Strip ANSI escape sequences (CSI/OSC) so raw child output can't inject
  *  cursor moves or colors into the notification area. */

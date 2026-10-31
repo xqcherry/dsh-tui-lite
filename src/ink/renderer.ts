@@ -1,4 +1,4 @@
-import { logForDebugging } from '../utils/debug.js'
+import { logForDebugging } from '../shared/platform/debug.js'
 import { type DOMElement, markDirty, scheduleRenderFrom } from './dom.js'
 import type { Frame } from './frame.js'
 import { invalidateNoInterestRect } from './hit-test.js'

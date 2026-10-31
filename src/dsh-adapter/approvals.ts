@@ -28,7 +28,7 @@ import {
   type PermissionPanelOutcome,
   type PermissionPanelSnapshot,
   type PermissionPanelSource,
-} from '../app/interaction/permissions.js'
+} from '../modules/decisions/index.js'
 import { snapshotLiveSessionEvents } from './compat/liveSession.js'
 
 /** What the TUI renders while an approval is pending (the shared panel

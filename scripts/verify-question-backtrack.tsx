@@ -30,10 +30,10 @@ const [
   import('node:stream'),
   import('react'),
   import('@xterm/headless'),
-  import('../src/tui/primitives.js'),
-  import('../src/tui/components/questions/AskUserQuestionPanel.js'),
+  import('../src/ui/primitives.js'),
+  import('../src/modules/decisions/ui/AskUserQuestionPanel.js'),
   import('../src/dsh-adapter/questions.js'),
-  import('../src/app/transcript/question-record.js'),
+  import('../src/modules/transcript/model/question-record.js'),
   import('./lib/term-test.mjs'),
 ])
 

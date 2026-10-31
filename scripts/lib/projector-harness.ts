@@ -8,9 +8,9 @@
  *
  * Import from TypeScript scripts run with `node --import tsx/esm`.
  */
-import type { AgentEvent } from '../../src/app/session/events.js'
-import { createChannelProjection } from '../../src/app/transcript/projection.js'
-import { createInitialChannelView } from '../../src/app/state/initial-state.js'
+import type { AgentEvent } from '../../src/shared/protocol/events.js'
+import { createChannelProjection } from '../../src/modules/transcript/model/projection.js'
+import { createInitialChannelView } from '../../src/dsh-adapter/runtime/initial-state.js'
 
 type ProjectionArgs = Parameters<typeof createChannelProjection>
 

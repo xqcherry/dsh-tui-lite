@@ -62,7 +62,7 @@ import {
 import { createRequire } from 'node:module'
 import { dirname, join, sep } from 'node:path'
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
-import { homeDir } from '../../utils/paths.js'
+import { homeDir } from '../../shared/platform/paths.js'
 
 /**
  * Legacy third-party session-event types the TUI vouches for as ephemeral

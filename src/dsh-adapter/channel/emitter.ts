@@ -1,5 +1,5 @@
 /** One owner for synchronous versions and frame-coalesced renderer wakeups. */
-import { foldRows, MAX_ROWS } from '../../app/transcript/window.js'
+import { foldRows, MAX_ROWS } from '../../modules/transcript/index.js'
 import { swallowNestedUpdateOverflow } from '../../ink/update-overflow-guard.js'
 import type { ChannelState, ChatRow } from './types.js'
 

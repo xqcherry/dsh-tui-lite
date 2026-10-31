@@ -96,8 +96,8 @@ import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import {
   deriveKeyRef,
   runProviderWizard,
-} from '../lib/types/app/settings/providerWizard.js'
-import { t } from '../lib/types/app/i18n.js'
+} from '../lib/types/modules/settings/model/providerWizard.js'
+import { t } from '../lib/types/shared/i18n.js'
 
 let failed = 0
 function check(name, ok, extra = '') {

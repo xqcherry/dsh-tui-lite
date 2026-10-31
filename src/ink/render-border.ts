@@ -3,7 +3,7 @@ import cliBoxes, { type Boxes, type BoxStyle } from 'cli-boxes'
 import { applyColor, applyTextStyles } from './colorize.js'
 import type { DOMNode } from './dom.js'
 import type Output from './output.js'
-import { stringWidth } from '../utils/stringWidth.js'
+import { stringWidth } from '../shared/platform/stringWidth.js'
 import type { Color } from './styles.js'
 
 /** Options for embedding a text label into a border line. */

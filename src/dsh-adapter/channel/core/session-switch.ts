@@ -6,8 +6,8 @@
  * before their reservations are released; dsh resume has its own adoption path.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { t } from '../../../app/i18n.js'
-import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
+import { t } from '../../../shared/i18n.js'
+import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from '../../backend/session.js'
 import type { ChannelBinding } from '../binding.js'
 import type { ChannelState } from '../types.js'

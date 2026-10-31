@@ -15,7 +15,7 @@
 const { Context, Fiber } = await import('@deepseek-ai/cordis')
 const executeBeforeImport = Object.getOwnPropertyDescriptor(Fiber.prototype, '_execute')?.value
 await import('../src/dsh-adapter/plugin.js')
-const { createExitFunnel } = await import('../src/app/lifecycle/exit.js')
+const { createExitFunnel } = await import('../src/shared/lifecycle/exit.js')
 
 let failed = 0
 const check = (name: string, ok: boolean) => {

@@ -1,6 +1,6 @@
 /** Focused reset regression for L4 session adoption. */
 import assert from 'node:assert/strict'
-import { resetSessionProjection } from '../src/app/state/session-reset.js'
+import { resetSessionProjection } from '../src/modules/sessions/model/session-reset.js'
 
 const rows = [{ id: 1 }] as never[]
 const state = {

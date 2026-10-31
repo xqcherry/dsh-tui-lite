@@ -1,6 +1,6 @@
 /** Compose one dsh session with its client state and host services. */
 import type { Context } from '@deepseek-ai/cordis'
-import { createChannelOwner } from '../app/lifecycle/owner.js'
+import { createChannelOwner } from '../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from './backend/session.js'
 import { createCoreChannel } from './channel/core/compose.js'
 import { configureDshServices } from './channel/services.js'

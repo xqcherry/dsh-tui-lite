@@ -4,7 +4,7 @@ import { assembleContextFor } from '@deepseek-ai/dsh-agent'
 import { loadBaselineInstructions } from '@deepseek-ai/dsh-agent-instructions'
 import { isModelInvocable, type SkillSummary } from '@deepseek-ai/dsh-skill'
 import { renderContextSections, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
-import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
 import type { LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool } from './types.js'
 
 export type SkillRegistry = {

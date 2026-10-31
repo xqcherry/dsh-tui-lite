@@ -8,9 +8,9 @@ const [assertModule, React, { renderToScreen }, { cellAt }, { MarkdownTable }, {
   import('react'),
   import('../src/ink/render-to-screen.js'),
   import('../src/ink/screen.js'),
-  import('../src/tui/components/MarkdownTable.js'),
+  import('../src/ui/MarkdownTable.js'),
   import('../src/ink/components/TerminalSizeContext.js'),
-  import('../src/tui/terminal-utils/markdown.js'),
+  import('../src/ui/text/markdown.js'),
 ])
 const assert = assertModule.default
 

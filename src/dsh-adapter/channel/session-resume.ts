@@ -2,21 +2,21 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { randomUUID } from 'node:crypto'
-import { t } from '../../app/i18n.js'
-import type { ChannelOwner } from '../../app/lifecycle/owner.js'
-import { readModelPref } from '../../app/preferences/modelPrefs.js'
-import { migratePresetPref, readPresetPref } from '../../app/preferences/presetPrefs.js'
-import { mountFailureText } from '../../app/session/resumeFailure.js'
-import { clearResumeTarget, touchSession, writeResumeTarget } from '../../app/session/sessionHistory.js'
+import { t } from '../../shared/i18n.js'
+import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
+import { readModelPref } from '../../modules/settings/index.js'
+import { migratePresetPref, readPresetPref } from '../../modules/settings/index.js'
+import { mountFailureText } from '../../modules/sessions/index.js'
+import { clearResumeTarget, touchSession, writeResumeTarget } from '../../modules/sessions/index.js'
 import {
   occupancyOf,
   readSessionOwners,
   reserveMount,
   reserveNewSession,
   type MountReservation,
-} from '../../app/session/sessionMounts.js'
-import { explicitModelRoute, recordedModelRoute, resolveModelRoute, validateModelRoute } from '../../app/settings/modelRoute.js'
-import { resetSessionProjection } from '../../app/state/session-reset.js'
+} from '../../modules/sessions/index.js'
+import { explicitModelRoute, recordedModelRoute, resolveModelRoute, validateModelRoute } from '../../modules/settings/index.js'
+import { resetSessionProjection } from '../../modules/sessions/index.js'
 import type { DshSession as AgentSession } from '../backend/session.js'
 import { createDshSession, dshHandleOf } from '../backend/session.js'
 import { ensureLegacySessionEventTypes } from '../compat/index.js'

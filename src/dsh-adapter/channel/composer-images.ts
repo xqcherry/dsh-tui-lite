@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-import type { ChannelOwner } from '../../app/lifecycle/owner.js'
-import type { AdaptOutcome, ImageSizeProbe, ResizeLimits } from '../../utils/imageResize.js'
-import { adaptImageForAdmission, probeImageSize, withinDimensionLimits } from '../../utils/imageResize.js'
+import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
+import type { AdaptOutcome, ImageSizeProbe, ResizeLimits } from '../../shared/platform/imageResize.js'
+import { adaptImageForAdmission, probeImageSize, withinDimensionLimits } from '../../shared/platform/imageResize.js'
 import { rememberImagePath, transcriptImageFromAttachment } from '../transcript-images.js'
 import { mentionAttachments } from './mentions.js'
 import type {

@@ -1,8 +1,8 @@
 import { coerce } from 'semver'
 import type { Writable } from 'stream'
 import { appendFileSync } from 'node:fs'
-import { env } from '../utils/env.js'
-import { gte } from '../utils/semver.js'
+import { env } from '../shared/platform/env.js'
+import { gte } from '../shared/platform/semver.js'
 import { getClearTerminalSequence } from './clearTerminal.js'
 import type { Diff } from './frame.js'
 import {

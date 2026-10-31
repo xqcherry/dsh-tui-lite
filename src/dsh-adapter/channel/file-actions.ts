@@ -1,5 +1,5 @@
-import type { FileCandidate } from '../../utils/fileSuggestions.js'
-import { isPathLikeQuery, rankFileCandidates } from '../../utils/fileSuggestions.js'
+import type { FileCandidate } from '../../shared/platform/file-suggestions.js'
+import { isPathLikeQuery, rankFileCandidates } from '../../shared/platform/file-suggestions.js'
 import { listFilesDeepCandidates, listPathCandidates } from './paths.js'
 import type { MentionFs } from './types.js'
 

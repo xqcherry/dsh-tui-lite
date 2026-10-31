@@ -1,14 +1,14 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { RawTrajEvent } from '../../app/contracts/session-view.js'
-import type { ToolCallView, ToolResultView } from '../../app/contracts/transcript-view.js'
-export type { ComposerImageRef, ComposerSubmission, PendingMessage, StagedImageAdjustment, StagedImageHandle, StagedImageInput, TranscriptImage } from '../../app/contracts/composer-view.js'
-export type { JobControl, JobGroupRow, JobRow } from '../../app/contracts/job-view.js'
-export type { CredentialStatus, EffortOption, PermissionPresetAvailability, PermissionPresetCurrent, PermissionPresetOption, PermissionPresetSnapshot, PresetOption, SkillInfo } from '../../app/contracts/model-view.js'
-export type { AgentViewDispatchResult, AgentViewRow, AgentViewStatus, BackgroundResult, ChannelGoal, ExternalCommandOutcome, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, NotificationItem, ResumeResult, TodoPanelItem, TrajectorySource } from '../../app/contracts/session-view.js'
-export type { SubagentControl, SubagentRow, SubagentTranscriptView } from '../../app/contracts/subagent-view.js'
-export type { ChatRow, CostTokenBuckets, SessionCostByModel, SubagentCostEntry, TokenBucket, TokenUsage, ToolCallView, ToolFileDiff, ToolResultView, ToolRow } from '../../app/contracts/transcript-view.js'
-export type { ClientState as ChannelState } from '../../app/state/client-state.js'
+import type { RawTrajEvent } from '../../shared/protocol/session.js'
+import type { ToolCallView, ToolResultView } from '../../shared/protocol/transcript.js'
+export type { ComposerImageRef, ComposerSubmission, PendingMessage, StagedImageAdjustment, StagedImageHandle, StagedImageInput, TranscriptImage } from '../../shared/protocol/composer.js'
+export type { JobControl, JobGroupRow, JobRow } from '../../shared/protocol/jobs.js'
+export type { CredentialStatus, EffortOption, PermissionPresetAvailability, PermissionPresetCurrent, PermissionPresetOption, PermissionPresetSnapshot, PresetOption, SkillInfo } from '../../shared/protocol/models.js'
+export type { AgentViewDispatchResult, AgentViewRow, AgentViewStatus, BackgroundResult, ChannelGoal, ExternalCommandOutcome, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, NotificationItem, ResumeResult, TodoPanelItem, TrajectorySource } from '../../shared/protocol/session.js'
+export type { SubagentControl, SubagentRow, SubagentTranscriptView } from '../../shared/protocol/subagents.js'
+export type { ChatRow, CostTokenBuckets, SessionCostByModel, SubagentCostEntry, TokenBucket, TokenUsage, ToolCallView, ToolFileDiff, ToolResultView, ToolRow } from '../../shared/protocol/transcript.js'
+export type { ClientState as ChannelState } from '../runtime/mutable-state.js'
 
 export type PermissionPresetService = {
   names?: unknown
