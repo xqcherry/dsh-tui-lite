@@ -1,12 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { isCommandCompletionToken } from '../../commands.js'
+import { isCommandCompletionToken } from '../../app/commands/catalog.js'
+import { t } from '../../app/i18n.js'
+import { modeDisplayName, type SessionModeSpec } from '../../app/session/modes.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
-import { t } from '../../i18n.js'
-import { modeDisplayName, type SessionModeSpec } from '../../sessionModes.js'
-import { PERMISSION_PRESET_CUSTOM, permissionPresetRuntime } from './permissions.js'
 import type { PermissionModeRoster } from './mode-roster.js'
+import { PERMISSION_PRESET_CUSTOM, permissionPresetRuntime } from './permissions.js'
 import type { ChannelState } from './types.js'
 
 /** Last durable permission preset identity (`permission/preset`), if any.
@@ -101,7 +101,7 @@ export interface PermissionIdentity {
   /** The captured pre-plan identity, if one is still pending. */
   prePlanPermissionIdentity(session: Agent['session']): string | undefined
   forgetPrePlanIdentity(session: Agent['session']): void
-  /** `ChannelUi.runPermissionPreset` (see the public Channel type). */
+  /** `Client.runPermissionPreset` (see the public Channel type). */
   runPermissionPreset(name: string): Promise<boolean>
 }
 

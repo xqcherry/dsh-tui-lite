@@ -1,4 +1,4 @@
-import { t } from '../i18n.js'
+import { t } from '../app/i18n.js'
 import { primaryComboString } from './keymap.js'
 
 /**

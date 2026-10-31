@@ -45,8 +45,8 @@ const [
   { PromptInput },
 ] = await Promise.all([
   import('react'),
-  import('../lib/types/ui.js'),
-  import('../lib/types/components/PromptInput.js'),
+  import('../lib/types/tui/primitives.js'),
+  import('../lib/types/tui/components/PromptInput.js'),
 ])
 
 let failed = 0

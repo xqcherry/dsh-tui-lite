@@ -1,8 +1,7 @@
-import { t } from '../../i18n.js'
+import { t } from '../../app/i18n.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { foldBack as FoldBack } from './transcript.js'
 import type { ChannelState, ToolViewPresenter } from './types.js'
-
 
 /**
  * The DSH halves of the local actions (the backend-neutral ones live in

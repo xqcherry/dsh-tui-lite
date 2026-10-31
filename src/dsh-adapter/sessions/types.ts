@@ -1,6 +1,5 @@
-import type { SessionSummary, SessionKind, SessionTitle, TitleSource, PreviewEntry } from '../../adapter/ports/channel-session.js'
-export type { SessionSummary, SessionKind, SessionTitle, TitleSource, PreviewEntry } from '../../adapter/ports/channel-session.js'
-
+import type { SessionSummary, SessionTitle } from '../../app/contracts/channel-session.js'
+export type { PreviewEntry, SessionKind, SessionSummary, SessionTitle, TitleSource } from '../../app/contracts/channel-session.js'
 
 /**
  * Facts a bounded read can recover from one session log.

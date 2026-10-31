@@ -1,10 +1,14 @@
-import type { ChannelUi } from '../../adapter/ports/channel-ui.js'
-import type { RawTrajEvent, ChatRow, ToolRow, ToolCallView, ToolFileDiff, ToolResultView, SubagentRow, JobGroupRow, JobRow, TokenUsage, TokenBucket, CostTokenBuckets, SessionCostByModel, SubagentCostEntry, NotificationItem, ChannelGoal, TodoPanelItem, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, PendingMessage, SubagentControl, SubagentTranscriptView, JobControl, StagedImageInput, StagedImageAdjustment, StagedImageHandle, ComposerImageRef, ComposerSubmission, ExternalCommandOutcome, TranscriptImage, ResumeResult, EffortOption, PermissionPresetSnapshot, PermissionPresetAvailability, PermissionPresetOption, PermissionPresetCurrent, PresetOption, SkillInfo, CredentialStatus, AgentViewRow, AgentViewStatus, AgentViewDispatchResult, BackgroundResult, BackendModeOption, BackendChannelOption, TrajectorySource } from '../../adapter/ports/channel-view.js'
-export type { ChatRow, ToolRow, ToolCallView, ToolFileDiff, ToolResultView, SubagentRow, JobGroupRow, JobRow, TokenUsage, TokenBucket, CostTokenBuckets, SessionCostByModel, SubagentCostEntry, NotificationItem, ChannelGoal, TodoPanelItem, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, PendingMessage, SubagentControl, SubagentTranscriptView, JobControl, StagedImageInput, StagedImageAdjustment, StagedImageHandle, ComposerImageRef, ComposerSubmission, ExternalCommandOutcome, TranscriptImage, ResumeResult, EffortOption, PermissionPresetSnapshot, PermissionPresetAvailability, PermissionPresetOption, PermissionPresetCurrent, PresetOption, SkillInfo, CredentialStatus, AgentViewRow, AgentViewStatus, AgentViewDispatchResult, BackgroundResult, BackendModeOption, BackendChannelOption, TrajectorySource } from '../../adapter/ports/channel-view.js'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { BackgroundJobState } from '../jobs.js'
-import type { SubagentState } from '../subagents.js'
+import type { RawTrajEvent } from '../../app/contracts/session-view.js'
+import type { ToolCallView, ToolResultView } from '../../app/contracts/transcript-view.js'
+export type { ComposerImageRef, ComposerSubmission, PendingMessage, StagedImageAdjustment, StagedImageHandle, StagedImageInput, TranscriptImage } from '../../app/contracts/composer-view.js'
+export type { JobControl, JobGroupRow, JobRow } from '../../app/contracts/job-view.js'
+export type { CredentialStatus, EffortOption, PermissionPresetAvailability, PermissionPresetCurrent, PermissionPresetOption, PermissionPresetSnapshot, PresetOption, SkillInfo } from '../../app/contracts/model-view.js'
+export type { AgentViewDispatchResult, AgentViewRow, AgentViewStatus, BackgroundResult, ChannelGoal, ExternalCommandOutcome, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, NotificationItem, ResumeResult, TodoPanelItem, TrajectorySource } from '../../app/contracts/session-view.js'
+export type { SubagentControl, SubagentRow, SubagentTranscriptView } from '../../app/contracts/subagent-view.js'
+export type { ChatRow, CostTokenBuckets, SessionCostByModel, SubagentCostEntry, TokenBucket, TokenUsage, ToolCallView, ToolFileDiff, ToolResultView, ToolRow } from '../../app/contracts/transcript-view.js'
+export type { ClientState as ChannelState } from '../../app/state/client-state.js'
 
 export type PermissionPresetService = {
   names?: unknown
@@ -32,38 +36,6 @@ export interface ToolsRegistryLike {
 export interface ToolViewPresenter {
   call(name: string, rawArgs: string): ToolCallView | undefined
   result(name: string, rawArgs: string, data: SessionEvent<'tool/result'>['data']): ToolResultView | undefined
-}
-/** Raw host implementation; the renderer receives ChannelUi instead. */
-export interface Channel extends ChannelUi {
-  releaseContributions(): void
-}
-type MutableChannelView = { -readonly [K in keyof ChannelUi]: ChannelUi[K] }
-
-/** Internal writable store; command signatures are owned once by ChannelUi. */
-export interface ChannelState extends Omit<MutableChannelView, 'rows' | 'notifications' | 'todos' | 'pending' | 'tpsSamples' | 'subagents' | 'backgroundJobs'> {
-
-  rows: ChatRow[]
-  notifications: NotificationItem[]
-  /** Per-turn tps samples (sparkline history), oldest first. */
-  tpsSamples: { tps: number; at: number }[]
-  /** Latest todo-list snapshot (see the public Channel type). */
-  todos: TodoPanelItem[]
-  /** Messages submitted while working, awaiting their turn/step boundary.
-   *  Driven by agent inbox events (inserted/claimed/discarded). */
-  pending: PendingMessage[]
-  /** Active subagents roster (see the public Channel type). */
-  subagents: readonly SubagentState[]
-  /** Background jobs of the current session (see the public Channel type). */
-  backgroundJobs: readonly BackgroundJobState[]
-  /** @internal event bump (the public `notify(text)` posts a notification). */
-  emit(): void
-  /** @internal frame-aligned emit for high-frequency streaming deltas:
-   *  version bumps synchronously but listeners fire at most once per 16ms
-   *  window (trailing edge). */
-  emitStream(): void
-  /** See {@link Channel.releaseContributions}. */
-  releaseContributions(): void
-
 }
 
 export type FileSuggestionFs = {

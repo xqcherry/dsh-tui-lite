@@ -48,7 +48,6 @@
  * @module @deepseek-harness-tui/dsh-tui/compat/sessionLog
  */
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { createRequire } from 'node:module'
 import {
   appendFileSync,
   closeSync,
@@ -60,6 +59,7 @@ import {
   realpathSync,
   rmSync,
 } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, sep } from 'node:path'
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import { homeDir } from '../../utils/paths.js'

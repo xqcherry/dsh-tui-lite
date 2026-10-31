@@ -8,10 +8,9 @@
  *
  * Import from TypeScript scripts run with `node --import tsx/esm`.
  */
-import type { AgentEvent } from '../../src/agent/events.js'
-import { createActivityProjection, type ActivityProjection } from '../../src/channel/activity.js'
-import { createChannelProjection } from '../../src/channel/projection.js'
-import { createInitialChannelView } from '../../src/dsh-adapter/channel/state.js'
+import type { AgentEvent } from '../../src/app/session/events.js'
+import { createChannelProjection } from '../../src/app/transcript/projection.js'
+import { createInitialChannelView } from '../../src/app/state/initial-state.js'
 
 type ProjectionArgs = Parameters<typeof createChannelProjection>
 
@@ -19,14 +18,11 @@ export interface ProjectorHarness {
   readonly state: ProjectionArgs[0]
   readonly projector: ReturnType<typeof createChannelProjection>
   readonly notices: string[]
-  /** The event-driven subagent / job projection (only with `activity: true`,
-   *  as the channel core installs it for a non-DSH session). */
-  readonly activity?: ActivityProjection
   /** Fold one live batch (or a replay batch with `replay: true`). */
   apply(events: readonly AgentEvent[], replay?: boolean): void
 }
 
-export function createProjectorHarness(options: { agentPreset?: string; thinkingFold?: 'preview' | 'full'; model?: string; activity?: boolean; now?: () => number } = {}): ProjectorHarness {
+export function createProjectorHarness(options: { agentPreset?: string; thinkingFold?: 'preview' | 'full'; model?: string; now?: () => number } = {}): ProjectorHarness {
   const view = createInitialChannelView(
     { model: options.model ?? 'fixture-model', provider: 'fixture', cwd: '/fixture', agentPreset: options.agentPreset, thinkingFold: options.thinkingFold },
     { agentId: 'fixture-agent', sessionId: 'fixture-session', mode: { id: 'normal', name: 'Normal' } as never, cwdDescription: '/fixture' },
@@ -38,9 +34,6 @@ export function createProjectorHarness(options: { agentPreset?: string; thinking
     notices.push(text)
     return () => undefined
   }
-  const activity = options.activity === true
-    ? createActivityProjection(() => state as never, { rowIds, notify, ...(options.now === undefined ? {} : { now: options.now }) })
-    : undefined
   const projector = createChannelProjection(state, {
     rowIds,
     resetContextWarning: () => undefined,
@@ -52,13 +45,11 @@ export function createProjectorHarness(options: { agentPreset?: string; thinking
     jobs: { onOutputSeen: () => undefined, onStarted: () => undefined },
     inputConvergence: { cancelInFlight: false },
     selectionAttached: () => undefined,
-    ...(activity === undefined ? {} : { activity }),
   })
   return {
     state,
     projector,
     notices,
-    ...(activity === undefined ? {} : { activity }),
     apply(events, replay = false) {
       projector.apply(events, { replay })
     },

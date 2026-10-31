@@ -30,7 +30,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { clearOwnMounts, publishMounts } from '../sessionMounts.js'
+import { clearOwnMounts, publishMounts } from '../app/session/sessionMounts.js'
 
 /**
  * How often the mounted set is republished. One small file write, not tied to

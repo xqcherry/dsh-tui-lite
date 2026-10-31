@@ -30,21 +30,17 @@ export {
   liveSessionListingFields,
   liveSessionOffset,
   sliceLiveSessionSeed,
-  snapshotLiveSessionEvents,
+  snapshotLiveSessionEvents
 } from './liveSession.js'
 export {
-  appendSessionTitle,
+  LEGACY_SESSION_EVENT_TYPES, appendSessionTitle,
   defaultMaxScanned,
   deleteSessionLog,
   ensureLegacySessionEventTypes,
-  findSessionLogFile,
-  LEGACY_SESSION_EVENT_TYPES,
-  readPhysicalHeaderSeedLength,
+  findSessionLogFile, readPhysicalHeaderSeedLength,
   readPhysicalHeaderSeedLengthForSession,
   readSessionEventsFromFile,
   readSessionEventsFromLog,
-  readSessionTitleFromLog,
-  type SessionLogRead,
-  sessionsRoots,
-  userTitleData,
+  readSessionTitleFromLog, sessionsRoots,
+  userTitleData, type SessionLogRead
 } from './sessionLog.js'

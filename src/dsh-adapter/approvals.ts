@@ -20,16 +20,16 @@
  * source badge, the background-session id) ride along on the snapshot.
  */
 
-import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { snapshotLiveSessionEvents } from './compat/liveSession.js'
+import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import {
   DEFAULT_PERMISSION_OPTIONS,
   type PermissionPanelDecision,
   type PermissionPanelOutcome,
   type PermissionPanelSnapshot,
   type PermissionPanelSource,
-} from '../channel/permissions.js'
+} from '../app/interaction/permissions.js'
+import { snapshotLiveSessionEvents } from './compat/liveSession.js'
 
 /** What the TUI renders while an approval is pending (the shared panel
  *  shape plus the DSH facts it documents below). */

@@ -1,23 +1,23 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
-import { randomUUID } from 'node:crypto'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import type { AgentSession } from '../../agent/session.js'
-import { t } from '../../i18n.js'
-import { writeModelPref } from '../../modelPrefs.js'
-import { touchSession } from '../../sessionHistory.js'
+import { randomUUID } from 'node:crypto'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import { writeModelPref } from '../../app/preferences/modelPrefs.js'
+import { touchSession } from '../../app/session/sessionHistory.js'
+import { reserveNewSession } from '../../app/session/sessionMounts.js'
+import { resetSessionProjection } from '../../app/state/session-reset.js'
+import type { DshSession as AgentSession } from '../backend/session.js'
 import { createDshSession, dshHandleOf } from '../backend/session.js'
 import { liveSessionCreateOptions, sliceLiveSessionSeed } from '../compat/index.js'
 import { composePreset, runningPresetOf } from '../presets.js'
-import { reserveNewSession } from '../../sessionMounts.js'
 import { attachSessionToWorkspace } from '../workspace.js'
-import type { DshChannelBinding } from './binding.js'
-import type { ChannelOwner } from './owner.js'
-import { resetSessionProjection } from './session-reset.js'
+import type { ChannelBinding } from './binding.js'
 import { childRecordsLineage } from './session-lineage.js'
 import type { ChannelState } from './types.js'
 
-type Binding = DshChannelBinding
+type Binding = ChannelBinding
 type SwitchState = Parameters<typeof resetSessionProjection>[0] & Pick<ChannelState,
   'cwd' | 'working' | 'status' | 'agentId' | 'sessionId' | 'agentPreset' | 'provider' | 'model' | 'contextWindow' | 'effortLevels' | 'reasoningEffort' | 'emit'>
 

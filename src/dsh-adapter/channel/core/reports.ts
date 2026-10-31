@@ -6,10 +6,10 @@
  */
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AgentSession } from '../../../agent/session.js'
-import { t } from '../../../i18n.js'
+import { t } from '../../../app/i18n.js'
+import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
+import type { DshSession as AgentSession } from '../../backend/session.js'
 import type { ChannelBinding } from '../binding.js'
-import type { ChannelOwner } from '../owner.js'
 import type { ChannelState, ChatRow } from '../types.js'
 
 /** One transcript row as an export section; undefined = not exported. */
@@ -37,21 +37,20 @@ function exportSection(row: ChatRow): string | undefined {
 export function createCoreReports(deps: {
   owner: Pick<ChannelOwner, 'current'>
   binding: Pick<ChannelBinding, 'session' | 'capture' | 'isCurrent'>
-  state: () => Pick<ChannelState, 'rows' | 'model' | 'cwd' | 'contextWindow' | 'agentId' | 'backendCapabilities'>
+  state: () => Pick<ChannelState, 'rows' | 'model' | 'cwd' | 'contextWindow' | 'agentId'>
 }) {
   /** `/doctor`: the backend-neutral facts plus the backend's own lines. */
   const doctorInfo = (): string[] => {
     const session: AgentSession = deps.binding.session
     const state = deps.state()
-    const label = state.backendCapabilities.backendLabel
+    const label = 'DSH'
     return [
       `Node ${process.version} · ${process.platform} ${process.arch}`,
-      t('doctor-backend', { label, id: session.ref.backendId }),
+      t('doctor-backend', { label, id: 'dsh' }),
       t('doctor-model', { model: state.model || t('doctor-unknown'), provider: label }),
       t('doctor-cwd', { cwd: state.cwd }),
       t('doctor-context-window', { window: state.contextWindow ?? t('doctor-unknown') }),
-      t('doctor-session', { id: session.ref.sessionId }),
-      ...session.capabilities.diagnostics?.lines() ?? [],
+      t('doctor-session', { id: session.sessionId }),
     ]
   }
 

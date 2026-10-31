@@ -1,8 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmConfigurableProvider, LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
-import { t } from '../../i18n.js'
+import type { OAuthProviderStatus, OAuthSetupHost, ProfilePathOp, ProviderSetupHost } from '../../app/settings/providerWizard.js'
 import type { ChannelState } from '../channel/types.js'
-import type { OAuthProviderStatus, OAuthSetupHost, ProfilePathOp, ProviderSetupHost } from '../providerWizard.js'
 import { settingsValue } from '../compat/settings.js'
 
 export function createSettingsHosts(ctx: Context, assertActive: () => void = () => undefined): Pick<ChannelState, 'providerSetup' | 'oauthProviderStatuses'> {

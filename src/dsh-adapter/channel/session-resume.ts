@@ -1,33 +1,33 @@
-import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
-import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import { explicitModelRoute, recordedModelRoute, resolveModelRoute, validateModelRoute } from '../../modelRoute.js'
-import { clearResumeTarget, writeResumeTarget, touchSession } from '../../sessionHistory.js'
-import { mountFailureText } from '../../sessions/resumeFailure.js'
-import type { AgentSession } from '../../agent/session.js'
-import { t } from '../../i18n.js'
-import { readModelPref } from '../../modelPrefs.js'
-import { migratePresetPref, readPresetPref } from '../../presetPrefs.js'
+import { randomUUID } from 'node:crypto'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import { readModelPref } from '../../app/preferences/modelPrefs.js'
+import { migratePresetPref, readPresetPref } from '../../app/preferences/presetPrefs.js'
+import { mountFailureText } from '../../app/session/resumeFailure.js'
+import { clearResumeTarget, touchSession, writeResumeTarget } from '../../app/session/sessionHistory.js'
 import {
   occupancyOf,
   readSessionOwners,
   reserveMount,
   reserveNewSession,
   type MountReservation,
-} from '../../sessionMounts.js'
+} from '../../app/session/sessionMounts.js'
+import { explicitModelRoute, recordedModelRoute, resolveModelRoute, validateModelRoute } from '../../app/settings/modelRoute.js'
+import { resetSessionProjection } from '../../app/state/session-reset.js'
+import type { DshSession as AgentSession } from '../backend/session.js'
+import { createDshSession, dshHandleOf } from '../backend/session.js'
 import { ensureLegacySessionEventTypes } from '../compat/index.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import { composePreset, resolvePersistedPreset, resolvePersistedRoute } from '../presets.js'
 import { attachSessionToWorkspace } from '../workspace.js'
-import { createDshSession, dshHandleOf } from '../backend/session.js'
-import { resetSessionProjection } from './session-reset.js'
-import type { DshChannelBinding } from './binding.js'
-import type { ChannelOwner } from './owner.js'
-import type { ChannelState, ResumeResult } from './types.js'
+import type { ChannelBinding } from './binding.js'
 import type { NewSessionOpener, NewSessionPlan } from './core/session-switch.js'
+import type { ChannelState, ResumeResult } from './types.js'
 
-type Binding = DshChannelBinding
+type Binding = ChannelBinding
 type ResumeState = Pick<
   ChannelState,
   | 'working'

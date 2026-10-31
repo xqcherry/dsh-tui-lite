@@ -1,6 +1,5 @@
-import type { BackgroundJobOutputChannel, BackgroundJobOutputLine, BackgroundJobStatus, BackgroundJobState, JobTimelineEvent } from '../adapter/ports/channel-view.js'
-export type { BackgroundJobOutputChannel, BackgroundJobOutputLine, BackgroundJobStatus, BackgroundJobState, JobTimelineEvent } from '../adapter/ports/channel-view.js'
-
+import type { BackgroundJobOutputChannel, BackgroundJobOutputLine, BackgroundJobState, BackgroundJobStatus, JobTimelineEvent } from '../app/contracts/job-view.js'
+export type { BackgroundJobOutputChannel, BackgroundJobOutputLine, BackgroundJobState, BackgroundJobStatus, JobTimelineEvent } from '../app/contracts/job-view.js'
 
 /**
  * Structural mirror of the registry's `JobSnapshot` — only the fields the
@@ -419,4 +418,4 @@ export class BackgroundJobStore {
 
 // The formatter is backend-neutral (src/channel/job-format.ts); re-exported
 // here for the existing importers.
-export { formatJobDuration } from '../channel/job-format.js'
+export { formatJobDuration } from '../app/transcript/job-format.js'

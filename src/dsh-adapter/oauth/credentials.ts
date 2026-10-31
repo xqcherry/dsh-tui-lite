@@ -14,11 +14,11 @@
  * @module @deepseek-harness-tui/dsh-tui/oauth/credentials
  */
 
+import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
-import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import { dirname, join } from 'node:path'
 import type { PiAiCredential, PiAiCredentialInfo, PiAiCredentialStore } from './pi-ai.js'
 
 /** The stored credential shape: a pi-ai `OAuthCredential`. */

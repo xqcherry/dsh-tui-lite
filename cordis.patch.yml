@@ -1,67 +1,31 @@
-# Inline TUI over the host agent, tools, storage and policy services.
-
+# Terminal surface over the bundled dsh-base. User profile patches apply last.
+- id: hmr
+  disabled: true
 - id: system-prompt
-  config: !!js >-
-    (() => {
-      const persona = process.env.DSH_TUI_PERSONA ?? 'You are a coding agent.'
-      try {
-        const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-        const fs = process.getBuiltinModule('node:fs')
-        const manifest = require.resolve('@deepseek-ai/dsh-system-prompt/package.json')
-        const version = String(JSON.parse(fs.readFileSync(manifest, 'utf8')).version ?? '')
-        const match = /^(\d+)\.(\d+)\.(\d+)/u.exec(version)
-        const [major, minor, patch] = match === null ? [0, 0, 0] : [Number(match[1]), Number(match[2]), Number(match[3])]
-        if (major > 0 || minor > 1 || (minor === 1 && patch >= 3)) return { personaPrefix: persona }
-        return { persona }
-      } catch {
-        return { personaPrefix: persona }
-      }
-    })()
-- id: llm-deepseek
   config:
-    apiKeyEnv: 'DEEPSEEK_API_KEY'
-    baseURL: !!js process.env.DEEPSEEK_BASE_URL
-    thinking: enabled
-    reasoningEffort: max
-- id: agent-loop
-  config:
-    agents: []
-- id: session-telemetry-otel
-  config: !!js >-
-    (() => {
-      let url = 'https://dsh-otel-collector.deepseeksvc.com/v1/logs'
-      let modern = false
-      try {
-        const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-        const fs = process.getBuiltinModule('node:fs')
-        const manifest = require.resolve('@deepseek-ai/dsh-session-telemetry-otel/package.json')
-        const version = String(JSON.parse(fs.readFileSync(manifest, 'utf8')).version ?? '')
-        const match = /^(\d+)\.(\d+)\./u.exec(version)
-        modern = match === null || Number(match[1]) > 0 || Number(match[2]) >= 2
-        if (!modern) url = 'https://harness-telemetry.deepseeksvc.com/v1/logs'
-      } catch {}
-      return {
-        mode: process.env.DSH_TELEMETRY_MODE || 'DISABLED',
-        shutdownTimeoutMillis: 3000,
-        // 0.2.0's base config caps one request at 4 MB; the older plugin's
-        // schema has no such key, so only a probed 0.2+ host gets it.
-        ...(modern ? { maxRequestBytes: 4000000 } : {}),
-        exporter: {
-          url: process.env.DSH_TELEMETRY_OTLP_URL ?? url,
-          compression: 'gzip',
-          timeoutMillis: 1000,
-        },
-        processor: {
-          scheduledDelayMillis: 10000,
-          maxQueueSize: 2048,
-          maxExportBatchSize: 2048,
-          exportTimeoutMillis: 1500,
-        },
-      }
-    })()
+    personaPrefix: !!js process.env.DSH_TUI_PERSONA ?? 'You are a coding agent.'
 - id: plugin-package-inventory-deepseek
   config:
     enabled: false
+- id: session-telemetry-otel
+  config:
+    mode: !!js process.env.DSH_TELEMETRY_MODE || 'DISABLED'
+    shutdownTimeoutMillis: 3000
+    maxRequestBytes: 4000000
+    exporter:
+      url: !!js process.env.DSH_TELEMETRY_OTLP_URL ?? 'https://dsh-otel-collector.deepseeksvc.com/v1/logs'
+      compression: gzip
+      timeoutMillis: 1000
+    processor:
+      scheduledDelayMillis: 10000
+      maxQueueSize: 2048
+      maxExportBatchSize: 2048
+      exportTimeoutMillis: 1500
+- id: session-persistence-jsonl
+  config:
+    root: !!js process.env.DSH_TUI_SESSION_ROOT ?? dshHomePath('sessions')
+
+# These are supplied in the selected official agent preset, not duplicated globally.
 - id: agent-instructions
   disabled: true
 - id: command-compact
@@ -79,25 +43,7 @@
 - id: tool-fs-search
   disabled: true
 - id: command-goal
-  disabled: !!js >-
-    (() => {
-      const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-      const fs = process.getBuiltinModule('node:fs')
-      const path = process.getBuiltinModule('node:path')
-      try {
-        require.resolve('@deepseek-ai/dsh-agent-preset-registry/package.json')
-        return true
-      } catch {}
-      try {
-        const manifest = require.resolve('@deepseek-ai/dsh-agent-presets/package.json')
-        const preset = path.join(path.dirname(manifest), 'presets', 'standard', 'agent.cordis.yml')
-        return fs.readFileSync(preset, 'utf8')
-          .split(/\r?\n/u)
-          .some(line => line.trim() === '- id: command-goal')
-      } catch {
-        return false
-      }
-    })()
+  disabled: true
 - id: tool-goal
   disabled: true
 - id: tool-jobs
@@ -124,116 +70,29 @@
   disabled: true
 - id: tool-workflow
   disabled: true
-- id: sandbox-policy
-  config:
-    mode: !!js "process.platform === 'win32' ? 'danger-full-access' : (process.env.DSH_PERMISSION_MODE ?? 'workspace-write')"
-    workspaceRoot: !!js process.cwd()
-- id: approval
-  config:
-    policy: !!js "process.platform === 'win32' ? 'never' : ((process.env.DSH_PERMISSION_MODE ?? 'workspace-write') === 'danger-full-access' ? 'never' : 'ask')"
-- id: session-persistence-jsonl
-  config:
-    root: !!js process.env.DSH_TUI_SESSION_ROOT ?? dshHomePath('sessions')
+
 - insert:
-    - id: dsh-tui-storage
-      name: '@deepseek-ai/dsh-storage'
-      disabled: !!js "[...ctx.loader.entries()].some(entry => entry.options.id === 'storage' && entry.options.name === '@deepseek-ai/dsh-storage' && !entry.disabled)"
-    - id: dsh-tui-storage-json
-      name: '@deepseek-ai/dsh-storage-json'
-      disabled: !!js "[...ctx.loader.entries()].some(entry => entry.options.id === 'storage-json' && entry.options.name === '@deepseek-ai/dsh-storage-json' && !entry.disabled)"
-      config:
-        root: !!js dshHomePath('storages')
-    - id: dsh-tui-storage-domain
-      name: '@deepseek-ai/dsh-storage-domain'
-      disabled: !!js "[...ctx.loader.entries()].some(entry => entry.options.id === 'storage-domain' && entry.options.name === '@deepseek-ai/dsh-storage-domain' && !entry.disabled)"
-      config:
-        backend: json
-    - id: dsh-tui-workspace
-      name: '@deepseek-ai/dsh-workspace'
-      disabled: !!js "[...ctx.loader.entries()].some(entry => entry.options.id === 'workspace' && entry.options.name === '@deepseek-ai/dsh-workspace' && !entry.disabled)"
-    - id: dsh-tui-code-runtime
-      name: '@deepseek-ai/dsh-code-runtime-worker-thread'
-      disabled: !!js >-
-        (() => {
-          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-ptc-runtime-node/package.json'); return true } catch {}
-          return [...ctx.loader.entries()].some(entry => entry.options.id === 'code-runtime' && entry.options.name === '@deepseek-ai/dsh-code-runtime-worker-thread' && !entry.disabled)
-        })()
     - id: dsh-tui-subagent-model-selection-settings
       name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
-      disabled: !!js >-
-        (() => {
-          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try {
-            require.resolve('@deepseek-ai/dsh-tool-subagent/model-selection-settings')
-          } catch {
-            return true
-          }
-          return [...ctx.loader.entries()].some(entry => entry.options.id === 'subagent-model-selection-settings' && entry.options.name === '@deepseek-ai/dsh-tool-subagent/model-selection-settings' && !entry.disabled)
-        })()
-    - id: dsh-tui-agent-presets
-      name: '@deepseek-ai/dsh-agent-presets'
-      disabled: !!js >-
-        (() => {
-          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-agent-preset-registry/package.json'); return true } catch {}
-          return [...ctx.loader.entries()].some(entry => entry.options.id === 'agent-presets' && entry.options.name === '@deepseek-ai/dsh-agent-presets' && !entry.disabled)
-        })()
-      config: !!js >-
-        (() => {
-          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          const fs = process.getBuiltinModule('node:fs')
-          const path = process.getBuiltinModule('node:path')
-          try {
-            const manifest = require.resolve('@deepseek-ai/dsh-agent-presets/package.json')
-            if (fs.existsSync(path.join(path.dirname(manifest), 'presets'))) {
-              return { default: 'standard' }
-            }
-          } catch {
-            // Let the roster import report a missing package; preserve the rc
-            // root fallback below for every package generation without one.
-          }
-          const base = ctx.baseUrl
-          if (!base) return { default: 'standard' }
-          const root = new URL('../node_modules/@deepseek-ai/dsh/config/agent-presets/', base)
-          let rootPath = decodeURIComponent(root.pathname)
-          if (/^\/[A-Za-z]:/.test(rootPath)) rootPath = rootPath.slice(1)
-          return { default: 'standard', roots: [{ path: rootPath, trust: 'system' }] }
-        })()
     - id: dsh-tui-agent-preset-registry
       name: '@deepseek-ai/dsh-agent-preset-registry'
-      disabled: !!js >-
-        (() => {
-          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-agent-preset-registry/package.json') } catch { return true }
-          return [...ctx.loader.entries()].some(entry => entry.options.id === 'agent-preset-registry' && entry.options.name === '@deepseek-ai/dsh-agent-preset-registry' && !entry.disabled)
-        })()
       config:
         default: standard
     - id: dsh-tui-cordis-host-runner
       name: '@deepseek-ai/dsh-cordis-host-runner'
-      disabled: !!js "[...ctx.loader.entries()].some(entry => entry.options.id === 'cordis-host-runner' && entry.options.name === '@deepseek-ai/dsh-cordis-host-runner' && !entry.disabled)"
+    - id: dsh-tui-workspace
+      name: '@deepseek-ai/dsh-workspace'
     - id: dsh-tui-webserver
       name: '@deepseek-ai/dsh-host-webserver'
-      disabled: !!js >-
-        (() => {
-          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-host-webserver/package.json') } catch { return true }
-          const entries = [...ctx.loader.entries()]
-          return !entries.some(entry => entry.options.name === '@deepseek-ai/dsh-deepseek-account-platform' && !entry.disabled)
-            || entries.some(entry => entry.options.id === 'webserver' && entry.options.name === '@deepseek-ai/dsh-host-webserver' && !entry.disabled)
-        })()
       config:
         host: 127.0.0.1
         port: 0
     - id: dsh-tui-auth
-      name: '@deepseek-harness-tui/dsh-tui/oauth'
-      inject: [ llm, commands ]
+      name: './lib/types/oauth.js'
+      inject: [llm, commands]
     - id: dsh-tui
-      name: '@deepseek-harness-tui/dsh-tui'
-      inject:
-        - workspaceRegistry
-        - agents
+      name: './lib/types/index.js'
+      inject: [workspaceRegistry, agents]
       config:
         preset: !!js process.env.DSH_TUI_PRESET ?? undefined
         cwd: !!js process.env.DSH_TUI_WORKSPACE_TARGET ?? undefined

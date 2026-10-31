@@ -1,7 +1,7 @@
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
-import { QuestionStore as SharedQuestionStore } from '../channel/questions.js'
+import { QuestionStore as SharedQuestionStore } from '../app/interaction/questions.js'
 
-export type { QuestionDraft, QuestionSelection, QuestionSnapshot } from '../channel/questions.js'
+export type { QuestionDraft, QuestionSelection, QuestionSnapshot } from '../app/interaction/questions.js'
 
 /** Preserve the host protocol's cancellation error while sharing FIFO ownership. */
 export class QuestionStore extends SharedQuestionStore {

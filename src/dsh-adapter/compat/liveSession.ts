@@ -20,9 +20,9 @@
  *
  * @module @deepseek-harness-tui/dsh-tui/compat/liveSession
  */
-import * as dshSession from '@deepseek-ai/dsh-session'
 import type { CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import * as dshSession from '@deepseek-ai/dsh-session'
 
 interface LiveSessionShape {
   readonly seq?: unknown

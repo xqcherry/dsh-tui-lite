@@ -31,8 +31,8 @@ const [{ PassThrough, Writable }, React, { Terminal: XTerm }, { AskUserQuestionP
   import('node:stream'),
   import('react'),
   import('@xterm/headless'),
-  import('../src/components/questions/AskUserQuestionPanel.js'),
-  import('../src/ui.js'),
+  import('../src/tui/components/questions/AskUserQuestionPanel.js'),
+  import('../src/tui/primitives.js'),
   import('./lib/term-test.mjs'),
 ])
 

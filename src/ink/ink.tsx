@@ -6,7 +6,6 @@ import React, { type ReactNode } from 'react';
 import type { FiberRoot } from 'react-reconciler';
 import { ConcurrentRoot } from 'react-reconciler/constants.js';
 import { onExit } from 'signal-exit';
-import { flushInteractionTime } from '../bootstrap/state.js';
 import { getYogaCounters } from '../native-ts/yoga-layout/index.js';
 import { logForDebugging } from '../utils/debug.js';
 import { logError } from '../utils/log.js';
@@ -713,7 +712,7 @@ export default class Ink {
     // Date.now() at most once per frame instead of once per keypress.
     // Done before the render to avoid dirtying state that would trigger
     // an extra React re-render cycle.
-    flushInteractionTime();
+
 
     // Dimension consistency: onComputeLayout laid the tree out against
     // this.terminalColumns/Rows (the cached values handleResize owns), so

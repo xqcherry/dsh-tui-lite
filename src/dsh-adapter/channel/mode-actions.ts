@@ -1,15 +1,15 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { CommandRoute } from '../../adapter/ports/channel-capabilities.js'
-import { t } from '../../i18n.js'
-import { modeDisplayName, type SessionModeSpec } from '../../sessionModes.js'
-import type { ChannelState } from './types.js'
+import type { CommandRoute } from '../../app/contracts/channel-capabilities.js'
+import { t } from '../../app/i18n.js'
+import { modeDisplayName, type SessionModeSpec } from '../../app/session/modes.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
+import type { ChannelBinding } from './binding.js'
 import { agentCapabilityEvidence, resolveAgentCapabilities } from './capabilities.js'
-import type { DshChannelBinding } from './binding.js'
+import type { ChannelState } from './types.js'
 
-type Binding = DshChannelBinding
+type Binding = ChannelBinding
 type ModeState = Pick<ChannelState, 'mode' | 'modeIndex' | 'emit'>
 
 /**

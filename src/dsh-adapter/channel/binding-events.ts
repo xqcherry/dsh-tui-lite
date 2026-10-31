@@ -1,20 +1,20 @@
-import type { Agent, AssistantStreamFrame, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent, AssistantStreamFrame, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { carrierKeyOf } from '@deepseek-ai/dsh-scope'
-import type { ChannelProjection } from '../../channel/projection.js'
-import { t } from '../../i18n.js'
+import { t } from '../../app/i18n.js'
+import type { InputConvergence } from '../../app/input/actions.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import type { ChannelProjection } from '../../app/transcript/projection.js'
 import { runningPresetOf } from '../presets.js'
+import type { ChannelBinding } from './binding.js'
 import { agentCapabilityEvidence, resolveAgentCapabilities } from './capabilities.js'
 import { createSessionBatchRouter, createSessionBinder, type BindingFeedHooks, type BindingScope } from './core/binding-feed.js'
-import type { InputConvergence } from './input-actions.js'
-import type { DshChannelBinding } from './binding.js'
-import type { ChannelOwner } from './owner.js'
 import type { ChannelState } from './types.js'
 
 /**
  * Foreground transcript listeners capture a binding generation: the bound
  * `AgentSession`'s event batches feed the shared projector, and the DSH
- * specialists read the raw main-session events through `native.dsh`. Child
+ * specialists read the raw main-session events through the concrete DSH session. Child
  * (subagent) event listeners instead span the Channel owner, keeping parked
  * reducers current across rebinds. Both paths own registrations incrementally
  * and fence retained callbacks; only the projector presents the foreground
@@ -22,7 +22,7 @@ import type { ChannelState } from './types.js'
  */
 export function createBindingEvents(ctx: Context, deps: {
   owner: ChannelOwner
-  binding: DshChannelBinding
+  binding: ChannelBinding
   state: ChannelState
   /** Read the activity projection's current value for a freshly bound session.
    *  A projection value only arrives when it changes, so a resumed or
@@ -122,10 +122,9 @@ export function createBindingEvents(ctx: Context, deps: {
   const hooks = {
     // This composition maintains mode/effort/command facts through its own
     // specialists, and replays its seed synchronously at adoption.
-    ownsSessionFacts: true,
     onGeneration(): void {
       // DSH specialists attach only to a DSH session.
-      if (deps.binding.session.capabilities.native.dsh !== undefined) installSubagents()
+      if (deps.binding.session.dsh !== undefined) installSubagents()
     },
     onBind({ capture, current, register }: BindingScope): void {
       deps.seedActivity?.(deps.binding.agent.session)
@@ -141,7 +140,7 @@ export function createBindingEvents(ctx: Context, deps: {
       // compaction nor tool-result pruning changes what the user can expect
       // from a long session; say it once, here, before the turn starts.
       announceCapabilityGap()
-      const native = capture.session.capabilities.native.dsh
+      const native = capture.session.dsh
       if (native === undefined) return
       // Keep the upstream assembly/request pairing, but own each listener as
       // soon as it is installed. The upstream combined disposer is too late

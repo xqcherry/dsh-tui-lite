@@ -1,13 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
+import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { isUserInvocable, renderSkillContent, type SkillSummary } from '@deepseek-ai/dsh-skill'
-import { HIDDEN_COMMAND_NAMES, isLocalCommandName, parseCommandName, LOCAL_COMMANDS, type LocalCommand } from '../../commands.js'
-import { t } from '../../i18n.js'
-import { serviceForAgent } from '../presets.js'
+import { HIDDEN_COMMAND_NAMES, isLocalCommandName, LOCAL_COMMANDS, parseCommandName, type LocalCommand } from '../../app/commands/catalog.js'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
 import { hasCommandErrorCode, mapCommandError } from '../command-errors.js'
-import type { ChannelOwner } from './owner.js'
+import { serviceForAgent } from '../presets.js'
 import type { SkillRegistry } from './loaded-context.js'
 
 const SKILL_COMMAND_RETRY_MS = 800

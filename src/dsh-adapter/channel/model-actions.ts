@@ -1,14 +1,14 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { ReasoningEffortId, type LlmModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Agent, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
-import type { CommandCompletionNode } from '../../commands.js'
-import { nearestLowerEffort, readEffortPref, resolveEffortDefault, writeEffortPref, STANDARD_EFFORT_LADDER } from '../../effortPrefs.js'
-import { t, tOr, type I18nKey } from '../../i18n.js'
-import type { DshChannelBinding } from './binding.js'
-import type { ChannelOwner } from './owner.js'
+import { ReasoningEffortId, type LlmModelInfo } from '@deepseek-ai/dsh-llm'
+import type { CommandCompletionNode } from '../../app/commands/catalog.js'
+import { t, tOr, type I18nKey } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import { nearestLowerEffort, readEffortPref, resolveEffortDefault, STANDARD_EFFORT_LADDER, writeEffortPref } from '../../app/preferences/effortPrefs.js'
+import type { ChannelBinding } from './binding.js'
 import type { ChannelState, EffortOption } from './types.js'
 
-type Binding = DshChannelBinding
+type Binding = ChannelBinding
 
 /**
  * Route metadata, effort preference and preset/model catalog actions.

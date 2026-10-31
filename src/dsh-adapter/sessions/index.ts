@@ -14,7 +14,7 @@ export {
   classify,
   readHeader,
   readInheritedCut,
-  type RawSessionHeader,
+  type RawSessionHeader
 } from './header.js'
 
 export { digestSession, previewSession } from './digest.js'
@@ -29,5 +29,5 @@ export type {
   SessionKind,
   SessionSummary,
   SessionTitle,
-  TitleSource,
+  TitleSource
 } from './types.js'

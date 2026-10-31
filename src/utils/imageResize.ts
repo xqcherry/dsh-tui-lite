@@ -21,7 +21,7 @@
  * exactly what it did, so the caller can tell the user instead of silently
  * rewriting their image.
  */
-import { loadSharp } from '../dsh-adapter/sharp.js'
+import { loadSharp } from './sharp.js'
 
 export interface ImageSizeProbe {
   readonly width: number

@@ -36,7 +36,7 @@ import {
   recordedModelRoute,
   resolveModelRoute,
   validateModelRoute,
-} from '../lib/types/modelRoute.js'
+} from '../lib/types/app/settings/modelRoute.js'
 
 let failed = 0
 function check(name, ok, extra = '') {

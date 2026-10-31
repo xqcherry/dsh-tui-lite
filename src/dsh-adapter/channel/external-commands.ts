@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { CommandExecution, CommandRuntime } from '@deepseek-ai/dsh-commands'
+import { t } from '../../app/i18n.js'
 import { installedMeetsVersion } from '../contract.js'
-import { t } from '../../i18n.js'
 import { firstStaleComposerToken, orderedComposerImages, type ComposerImages } from './composer-images.js'
 import type { ChannelImageBlock, ComposerImageRef, ExternalCommandOutcome, MentionAttachments } from './types.js'
 

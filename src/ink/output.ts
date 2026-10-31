@@ -34,7 +34,7 @@ import {
   shiftRows,
   type CellRun,
 } from './screen.js'
-import { stringWidth } from './stringWidth.js'
+import { stringWidth } from '../utils/stringWidth.js'
 import { expandTabs } from './tabstops.js'
 import type { DOMElement } from './dom.js'
 import {

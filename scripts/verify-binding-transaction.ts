@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { createDshSession } from '../src/dsh-adapter/backend/session.js'
 import { createChannelBinding } from '../src/dsh-adapter/channel/binding.js'
-import { createChannelOwner } from '../src/dsh-adapter/channel/owner.js'
+import { createChannelOwner } from '../src/app/lifecycle/owner.js'
 
 /** The binding holds sessions: a borrowed agent, or an owned handle. Wrapping
  *  touches no host service, so no context is needed. */

@@ -1,35 +1,15 @@
-/**
- * The backend-neutral channel core: one composition for every
- * `AgentSession`, whatever backend serves it.
- *
- * `createCoreChannel` acquires, in one owner transaction, the binding, the
- * host seams and decision gate, the emitter, notifications, context
- * bookkeeping, the IDE selection link, the composer and input pipeline (FIFO,
- * `tui/input` decisions, `@` mentions, staged images, IDE selection) ending in
- * `session.submit`, the shared projector feed, session switching (`/new`),
- * local actions, files, reports and the capability-backed actions, and builds
- * the common half of the `ChannelState`. Nothing is subscribed and no action
- * is callable yet.
- *
- * An extension (the DSH extensions, `../extensions.ts`) then `extend`s the
- * core: hooks into the feed and the emitter, state fields it serves, and its
- * action delegates on top of the core's. `start()` installs the action table
- * once, starts the runtime subscriptions, binds the session, and hands the
- * channel lifetime to Cordis. A session no extension claims is served by the
- * core alone: every action is backed by a capability, the core, or explicitly
- * unavailable.
- */
+/** Client runtime assembly for dsh: acquire, configure host services, then start. */
 import type { Context } from '@deepseek-ai/cordis'
-import { markChannelReadDirty } from '../../../adapter/channel/read-view.js'
-import type { AgentCapabilities } from '../../../adapter/ports/channel-capabilities.js'
-import type { AgentIdentity, AgentMessageSubmitInput, AgentMessageSubmitResult } from '../../../adapter/ports/channel-view.js'
-import type { AgentSession } from '../../../agent/session.js'
-import { createActivityProjection } from '../../../channel/activity.js'
-import { channelCapabilities } from '../../../channel/capabilities.js'
-import { anchoredRow, prependHistoryRows, projectHistorySlice, restoreFoldedRows } from '../../../channel/history-restore.js'
-import { t } from '../../../i18n.js'
-import { logForDebugging } from '../../../utils/debug.js'
-import { DEFAULT_SESSION_MODES } from '../../../sessionModes.js'
+import { LOCAL_COMMANDS } from '../../../app/commands/catalog.js'
+import type { AgentCapabilities } from '../../../app/contracts/channel-capabilities.js'
+import { t } from '../../../app/i18n.js'
+import { createInputActions, type InputConvergence } from '../../../app/input/actions.js'
+import { registerChannelOwner, type ChannelOwner } from '../../../app/lifecycle/owner.js'
+import { DEFAULT_SESSION_MODES } from '../../../app/session/modes.js'
+import { createInitialChannelView } from '../../../app/state/initial-state.js'
+import { createChannelNotifications } from '../../../app/state/notifications.js'
+import { markChannelReadDirty } from '../../../app/state/read-view.js'
+import type { DshSession as AgentSession } from '../../backend/session.js'
 import { resolveContextOccupancy } from '../../context-occupancy.js'
 import { IdeChannel, ideLockDir, type SelectionSnapshot } from '../../ide-channel.js'
 import { createChannelActionMethods, createChannelActionReadiness, type ChannelActionDelegates } from '../action-readiness.js'
@@ -39,80 +19,41 @@ import { createComposerImages } from '../composer-images.js'
 import { createContextBookkeeping } from '../context-bookkeeping.js'
 import { createChannelEmitter } from '../emitter.js'
 import { createSelectionAttachments } from '../ide-selection.js'
-import { createInputActions, type InputConvergence } from '../input-actions.js'
 import { createInputDelivery } from '../input-delivery.js'
-import { createChannelNotifications } from '../notifications.js'
-import { registerChannelOwner, type ChannelOwner } from '../owner.js'
 import { unavailablePermissionPresetSnapshot } from '../permissions.js'
 import { createSettingsHosts } from '../settings-host.js'
-import { createInitialChannelView, type ChannelLaunchOptions } from '../state.js'
-import type { ChannelState, SubagentTranscriptView } from '../types.js'
-import { createCapabilityDelegates, installChannelActions } from './actions.js'
+import type { ChannelLaunchOptions } from '../state.js'
+import type { ChannelState } from '../types.js'
+import { installChannelActions } from './actions.js'
 import { createBindingFeed, type BindingFeedHooks } from './binding-feed.js'
 import { createCoreFiles, NO_COMPLETION_CATALOG, type CompletionCatalog } from './files.js'
 import { createGitBranchRefresher } from './host.js'
 import { createCoreLocalActions } from './local-actions.js'
-import { createLocalImageStore, type LocalImageStore } from './local-images.js'
 import { createCoreReports } from './reports.js'
-import { createSessionControls, localCommandsFor } from './session-controls.js'
-import { createCoreSessionActions } from './sessions.js'
-import { createBackendOpener, createSessionSwitch, SESSION_MOUNT_LEDGER, type NewSessionOpener, type ResumeSessionOpener } from './session-switch.js'
+import { createSessionSwitch, type NewSessionOpener } from './session-switch.js'
 
 /** Token buffer below the context window at which the context-low warning fires. */
 const CONTEXT_WARNING_BUFFER_TOKENS = 20_000
 
-/** No image may be staged (a session lost the capability mid-call). */
-const NO_IMAGES = Object.freeze({ mediaTypes: Object.freeze([]), maxImageBytes: 0, maxImagesPerMessage: 0, maxMessageImageBytes: 0, maxImageDimension: 0, maxImagePixels: 0 })
-
-/** The job registry feed is a DSH host service; nothing feeds it by default. */
+/** Initial job hooks are replaced by the dsh job projection before startup. */
 const NO_JOB_FEED = { onOutputSeen: () => undefined, onStarted: () => undefined }
 
-/**
- * What an extension contributes (every member optional; `extend` merges, a
- * later call wins per member, `delegates` merge by action name).
- */
-export interface ChannelExtension {
-  /** Flush deferred projection work before a frame wake; true = the
-   *  renderer-visible data changed (DSH: the subagent stream batcher). */
+/** Internal startup wiring, configured before subscriptions become active. */
+export interface ChannelServices {
   flushDeferred?(): boolean
-  /** Restore folded rows from the backend's durable history. Its presence
-   *  enables folding past the transcript window; absent, the session's
-   *  `transcript` capability does (folding only the rows it can restore),
-   *  and without either nothing folds. */
   loadOlder?(): number
-  /** The extension projects subagents and background jobs itself (DSH, from
-   *  its host services): the core's event-driven activity projection stays
-   *  inert and its controls are the extension's. */
-  readonly ownsActivity?: boolean
-  /** Whether the local disk stands in for a missing host `fs` service
-   *  (default true; the DSH workspace may be remote, so DSH says false). */
-  localFs?: boolean
-  /** Rows of extension projections that `/clear` drops with the transcript. */
   dropRows?(): void
-  /** Move a used session to the front of the `/resume` MRU. */
   touchSession?(sessionId: string): void
-  /** Record a resolved git branch against the bound session. */
   noteBranch?(branch: string): void
-  /** Argument catalogs for slash completion. */
   completions?: CompletionCatalog
-  /** What the bound agent's composition mounts (`ChannelUi.capabilities()`;
-   *  DSH: resolved from its live services, `../capabilities.ts`). Absent, the
-   *  core describes the session from its typed capabilities. */
   agentCapabilities?(): AgentCapabilities
-  /** Hooks into every bind (core/binding-feed.ts). */
   bind?: BindingFeedHooks
-  /** How `/new` opens a fresh session (default: `options.openSession`). */
   newSession?: NewSessionOpener
-  /** How the core `/resume` reopens a persisted session (default:
-   *  `options.openSession`; DSH serves `/resume` itself). */
-  resumeSession?: ResumeSessionOpener
-  /** Actions served on top of the core's. */
   delegates?: Partial<ChannelActionDelegates>
-  /** Runtime starts around the core's host subscriptions, before the bind. */
   start?: { before?(): void; after?(): void }
 }
 
-/** The core as an extension sees it. */
+/** Host service wiring consumes this runtime assembly. */
 export type CoreChannel = ReturnType<typeof createCoreChannel>
 
 export function createCoreChannel(
@@ -123,21 +64,17 @@ export function createCoreChannel(
 ) {
   const rowIds = { value: 0 }
   const binding: ChannelBinding = createChannelBinding(initialSession, owner)
-  // A session that owns its own lifetime (no host registry disposes it, i.e.
-  // any non-DSH backend) is closed when the channel releases. Registered
-  // first, so a throw anywhere later in construction still stops it. Replaced
-  // sessions are closed by the binding at adoption.
-  owner.own(() => { binding.releaseOwned() })
+  // Release the session and its subscriptions when this runtime ends.
 
-  let extension: ChannelExtension = {}
+  let services: ChannelServices = {}
   let started = false
 
-  const emitter = createChannelEmitter(() => state, () => extension.flushDeferred?.() ?? false, {
+  const emitter = createChannelEmitter(() => state, () => services.flushDeferred?.() ?? false, {
     // Folding drops a row's full text on the promise that `loadOlder`
     // restores it; without a history slicer every row stays whole. A
     // session's durable transcript restores only rows with a stable anchor.
-    fold: () => extension.loadOlder !== undefined || binding.session.capabilities.transcript !== undefined,
-    restorable: row => extension.loadOlder !== undefined || anchoredRow(row),
+    fold: () => services.loadOlder !== undefined,
+    restorable: row => services.loadOlder !== undefined,
   })
   // The emitter exists before the complete state surface. Put it in the
   // construction rollback funnel immediately; normal release remains
@@ -152,62 +89,8 @@ export function createCoreChannel(
     notify(t('capability-unavailable-backend', { name }), { color: 'warning', timeoutMs: 4000 })
   }
   const unavailableLines = (name: string): string[] => [t('capability-unavailable-backend', { name })]
-  const guarded = async <T>(name: string, fallback: T, run: () => Promise<T>, current = () => owner.current()): Promise<T> => {
-    try {
-      return await run()
-    } catch (error) {
-      if (current()) notify(t('capability-failed', { name, err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 })
-      return fallback
-    }
-  }
-  // A backend host belongs to one session and binding generation. Its
-  // controls, reports and notices must not reach a replacement session.
-  const mcpFence = () => {
-    const capture = binding.capture()
-    return { session: capture.session, current: () => binding.isCurrent(capture) }
-  }
-  /**
-   * Subagents and background jobs of a session no extension projects: fed by
-   * the shared projector in stream order. Output tails are read through the
-   * session's `tasks` capability while a card is watched.
-   */
-  const activity = createActivityProjection(() => state, {
-    rowIds,
-    notify: (...args) => notify(...args),
-    emit: () => { if (owner.current()) state.emit() },
-    readOutput: taskId => binding.session.capabilities.tasks?.readOutput?.(taskId),
-  })
-  owner.own(() => { activity.dispose() })
-  const activityOwned = (): boolean => extension.ownsActivity !== true
-  /**
-   * The binding generation the view was last `/clear`ed in. `/clear` is
-   * view-only on every backend. Until another session is bound, history
-   * older than the cleared view must not come back through "load earlier"
-   * (rows folded after the clear still restore) and the divider is hidden.
-   */
-  let clearedGeneration: number | undefined
-  const viewCleared = (): boolean => clearedGeneration !== undefined && clearedGeneration === state.agentBindingGeneration
   /** "Load earlier" through the session's durable transcript: restore the
    *  folded rows first, then prepend the next older slice. */
-  const transcriptLoadOlder = (): number => {
-    const transcript = binding.session.capabilities.transcript
-    if (transcript === undefined) return 0
-    const failed = (error: unknown): number => {
-      notify(t('capability-failed', { name: 'load earlier', err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 })
-      return 0
-    }
-    try {
-      if (state.rows.some(row => row.folded === true)) {
-        const record = transcript.record()
-        const restored = record === undefined ? 0 : restoreFoldedRows(state.rows, record)
-        if (restored > 0) return restored
-      }
-      if (viewCleared() || !transcript.hasOlder()) return 0
-      return prependHistoryRows(state.rows, projectHistorySlice(transcript.older(), state.thinkingFold))
-    } catch (error) {
-      return failed(error)
-    }
-  }
   const bookkeeping = createContextBookkeeping(
     () => state,
     (text, notifyOptions) => notify(text, notifyOptions),
@@ -264,25 +147,17 @@ export function createCoreChannel(
    * held in memory by the core (local-images.ts), under the bound session's
    * limits; a DSH session keeps the attachments service.
    */
-  let localImageStore: LocalImageStore | undefined
-  const localImages = (): LocalImageStore | undefined => {
-    if (binding.session.capabilities.images === undefined) return undefined
-    localImageStore ??= createLocalImageStore(() => binding.session.capabilities.images?.limits ?? NO_IMAGES)
-    return localImageStore
-  }
-  const composer = createComposerImages(ctx, owner, { generation: () => state.agentBindingGeneration, localImages })
+  const composer = createComposerImages(ctx, owner, { generation: () => state.agentBindingGeneration })
   const files = createCoreFiles(ctx, {
     owner,
     binding,
     state: () => state,
-    localFallback: () => extension.localFs !== false,
     // Read late: the session controls are built after the files.
-    mcpServers: () => controls.mcpServers(),
   })
   const inputDelivery = createInputDelivery(ctx, owner, binding, () => state,
     (...args) => notify(...args), trackPending, untrackPending, composer,
     () => currentSelection, (messageId, info) => selectionAttachments.remember(messageId, info),
-    files.fallbackFs, localImages)
+    )
   const { dispatchUserText, clearStagedImages } = inputDelivery
   /** Monotonic token: only the latest `interruptAndDeliver` re-queues, so a
    *  second interrupt while the abort settles cannot double-deliver. */
@@ -293,9 +168,6 @@ export function createCoreChannel(
    * the parent's own SendMessage call (whenever the model makes it) is
    * matched by its call id, not by this.
    */
-  let agentMessageIntents = 0
-  const messaging = binding.session.capabilities.subagents?.messaging
-
   const actionReadiness = createChannelActionReadiness()
   const getReadyActions = (): ChannelActionDelegates => {
     owner.assertActive()
@@ -303,37 +175,6 @@ export function createCoreChannel(
   }
   const actionMethods = createChannelActionMethods(getReadyActions)
 
-  const backendLabel = options.backendLabel ?? initialSession.ref.backendId
-  const snapshotOf = (session: AgentSession) => channelCapabilities({
-    backendId: session.ref.backendId,
-    backendLabel,
-    capabilities: session.capabilities,
-    dsh: false,
-    resume: options.openSession !== undefined && options.sessionCatalog !== undefined,
-  })
-  const initialCapabilities = snapshotOf(initialSession)
-  /**
-   * `ChannelUi.capabilities()` for a session no extension describes: what the
-   * session itself serves, in the composition-fact vocabulary the UI routes
-   * `/compact` and `/plan` by. `/compact` is the channel's compact action
-   * (delegated to the session's `compact` capability); `/plan` has no
-   * registry route (a backend's plan mode is one of its native modes).
-   */
-  const sessionAgentCapabilities = (): AgentCapabilities => {
-    const caps = binding.session.capabilities
-    const compact = caps.compact !== undefined
-    return {
-      compact: compact ? { route: 'local' } : { route: 'none', reasonKey: 'capability-reason-no-compaction' },
-      plan: { route: 'none', reasonKey: 'capability-reason-no-plan-command' },
-      compaction: compact,
-      pruner: false,
-      questionTool: caps.questions !== undefined,
-      skills: false,
-    }
-  }
-  // Official occupancy source (absent in compositions without the token meter,
-  // and never holding a non-DSH session's id): `read` is a cached lookup, so
-  // the accessor on the state below stays cheap.
   const contextPressure = options.contextPressure
 
   const state: ChannelState = {
@@ -341,14 +182,14 @@ export function createCoreChannel(
       composer,
       (text, placement, images) => dispatchUserText(text, placement, images),
       (command, includeInContext) => getReadyActions().runLocalCommand(command, includeInContext),
-      sessionId => { extension.touchSession?.(sessionId) }),
+      sessionId => { services.touchSession?.(sessionId) }),
     subscribe: emitter.subscribe,
     emit: emitter.emit,
     emitStream: emitter.emitStream,
     ...createSettingsHosts(ctx, owner.assertActive),
     ...createInitialChannelView(options, {
-      agentId: initialSession.ref.sessionId,
-      sessionId: initialSession.ref.sessionId,
+      agentId: initialSession.sessionId,
+      sessionId: initialSession.sessionId,
       // The unmarked base mode: backend-native modes are a capability.
       mode: DEFAULT_SESSION_MODES[0]!,
       cwdDescription: options.cwd,
@@ -367,85 +208,15 @@ export function createCoreChannel(
         state.contextWindow,
       )
     },
-    commandList: localCommandsFor(initialCapabilities.commands),
-    backendCapabilities: initialCapabilities,
-    capabilities: () => extension.agentCapabilities?.() ?? sessionAgentCapabilities(),
-    get sessionRef() {
-      const ref = binding.session.ref
-      return { backendId: ref.backendId, sessionId: ref.sessionId }
-    },
+    commandList: LOCAL_COMMANDS,
+    capabilities: () => services.agentCapabilities?.() ?? { compact: { route: 'none', reasonKey: 'capability-reason-no-compaction' }, plan: { route: 'none', reasonKey: 'capability-reason-no-plan-command' }, compaction: false, pruner: false, questionTool: false, skills: false },
     costReport: undefined,
-    rateLimit: undefined,
     get olderHistory(): boolean {
-      return extension.loadOlder === undefined && !viewCleared() && (binding.session.capabilities.transcript?.hasOlder() ?? false)
+      return false
     },
     ...actionMethods,
-    subagentControl: {
-      interrupt: agentId => {
-        const control = binding.session.capabilities.subagents
-        if (control === undefined) { unavailable('agents'); return false }
-        const subagent = activity.subagent(agentId)
-        if (subagent === undefined || (subagent.status !== 'running' && subagent.status !== 'starting')) return false
-        void control.interrupt(subagent.agentId).then(stopped => {
-          if (!stopped && owner.current()) notify(t('subagent-interrupt-failed', { id: subagent.agentId.slice(0, 8) }), { color: 'warning', timeoutMs: 6000 })
-        }, (error: unknown) => {
-          if (owner.current()) notify(t('capability-failed', { name: 'agents', err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 })
-        })
-        return true
-      },
-      // The child transcript source exists only while the bound session's
-      // `subagents.history` capability does (Claude's store read; the DSH
-      // extension replaces this whole control with one backed by its own
-      // child transcript reader). The detail scene renders a Transcript page
-      // only when this method exists. A failed read resolves null, so the
-      // scene shows "unavailable" rather than an empty transcript.
-      ...(binding.session.capabilities.subagents?.history === undefined ? {} : {
-        history: (agentId: string, window?: import('../../../agent/capabilities.js').SubagentTranscriptWindow): Promise<SubagentTranscriptView | null> => {
-          const history = binding.session.capabilities.subagents?.history
-          if (history === undefined) return Promise.resolve(null)
-          return history(agentId, window).catch(() => null)
-        },
-      }),
-      /** Parent-mediated messaging uses the session's submit pipeline. */
-      ...(messaging === undefined ? {} : {
-        message: {
-          via: messaging,
-          steer: false as const,
-          listTargets: (): Promise<readonly AgentIdentity[]> => Promise.resolve(state.subagents.map(sub => ({
-            agentId: sub.agentId,
-            ...(sub.sessionId === undefined ? {} : { sessionId: sub.sessionId }),
-            label: sub.description,
-            ...(sub.mode === undefined ? {} : { mode: sub.mode }),
-            status: sub.status,
-          }))),
-          submit: (input: AgentMessageSubmitInput): Promise<AgentMessageSubmitResult> => {
-            const text = input.text.trim()
-            if (text === '') return Promise.resolve({ ok: false, reason: 'failed', message: 'empty text' })
-            const name = input.targetName !== undefined && input.targetName.trim() !== '' ? input.targetName.trim() : input.targetId
-            const envelope = t('agent-message-envelope', { name, id: input.targetId, text })
-            const intentId = `agent-message-${(agentMessageIntents += 1)}`
-            dispatchUserText(envelope, 'followup', [], undefined)
-            return Promise.resolve({ ok: true, intentId, state: 'issued' })
-          },
-          messages: () => activity.agentMessages(),
-        },
-      }),
-    },
-    jobControl: {
-      kill: id => {
-        const tasks = binding.session.capabilities.tasks
-        if (tasks === undefined) { unavailable('jobs'); return false }
-        const job = activity.job(id)
-        if (job === undefined || (job.status !== 'running' && job.status !== 'stopping')) return false
-        void tasks.stop(id).then(stopped => {
-          if (!stopped && owner.current()) notify(t('jobs-kill-failed', { id }), { color: 'error', timeoutMs: 6000 })
-        }, (error: unknown) => {
-          if (owner.current()) notify(t('capability-failed', { name: 'jobs', err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 })
-        })
-        return true
-      },
-      watchOutput: id => activity.watchOutput(id),
-    },
+    subagentControl: { interrupt: () => false },
+    jobControl: { kill: () => false, watchOutput: () => () => undefined },
     stagedImageGeneration: composer.stagedImageGeneration,
     stageImage: composer.stageImage,
     stageComposerImage: composer.stageComposerImage,
@@ -469,7 +240,7 @@ export function createCoreChannel(
     },
   }
 
-  // Register the raw state before any extension can synchronously publish a
+  // Register the raw state before any services can synchronously publish a
   // callback. The renderer lease binds its external authority later, but this
   // owner already makes teardown and construction failure fail closed.
   registerChannelOwner(state, owner)
@@ -486,23 +257,19 @@ export function createCoreChannel(
     }))
   }
 
-  const controls = createSessionControls({ state: () => state, backendLabel: () => state.backendCapabilities.backendLabel })
   const feed = createBindingFeed(ctx, {
     owner,
     binding,
     state,
-    options,
     inputConvergence,
     projection: {
       rowIds, resetContextWarning,
       jobs: NO_JOB_FEED,
-      activity: { apply: (event, replaying) => { if (activityOwned()) activity.apply(event, replaying) } },
       checkContextWarning, notify: (...args) => notify(...args),
       selectionAttached: messageId => selectionAttachments.take(messageId),
     },
     retireAttachment: inputDelivery.retireAttachment,
-    controls,
-    hooks: () => extension.bind ?? {},
+    hooks: () => services.bind ?? {},
     onReset: event => { resetConversation(event) },
   })
   /**
@@ -519,8 +286,7 @@ export function createCoreChannel(
     markChannelReadDirty(state.rows)
     rowIds.value = 0
     feed.resetProjection()
-    extension.dropRows?.()
-    if (activityOwned()) activity.reset()
+    services.dropRows?.()
     state.todos = []
     state.sessionTitle = ''
     state.tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, peak: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, idle: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }
@@ -536,7 +302,6 @@ export function createCoreChannel(
     resetContextWarning()
     // The history before the reset is another conversation's: "load
     // earlier" never brings it back above this view.
-    clearedGeneration = state.agentBindingGeneration
     const key = event.trigger === 'clear' ? 'conversation-reset-clear'
       : event.trigger === 'plan_mode_exit' ? 'conversation-reset-plan'
         : event.trigger === 'fresh_session' ? 'conversation-reset-fresh'
@@ -554,8 +319,7 @@ export function createCoreChannel(
     notify,
     resetIdeSelection,
     clearStagedImages,
-    opener: () => extension.newSession ?? defaultOpeners?.create,
-    resumeOpener: () => extension.resumeSession ?? defaultOpeners?.resume,
+    opener: () => services.newSession,
     activity: () => {
       const fifo = inputDelivery.activity()
       return {
@@ -567,35 +331,8 @@ export function createCoreChannel(
     },
     unavailable,
   })
-  /** `/new` and `/resume` on a session no extension claims: the backend's
+  /** `/new` and `/resume` on a session no services claims: the backend's
    *  own `open`. */
-  const defaultOpeners = options.openSession === undefined ? undefined : createBackendOpener({
-    open: options.openSession,
-    state,
-    rowIds,
-    resetProjection: feed.resetProjection,
-    resetActivity: () => { activity.reset() },
-    snapshotOf,
-    resetControls: controls.reset,
-    bind: seed => feed.bind(seed),
-    bound: () => binding.session,
-    mounts: SESSION_MOUNT_LEDGER,
-    ...(options.sessionPrefs === undefined ? {} : { touch: (sessionId: string) => options.sessionPrefs?.touch(sessionId) }),
-    notify,
-  })
-  /** Durable session catalog and resume actions. */
-  const sessionActions = createCoreSessionActions({
-    owner,
-    session: () => binding.session,
-    state: () => state,
-    notify,
-    unavailable,
-    catalog: options.sessionCatalog,
-    prefs: options.sessionPrefs,
-    resume: sessionId => sessionSwitch.resumeSession(sessionId),
-    canOpen: options.openSession !== undefined && options.sessionCatalog !== undefined,
-  })
-
   const local = createCoreLocalActions(ctx, {
     owner,
     binding,
@@ -605,10 +342,9 @@ export function createCoreChannel(
     notify,
     unavailable,
     dropRows: () => {
-      extension.dropRows?.()
-      if (activityOwned()) activity.dropRows()
+      services.dropRows?.()
     },
-    loadOlder: () => extension.loadOlder ?? (binding.session.capabilities.transcript === undefined ? undefined : transcriptLoadOlder),
+    loadOlder: () => services.loadOlder,
     beginInput: () => {
       shellInputs.started += 1
       shellInputs.inFlight += 1
@@ -624,7 +360,7 @@ export function createCoreChannel(
   const refreshGitBranch = createGitBranchRefresher(ctx, {
     owner,
     state,
-    noteBranch: branch => { extension.noteBranch?.(branch) },
+    noteBranch: branch => { services.noteBranch?.(branch) },
   })
 
   return {
@@ -645,13 +381,13 @@ export function createCoreChannel(
     reports,
     resetIdeSelection,
     refreshGitBranch,
-    /** Merge an extension's contributions (before `start`). */
-    extend(next: ChannelExtension): void {
+    /** Merge an services's contributions (before `start`). */
+    configure(next: ChannelServices): void {
       if (started) throw new Error('dsh-tui: Channel extensions must attach before the channel starts')
-      extension = {
-        ...extension,
+      services = {
+        ...services,
         ...next,
-        delegates: { ...extension.delegates, ...next.delegates },
+        delegates: { ...services.delegates, ...next.delegates },
       }
     },
     /** Install the actions, start the runtime, bind the session. */
@@ -659,51 +395,31 @@ export function createCoreChannel(
       if (started) throw new Error('dsh-tui: Channel already started')
       started = true
       const core: Partial<ChannelActionDelegates> = {
-        commandCompletions: files.commandCompletions(extension.completions ?? NO_COMPLETION_CATALOG),
+        commandCompletions: files.commandCompletions(services.completions ?? NO_COMPLETION_CATALOG),
         runLocalCommand: local.runLocalCommand,
         loadOlder: local.loadOlder,
-        clear: () => {
-          local.clear()
-          clearedGeneration = state.agentBindingGeneration
-        },
+        clear: local.clear,
         pushLocal: local.pushLocal,
         listFileCandidates: files.listFileCandidates,
         listFiles: files.listFiles,
         doctorInfo: reports.doctorInfo,
         exportSession: reports.exportSession,
         newSession: () => sessionSwitch.newSession(),
-        // `/agents` from the event-driven roster (the DSH extension serves its own).
-        mcpStatus: () => {
-          if (binding.session.capabilities.mcp === undefined) return unavailableLines('mcp')
-          const fence = mcpFence()
-          return controls.mcpReport(fence.session, fence.current) ?? [t('backend-mcp-loading')]
-        },
-        listSubagents: () => Promise.resolve(binding.session.capabilities.subagents === undefined ? unavailableLines('agents') : activity.listLines()),
-        ...sessionActions.delegates,
       }
       installChannelActions(actionReadiness, {
         unavailable,
         unavailableLines,
-        capability: createCapabilityDelegates({
-          owner,
-          session: () => binding.session,
-          state: () => state,
-          notify,
-          unavailable,
-          unavailableLines,
-          guarded,
-        }),
         core,
-        extension: extension.delegates,
+        extension: services.delegates,
       })
       // Everything below can synchronously invoke external callbacks. It runs
       // only after the owner is registered and the complete delegate surface
       // is installed; the outer construction transaction rolls every step back.
-      extension.start?.before?.()
-      extension.start?.after?.()
+      services.start?.before?.()
+      services.start?.after?.()
       // The startup session's history, read ahead of construction, paints
-      // before any live event (an extension owning the facts replays its own).
-      feed.bind(extension.bind?.ownsSessionFacts === true ? undefined : options.initialHistory)
+      // before any live event (an services owning the facts replays its own).
+      feed.bind()
       // Cordis owns the Channel lifetime. Rebinding handles the common case;
       // this effect closes the final timer and releases the DecisionEvents
       // dispatch-topology marker when the Channel's context unloads.
@@ -716,7 +432,7 @@ export function createCoreChannel(
         state.releaseContributions()
       }, 'dsh-tui channel lifecycle')
       refreshGitBranch()
-      if (extension.bind?.ownsSessionFacts !== true) state.emit()
+      state.emit()
       return state
     },
   }

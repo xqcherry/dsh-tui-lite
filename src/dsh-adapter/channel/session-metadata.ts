@@ -1,19 +1,18 @@
-import type { DshBindingCapture, DshChannelBinding } from './binding.js'
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Context } from '@deepseek-ai/cordis'
-import { clearResumeTarget, forgetSession, readResumeTarget, touchSession, writeResumeTarget } from '../../sessionHistory.js'
-import { t } from '../../i18n.js'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { isUserInvocable } from '@deepseek-ai/dsh-skill'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import { clearResumeTarget, forgetSession, readResumeTarget, touchSession, writeResumeTarget } from '../../app/session/sessionHistory.js'
 import { appendSessionTitle, deleteSessionLog, userTitleData } from '../compat/index.js'
 import { listSummaries, locateSession, previewSession, type SessionSource, type SessionSummary } from '../sessions/index.js'
 import { readListingSnapshot } from '../sessions/snapshot.js'
-import type { ChannelOwner } from './owner.js'
+import type { BindingCapture, ChannelBinding } from './binding.js'
 import type { CredentialStatus } from './types.js'
-import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 
 const PREVIEW_ENTRIES = 8
 
-type Capture = DshBindingCapture
-type Binding = Pick<DshChannelBinding, 'agent' | 'capture' | 'isCurrent'>
+type Capture = BindingCapture
+type Binding = Pick<ChannelBinding, 'agent' | 'capture' | 'isCurrent'>
 
 /** Session-scoped metadata, persistence queries, and tool-less LLM reads. */
 export function createSessionMetadataActions(ctx: Context, deps: {

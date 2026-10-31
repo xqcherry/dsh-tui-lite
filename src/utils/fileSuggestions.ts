@@ -1,5 +1,5 @@
-import type { FileCandidate, FileCandidateKind } from '../adapter/ports/channel-catalog.js'
-export type { FileCandidate, FileCandidateKind } from '../adapter/ports/channel-catalog.js'
+import type { FileCandidate, FileCandidateKind } from '../app/contracts/channel-catalog.js'
+export type { FileCandidate, FileCandidateKind } from '../app/contracts/channel-catalog.js'
 
 
 export interface FileSuggestionOptions {

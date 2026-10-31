@@ -1,8 +1,8 @@
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Context } from '@deepseek-ai/cordis'
-import { t } from '../../i18n.js'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
 import { serviceForAgent } from '../presets.js'
-import type { ChannelOwner } from './owner.js'
 import type { ChannelState } from './types.js'
 
 interface ManualCompaction {

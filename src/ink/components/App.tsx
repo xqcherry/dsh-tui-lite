@@ -1,5 +1,4 @@
 import React, { PureComponent, type ReactNode } from "react";
-import { updateLastInteractionTime } from "../../bootstrap/state.js";
 import { logForDebugging } from "../../utils/debug.js";
 import { stopCapturingEarlyInput } from "../../utils/earlyInput.js";
 import { isEnvTruthy } from "../../utils/envUtils.js";
@@ -907,7 +906,7 @@ function processKeysInBatch(
 					!((i.button & 0x20) !== 0 && (i.button & 0x03) === 3)),
 		)
 	) {
-		updateLastInteractionTime();
+
 	}
 	for (let i = 0; i < items.length; i++) {
 		const item = items[i]!;

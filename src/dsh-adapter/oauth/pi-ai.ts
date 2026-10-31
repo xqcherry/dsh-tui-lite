@@ -8,11 +8,11 @@
  * from the adapter contract so this package owns no pi-ai version.
  */
 
+import type { PiAiAdapterOptions, ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { PiAiAdapterOptions, ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 
 // 0.1.5 made `piProvider` optional (absent when a stored route cannot be
 // constructed); this package only ever handles constructible catalog

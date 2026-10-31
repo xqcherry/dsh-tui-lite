@@ -8,19 +8,19 @@
  * @module @deepseek-harness-tui/dsh-tui/oauth/service
  */
 
-import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import { Service } from '@deepseek-ai/cordis'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { asStoredCredential, CredentialFile } from './credentials.js'
-import { oauthOf } from './profiles.js'
-import { QuestionBridge, type AskFn } from './interaction.js'
-import { loginOAuth, type PiAiProvider } from './pi-ai.js'
 import {
   DEEPSEEK_ACCOUNT_PROVIDER,
   deepSeekClientMetadata,
   loginDeepSeekAccount,
   type DeepSeekAccountAuth,
 } from './deepseek.js'
+import { QuestionBridge, type AskFn } from './interaction.js'
+import { loginOAuth, type PiAiProvider } from './pi-ai.js'
+import { oauthOf } from './profiles.js'
 
 /**
  * The constructed catalog provider one mounted route carries. 0.1.5 made

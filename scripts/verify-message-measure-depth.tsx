@@ -1,7 +1,7 @@
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
-import { render } from '../src/ui.js'
-import { MessageList } from '../src/components/MessageList.js'
+import { render } from '../src/tui/primitives.js'
+import { MessageList } from '../src/tui/components/MessageList.js'
 import { settled } from './lib/term-test.mjs'
 
 class Output extends Writable {

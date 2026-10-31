@@ -21,8 +21,8 @@ process.env.USERPROFILE = home
 
 const [{ default: React }, { render }, { PromptInput }] = await Promise.all([
   import('react'),
-  import('../lib/types/ui.js'),
-  import('../lib/types/components/PromptInput.js'),
+  import('../lib/types/tui/primitives.js'),
+  import('../lib/types/tui/components/PromptInput.js'),
 ])
 
 function makeStreams() {

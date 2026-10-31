@@ -1,51 +1,31 @@
-/**
- * Channel composition root: one backend-neutral core for every
- * `AgentSession` (`channel/core/compose.ts`), plus the DSH extensions when the
- * bound session is a DSH session (`channel/extensions.ts`). A new backend
- * needs no channel code; its session's typed capabilities decide what the
- * core serves. See docs/agent-backend-design.md.
- */
+/** Compose one dsh session with its client state and host services. */
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { AgentSession } from '../agent/session.js'
-import { createDshSession, isAgentSession } from './backend/session.js'
+import { createChannelOwner } from '../app/lifecycle/owner.js'
+import type { DshSession as AgentSession } from './backend/session.js'
 import { createCoreChannel } from './channel/core/compose.js'
-import { attachDshExtensions } from './channel/extensions.js'
-import { attachSessionWorkingActivity } from './channel/session-activity.js'
-import { createChannelOwner } from './channel/owner.js'
+import { configureDshServices } from './channel/services.js'
 import type { ChannelLaunchOptions } from './channel/state.js'
 import type { ChannelState } from './channel/types.js'
-export type { SubagentState } from './subagents.js'
 
 /**
  * Create the live channel state for one agent session: replay the durable
  * transcript, subscribe to the session's events, and expose every TUI action.
  * @internal
  * @param ctx - The plugin context; optional services are resolved via ctx.get.
- * @param initial - The session the channel renders; rewinds, resumes, and
- *   model switches replace it. A raw DSH agent (direct embedders, fixtures) is
- *   wrapped as a DSH session together with `options.handle`.
+ * @param session - The concrete DSH session initially attached to this client.
  * @param options - Boot options: model route, cwd, provider, and the
  *   reasoning-effort / working-activity preferences.
  * @returns The live channel state, subscribed and ready to render.
  */
 export function createChannel(
   ctx: Context,
-  initial: AgentSession | Agent,
+  session: AgentSession,
   options: ChannelLaunchOptions,
 ): ChannelState {
   const owner = createChannelOwner()
   try {
-    const session = isAgentSession(initial) ? initial : createDshSession(ctx, { agent: initial, handle: options.handle })
     const core = createCoreChannel(ctx, session, options, owner)
-    // DSH extensions attach only to a DSH session; other backends get the
-    // core and whatever their session capabilities offer.
-    const native = session.capabilities.native.dsh
-    if (native !== undefined) attachDshExtensions(core, ctx, native, options)
-    // A backend that builds its own working line (the Claude backend) exposes
-    // it as a capability. DSH keeps using its projection above. Without the
-    // capability or the publish option nothing is attached.
-    if (session.capabilities.workingActivity !== undefined) attachSessionWorkingActivity(core, options)
+    configureDshServices(core, ctx, session.dsh, options)
     return core.start()
   } catch (error) {
     // Setup is one transaction from the first acquired resource. Preserve the
@@ -54,9 +34,3 @@ export function createChannel(
     throw error
   }
 }
-
-export type { ChannelLaunchOptions } from './channel/state.js'
-export { expandMentions } from './channel/mentions.js'
-export { sessionCwdMatches } from './channel/paths.js'
-export type { AgentViewDispatchResult, AgentViewRow, AgentViewStatus, BackgroundResult, BackendModeOption, BackendChannelOption, Channel, ChannelGoal, ChannelState, ChatRow, ComposerImageRef, ComposerSubmission, CredentialStatus, EffortOption, ExternalCommandOutcome, JobControl, JobGroupRow, JobRow, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, MentionAttachments, MentionExpansion, MentionFs, NotificationItem, PendingMessage, PermissionPresetAvailability, PermissionPresetCurrent, PermissionPresetOption, PermissionPresetSnapshot, PresetOption, ResumeResult, SkillInfo, StagedImageHandle, StagedImageInput, SubagentControl, SubagentRow, TodoPanelItem, TokenBucket, TokenUsage, ToolCallView, ToolFileDiff, ToolResultView, ToolRow, ToolViewPresenter, TranscriptImage } from './channel/types.js'
-export { emptyTokenUsage } from './channel/usage.js'

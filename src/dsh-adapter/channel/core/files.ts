@@ -8,13 +8,12 @@
  * completion lists them like any other entry.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { CommandCompletionNode } from '../../../commands.js'
+import type { CommandCompletionNode } from '../../../app/commands/catalog.js'
+import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
 import type { ChannelBinding } from '../binding.js'
 import { createCommandCompletions } from '../command-completions.js'
 import { createFileActions } from '../file-actions.js'
-import { createLocalFs } from '../local-fs.js'
 import { mentionFs } from '../mentions.js'
-import type { ChannelOwner } from '../owner.js'
 import type { ChannelState, MentionFs } from '../types.js'
 
 /** Argument catalogs the slash completion tree warms and reads. */
@@ -40,15 +39,12 @@ export function createCoreFiles(ctx: Context, deps: {
   binding: Pick<ChannelBinding, 'capture' | 'isCurrent'>
   state: () => ChannelState
   /** Whether the local disk stands in for a missing host fs service. */
-  localFallback(): boolean
   /** The bound backend's MCP server names (`/mcp` completion). */
   mcpServers?(): readonly string[] | undefined
 }) {
   // The session's working directory is the local disk when the host mounts
   // no fs service and the backend runs here (mentions and `@` completion).
-  const localFs = createLocalFs()
-  const fallbackFs = (): MentionFs | undefined => deps.localFallback() ? localFs : undefined
-  const fs = (): MentionFs | undefined => mentionFs(ctx) ?? fallbackFs()
+  const fs = (): MentionFs | undefined => mentionFs(ctx)
   const fileActions = createFileActions({
     owner: deps.owner,
     capture: () => deps.binding.capture(),
@@ -57,7 +53,6 @@ export function createCoreFiles(ctx: Context, deps: {
     fs,
   })
   return {
-    fallbackFs,
     listFileCandidates: fileActions.listFileCandidates,
     listFiles: fileActions.listFiles,
     /** The slash completion over the composition's argument catalogs. */

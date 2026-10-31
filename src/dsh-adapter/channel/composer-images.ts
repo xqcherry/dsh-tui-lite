@@ -1,11 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-import { rememberImagePath, transcriptImageFromAttachment } from '../transcript-images.js'
-import { probeImageSize, adaptImageForAdmission, withinDimensionLimits } from '../../utils/imageResize.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
 import type { AdaptOutcome, ImageSizeProbe, ResizeLimits } from '../../utils/imageResize.js'
+import { adaptImageForAdmission, probeImageSize, withinDimensionLimits } from '../../utils/imageResize.js'
+import { rememberImagePath, transcriptImageFromAttachment } from '../transcript-images.js'
 import { mentionAttachments } from './mentions.js'
-import type { LocalImageStore } from './core/local-images.js'
-import type { ChannelOwner } from './owner.js'
 import type {
   ChannelImageBlock,
   ComposerImageRef,
@@ -142,7 +141,6 @@ export function createComposerImages(
     /** The in-memory store of a session that takes images itself (a
      *  backend with the `images` capability); undefined = the DSH
      *  attachments service. */
-    localImages?(): LocalImageStore | undefined
   },
 ): ComposerImages {
   /** Session epoch for the staged-image maps: bumped by every clear so a
@@ -215,8 +213,7 @@ export function createComposerImages(
     generation: number,
   ): Promise<StagedImageHandle> => {
     syncSession()
-    const local = deps.localImages?.()
-    const attachments = local ?? mentionAttachments(ctx)
+    const attachments = mentionAttachments(ctx)
     if (attachments === undefined) throw new Error('image attachments are unavailable in this profile')
     if (generation !== stagedImageEpoch) {
       throw new Error('the session changed while the image was being staged')
@@ -306,7 +303,7 @@ export function createComposerImages(
     const stageId = randomUUID()
     stagedImages.set(stageId, attachment)
     if (path !== undefined) rememberImagePath(String(attachment.attachmentId), path)
-    const view = local !== undefined ? local.facade(attachment) : transcriptImageFromAttachment(attachment, () => ctx.get('attachments'))
+    const view = transcriptImageFromAttachment(attachment, () => ctx.get('attachments'))
     if (view !== undefined) stagedImageViews.set(stageId, view)
     while (stagedImages.size > STAGED_IMAGE_LIMIT) {
       const oldest = stagedImages.keys().next().value as string | undefined
@@ -368,7 +365,7 @@ export function createComposerImages(
     },
     stagedImageLimits(): ComposerImageLimits | undefined {
       syncSession()
-      const limits = (deps.localImages?.() ?? mentionAttachments(ctx))?.imageLimits
+      const limits = mentionAttachments(ctx)?.imageLimits
       if (limits === undefined) return undefined
       return {
         maxImageBytes: limits.maxImageBytes,

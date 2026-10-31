@@ -7,46 +7,48 @@
  * `session.status` and `compaction.progress`.
  *
  * DSH features that have no typed capability yet reach the agent through
- * `capabilities.native.dsh` (only `src/dsh-adapter/**` may read it).
+ * `dsh` (only `src/dsh-adapter/**` may read it).
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, MessageId, type ContentBlock, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { AgentEvent, AgentEventMeta, PendingItem } from '../../agent/events.js'
-import type { AgentInput, AgentSession, AgentSessionStatus, CancelCause, SubmitPlacement } from '../../agent/session.js'
-import { isTokenDelta, tokenDeltaChars } from '../channel/usage.js'
+import type { AgentEvent, AgentEventMeta, PendingItem } from '../../app/session/events.js'
+import type { AgentInput, AgentSession, AgentSessionStatus, CancelCause, SubmitPlacement } from '../../app/session/session.js'
 import type { ToolsRegistryLike } from '../channel/types.js'
+import { isTokenDelta, tokenDeltaChars } from '../channel/usage.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import { createDshTranslator, type DshTranslator } from './translate.js'
 
-declare module '../../agent/capabilities.js' {
-  interface DshNative {
-    /** The live DSH agent this session drives. */
-    readonly agent: Agent
-    /** The lifetime handle, when this session owns the agent's lifetime;
-     *  absent for a borrowed registry agent (agent-view attachment). */
-    readonly handle: AgentHandle | undefined
-    /** The plugin context the session's listeners are installed on. */
-    readonly ctx: Context
-    /** Raw durable events of the main session, in arrival order. Raw
-     *  listeners registered before `subscribe` run before the projector sees
-     *  the same event. */
-    subscribeRaw(listener: (event: SessionEvent) => void): () => void
-    /** The durable session log snapshot (`/trace`, fold restore, seeds). */
-    rawHistory(): readonly SessionEvent[]
-    /**
-     * Synchronously translate a durable replay seed with this session's
-     * translator. The channel's adoption transactions replay inside a
-     * synchronous tail, which the async `history()` cannot serve.
-     */
-    translateReplay(events: readonly SessionEvent[]): readonly AgentEvent[]
-    /** Forget the translator's per-session state (paired with a projector reset). */
-    resetTranslation(): void
-    /** The dsh-tools presenters, scoped to this session's agent. */
-    readonly presentCallView: DshTranslator['presentCallView']
-    readonly presentResultView: DshTranslator['presentResultView']
-  }
+export interface DshSessionService {
+  /** The live DSH agent this session drives. */
+  readonly agent: Agent
+  /** The lifetime handle, when this session owns the agent's lifetime;
+   *  absent for a borrowed registry agent (agent-view attachment). */
+  readonly handle: AgentHandle | undefined
+  /** The plugin context the session's listeners are installed on. */
+  readonly ctx: Context
+  /** Raw durable events of the main session, in arrival order. Raw
+   *  listeners registered before `subscribe` run before the projector sees
+   *  the same event. */
+  subscribeRaw(listener: (event: SessionEvent) => void): () => void
+  /** The durable session log snapshot (`/trace`, fold restore, seeds). */
+  rawHistory(): readonly SessionEvent[]
+  /**
+   * Synchronously translate a durable replay seed with this session's
+   * translator. The channel's adoption transactions replay inside a
+   * synchronous tail, which the async `history()` cannot serve.
+   */
+  translateReplay(events: readonly SessionEvent[]): readonly AgentEvent[]
+  /** Forget the translator's per-session state (paired with a projector reset). */
+  resetTranslation(): void
+  /** The dsh-tools presenters, scoped to this session's agent. */
+  readonly presentCallView: DshTranslator['presentCallView']
+  readonly presentResultView: DshTranslator['presentResultView']
+}
+
+export interface DshSession extends AgentSession {
+  readonly dsh: DshSessionService
 }
 
 /** What a DSH session wraps: an owned handle, or an agent plus the handle
@@ -61,20 +63,13 @@ const QUIET: AgentEventMeta = { replay: false, wake: 'none' }
 // anything else is the handle itself.
 const isHandle = (target: DshSessionTarget): target is AgentHandle => !('handle' in target)
 
-/** Whether a value is an `AgentSession` rather than a raw DSH agent. */
-export function isAgentSession(value: unknown): value is AgentSession {
-  return typeof value === 'object' && value !== null &&
-    typeof (value as { subscribe?: unknown }).subscribe === 'function' &&
-    typeof (value as { capabilities?: unknown }).capabilities === 'object'
-}
-
 /**
  * Wrap a DSH agent (and the handle that owns it, if any) as an
  * `AgentSession`. Creating the wrapper acquires nothing: listeners exist only
  * while `subscribe`/`subscribeRaw` subscriptions are live, and only `dispose()`
  * releases the handle.
  */
-export function createDshSession(ctx: Context, target: DshSessionTarget): AgentSession {
+export function createDshSession(ctx: Context, target: DshSessionTarget): DshSession {
   const agent = target.agent
   const handle = isHandle(target) ? target : target.handle
   // The tools registry is read lazily, once per session, on the first
@@ -165,8 +160,9 @@ export function createDshSession(ctx: Context, target: DshSessionTarget): AgentS
     presentResultView: translator.presentResultView,
   }
 
-  const session: AgentSession = {
-    get ref() { return { backendId: 'dsh', sessionId: String(agent.session.id) } },
+  const session: DshSession = {
+    dsh: native,
+    get sessionId() { return String(agent.session.id) },
     get cwd(): string {
       return (agent.session as { header?: { cwd?: string } }).header?.cwd ?? ''
     },
@@ -182,7 +178,6 @@ export function createDshSession(ctx: Context, target: DshSessionTarget): AgentS
           return removed
         },
       },
-      native: { dsh: native },
     },
     // A throwaway translator: `history()` is a read, so it must neither reset
     // the live translator's frame fence nor leave the replay's open calls in
@@ -313,8 +308,8 @@ export function createDshSession(ctx: Context, target: DshSessionTarget): AgentS
 
 /** The lifetime handle of a DSH session this process created or resumed;
  *  throws when the session borrows its agent (or is not a DSH session). */
-export function dshHandleOf(session: AgentSession): AgentHandle {
-  const handle = session.capabilities.native.dsh?.handle
-  if (handle === undefined) throw new Error(`dsh-tui: session ${session.ref.backendId}:${session.ref.sessionId} owns no DSH handle`)
+export function dshHandleOf(session: DshSession): AgentHandle {
+  const handle = session.dsh?.handle
+  if (handle === undefined) throw new Error(`dsh-tui: session ${session.sessionId} owns no DSH handle`)
   return handle
 }

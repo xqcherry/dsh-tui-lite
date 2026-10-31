@@ -35,6 +35,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { normalizeIdePath } from '../app/session/ide-path.js'
 import { DATA_DIR } from '../utils/paths.js'
 
 /** Env var carrying the extension's loopback WS port (spawn-injected). */
@@ -155,10 +156,7 @@ export function parseHelloAck(message: unknown): {
  * case-insensitive (same semantics as channel.ts normalizeCwd — sessions.ts
  * precedent). Exported so verifiers can pin the Windows behavior.
  */
-export function normalizeIdePath(path: string, caseInsensitive: boolean): string {
-  const normalized = path === '/' ? '/' : path.replace(/\\/g, '/').replace(/\/+$/, '')
-  return caseInsensitive ? normalized.toLowerCase() : normalized
-}
+export { normalizeIdePath } from '../app/session/ide-path.js'
 
 function platformCaseInsensitive(): boolean {
   return process.platform === 'win32' || process.platform === 'darwin'

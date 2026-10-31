@@ -1,8 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
-import type { AgentSession } from '../../agent/session.js'
-import { t } from '../../i18n.js'
+import type { ChannelSelection, SelectionAttachment } from '../../app/contracts/composer-view.js'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
 import { logForDebugging } from '../../utils/debug.js'
+import type { DshSession as AgentSession } from '../backend/session.js'
 import {
   firstStaleComposerToken,
   formatMissingReference,
@@ -12,9 +14,6 @@ import {
 import { expandComposerMentions } from './composer-mentions.js'
 import { attachIdeSelection } from './ide-selection.js'
 import { mentionAttachments, mentionFs } from './mentions.js'
-import type { LocalImageStore } from './core/local-images.js'
-import type { ChannelOwner } from './owner.js'
-import type { ChannelSelection, SelectionAttachment } from '../../adapter/ports/channel-view.js'
 import type {
   ChannelImageBlock,
   ChannelState,
@@ -36,7 +35,6 @@ export interface UserTextOrigin {
   readonly attachments: MentionAttachments | undefined
   /** The in-memory image store when the session takes images itself: the
    *  staged references resolve to its facades for `submit`. */
-  readonly localImages?: LocalImageStore
   readonly stagedImages: ReadonlyMap<string, ChannelImageBlock['attachment']>
   /** Live editor selection AT ENQUEUE (undefined = none). Captured here so a
    *  selection made while the FIFO or mention expansion parks the delivery
@@ -60,7 +58,6 @@ export function createInputDelivery(
  fallbackFs?: () => MentionFs | undefined,
  /** The in-memory image store of a session that takes images itself (the
   *  `images` capability); absent / undefined = the DSH attachments service. */
- localImages?: () => LocalImageStore | undefined,
 
 ) {
   /**
@@ -140,15 +137,13 @@ export function createInputDelivery(
    *  adopt the NEW session as this text's origin and deliver the old
    *  conversation's words into it. */
   const captureOrigin = (): UserTextOrigin => {
-    const local = localImages?.()
     return {
     session: binding.session,
     agentId: state().agentId,
     generation: state().agentBindingGeneration,
     cwd: state().cwd,
     fs: mentionFs(ctx) ?? fallbackFs?.(),
-    attachments: local ?? mentionAttachments(ctx),
-    ...(local === undefined ? {} : { localImages: local }),
+    attachments: mentionAttachments(ctx),
     stagedImages: composer.snapshot(),
     selection: selection(),
     }
@@ -212,13 +207,7 @@ export function createInputDelivery(
       // DSH session delivers this exact message (steer/followup).
       // A session that takes images itself reads them through their
       // in-memory facades, in block order.
-      const local = origin.localImages
-      const images = local === undefined ? undefined : expansion.blocks.flatMap(block => {
-        if (block.type !== 'image') return []
-        const view = local.facade(block.attachment)
-        return view === undefined ? [] : [view]
-      })
-      await origin.session.submit({ text, blocks: message.content, clientMessageId: message.id, native: message, ...(images === undefined || images.length === 0 ? {} : { images }) }, placement)
+      await origin.session.submit({ text, blocks: message.content, clientMessageId: message.id, native: message }, placement)
     } catch (error) {
       if (attach !== undefined) attachedByMessageId.delete(message.id)
       untrackPending(message.id)

@@ -32,7 +32,7 @@ import { isXtermJs } from './terminal.js'
 import { terminalImageSourceFromAttributes } from './terminal-image.js'
 import type { TerminalImagePlacement } from './terminal-image.js'
 import { lineWidth } from './line-width-cache.js'
-import { stringWidth } from './stringWidth.js'
+import { stringWidth } from '../utils/stringWidth.js'
 import { widestLine } from './widest-line.js'
 import wrapText from './wrap-text.js'
 

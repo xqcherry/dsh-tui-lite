@@ -10,7 +10,7 @@
  * the same line-slice semantics and size-cap policy as mention attachments.
  */
 import { isAbsolute, join } from 'node:path'
-import type { ChannelSelection, SelectionAttachment } from '../../adapter/ports/channel-view.js'
+import type { ChannelSelection, SelectionAttachment } from '../../app/contracts/composer-view.js'
 import { MENTION_MAX_FILE_CHARS } from './mentions.js'
 import type { MentionExpansion, MentionFs } from './types.js'
 
@@ -170,7 +170,7 @@ export async function attachIdeSelection(
 // The durable-content replay of the indicator is a pure parse of the block
 // this module builds, shared with the backend-neutral projector
 // (src/channel/selection-record.ts); re-exported for existing importers.
-export { replaySelectionAttachment } from '../../channel/selection-record.js'
+export { replaySelectionAttachment } from '../../app/transcript/selection-record.js'
 
 /**
  * Bounded map from a submitted message id → what its selection attached.

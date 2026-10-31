@@ -1,12 +1,12 @@
-import { randomUUID } from 'node:crypto'
 import type { Agent, AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
-import { markChannelReadDirty } from '../../adapter/channel/read-view.js'
-import { agentMessageFailureOf, agentMessageTextOf, agentRelaySourceOf, foldAgentMessage } from '../../agent/messages.js'
+import { randomUUID } from 'node:crypto'
+import type { AgentIdentity, AgentMessageControl, AgentMessageSubmitInput, AgentMessageSubmitResult, AgentMessageView } from '../../app/contracts/subagent-view.js'
+import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../app/session/capabilities.js'
+import { agentMessageFailureOf, agentMessageTextOf, agentRelaySourceOf, foldAgentMessage } from '../../app/session/messages.js'
+import { markChannelReadDirty } from '../../app/state/read-view.js'
 import { SubagentActivityStore, type SubagentState } from '../subagents.js'
-import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../agent/capabilities.js'
-import type { AgentIdentity, AgentMessageControl, AgentMessageSubmitInput, AgentMessageSubmitResult, AgentMessageView } from '../../adapter/ports/channel-view.js'
-import type { ChannelState, ChatRow, SubagentControl, SubagentRow } from './types.js'
 import { isSubagentToolName } from './projection-helpers.js'
+import type { ChannelState, ChatRow, SubagentControl, SubagentRow } from './types.js'
 
 type ProjectionState = Pick<ChannelState, 'rows' | 'subagents' | 'subagentCost' | 'emit' | 'emitStream'>
 

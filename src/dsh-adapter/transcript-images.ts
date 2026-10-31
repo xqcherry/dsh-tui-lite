@@ -1,5 +1,5 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { TranscriptImage } from '../adapter/ports/channel-view.js'
+import type { TranscriptImage } from '../app/contracts/composer-view.js'
 
 type ImageBlock = Extract<ContentBlock, { type: 'image' }>
 type ImageAttachment = ImageBlock['attachment']

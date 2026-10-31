@@ -8,10 +8,10 @@
  * panel. It never reads or writes the account grant.
  */
 
-import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AccountClientMetadata, AccountView, DeepSeekAccount, SignInAttemptId } from '@deepseek-ai/dsh-deepseek-account'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
+import { readFileSync } from 'node:fs'
 import { QuestionBridge, type AskFn, type QuestionBridgeHelpers } from './interaction.js'
 
 export const DEEPSEEK_ACCOUNT_PROVIDER = 'deepseek-account'

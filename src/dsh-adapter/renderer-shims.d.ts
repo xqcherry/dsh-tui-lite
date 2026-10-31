@@ -5,7 +5,7 @@
  * a module augmentation that merges with the real declarations — a global
  * script file would shadow them instead.
  */
-import type {} from 'react'
+import type { } from 'react'
 
 // Custom renderer JSX element declarations.
 declare module 'react' {

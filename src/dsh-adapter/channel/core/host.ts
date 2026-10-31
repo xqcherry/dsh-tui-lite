@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
 import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
-import type { ChannelOwner } from '../owner.js'
 import type { ChannelState } from '../types.js'
 
 /**

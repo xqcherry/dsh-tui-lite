@@ -52,8 +52,8 @@ writeFileSync(
 const [{ default: React }, xtermModule, { render }, { PromptInput }] = await Promise.all([
   import('react'),
   import('@xterm/headless'),
-  import('../lib/types/ui.js'),
-  import('../lib/types/components/PromptInput.js'),
+  import('../lib/types/tui/primitives.js'),
+  import('../lib/types/tui/components/PromptInput.js'),
 ])
 const { Terminal: XTerm } = xtermModule.default ?? xtermModule
 

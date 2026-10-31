@@ -29,12 +29,12 @@
  *     closed exactly once on every path.
  */
 import { SESSION_FORMAT_VERSION, type SessionEvent } from '@deepseek-ai/dsh-session'
-import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../agent/capabilities.js'
-import type { AgentEvent, AgentEventOf } from '../../agent/events.js'
-import { textOfBlocks } from '../../channel/projection.js'
+import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../app/session/capabilities.js'
+import type { AgentEvent, AgentEventOf } from '../../app/session/events.js'
+import { textOfBlocks } from '../../app/transcript/projection.js'
 import type { DshTranslator } from '../backend/translate.js'
-import { toolErrorText } from './transcript.js'
 import type { SubagentsServiceView } from './subagent-projection.js'
+import { toolErrorText } from './transcript.js'
 
 /**
  * One page window in source events. Claude pages by 400 SDK messages

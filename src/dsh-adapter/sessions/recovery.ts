@@ -1,6 +1,6 @@
 /** Best-effort, process-local title and model recovery outside the listing path. */
-import { fileFacts } from './frames.js'
 import { recoverSessionMetadata } from './digest.js'
+import { fileFacts } from './frames.js'
 import { indexFileStamp, readIndex, writeIndex, type DerivedEntry } from './store.js'
 
 interface RecoveryWork {

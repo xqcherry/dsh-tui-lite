@@ -1,10 +1,10 @@
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { t } from '../../i18n.js'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
-import type { ChannelOwner } from './owner.js'
 import { toolResultText } from './transcript.js'
 
 /** Export only durable session facts. */

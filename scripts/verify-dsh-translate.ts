@@ -13,8 +13,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AgentEvent } from '../src/agent/events.js'
-import { prependHistoryRows, projectHistorySlice } from '../src/channel/history-restore.js'
+import type { AgentEvent } from '../src/app/session/events.js'
 import { createDshTranslator, dshPricingWindow } from '../src/dsh-adapter/backend/translate.js'
 import { FIXTURE_DIR, buildFixtures } from './fixtures/dsh/generate.js'
 import { createProjectorHarness } from './lib/projector-harness.js'
@@ -176,10 +175,7 @@ check('compaction bracket → compaction.start/end', of(live, 'compaction.start'
   check('a re-delivered chunk reuses the row it opened', harness.state.rows.filter(row => row.kind === 'assistant').length === 1)
   // "Load earlier" prepends rows from a separate projection whose seqs can
   // collide with live ones; a live settlement must never land on them.
-  const older = projectHistorySlice([
-    { type: 'assistant.message', seq: 7, anchor: 'older-7', turn: 1, step: 1, attemptId: 'older-7', time: 1, canonical: true, blocks: [{ type: 'text', text: 'older answer' }] },
-  ], 'preview')
-  prependHistoryRows(harness.state.rows, older)
+  harness.state.rows.unshift({ id: -1, kind: 'assistant', seq: 7, text: 'older answer', restored: true })
   harness.apply([{ type: 'assistant.message', seq: 7, anchor: 'live-7', attemptId: 'live-7', time: 9, canonical: true, blocks: [{ type: 'text', text: 'live answer' }] }])
   const assistants = harness.state.rows.filter(row => row.kind === 'assistant')
   check('a live settlement never overwrites a restored row with the same seq', assistants[0]?.text === 'older answer' && assistants.at(-1)?.text === 'live answer')

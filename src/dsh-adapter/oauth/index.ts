@@ -39,22 +39,22 @@
  * @module @deepseek-harness-tui/dsh-tui/oauth
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
+import type { LlmAdapter, LlmModelInfo } from '@deepseek-ai/dsh-llm'
+import type { PiAiAdapterOptions } from '@deepseek-ai/dsh-llm-pi-ai'
+import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import z from '@deepseek-ai/schemastery'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
-import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
-import type { LlmAdapter, LlmModelInfo } from '@deepseek-ai/dsh-llm'
-import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
-import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
-import type { PiAiAdapterOptions } from '@deepseek-ai/dsh-llm-pi-ai'
+import { createAuthCommandHandler } from './command.js'
 import { CredentialFile, defaultCredentialsFile } from './credentials.js'
+import { createDeepSeekCallbackOriginResolver, deepSeekAccountFrom } from './deepseek.js'
+import type { PiAiAuthContext } from './pi-ai.js'
 import { availableOAuthProviderIds, buildOAuthProfile, OAUTH_PROVIDER_IDS, type ModelOverride } from './profiles.js'
 import { createDshAuthApi, DshAuthService } from './service.js'
-import { createAuthCommandHandler } from './command.js'
-import type { PiAiAuthContext } from './pi-ai.js'
-import { createDeepSeekCallbackOriginResolver, deepSeekAccountFrom } from './deepseek.js'
 
 export const name = 'dsh-auth'
 /**
@@ -107,14 +107,14 @@ export const Config: z<Config> = z.object({
   modelOverrides: z.dict(z.dict(modelOverride)),
 })
 
-export type { DshAuthApi, DshAuthLoginResult, DshAuthSignInStatus, DshAuthService } from './service.js'
-export { createDshAuthApi } from './service.js'
-export { QuestionBridge, describeEvent } from './interaction.js'
-export type { AskFn, QuestionBridgeHelpers } from './interaction.js'
-export { copyToClipboard, openInBrowser, openerFor } from './opener.js'
 export { CredentialFile, defaultCredentialsFile } from './credentials.js'
-export { OAUTH_PROVIDER_IDS, availableOAuthProviderIds, buildOAuthProfile, type ModelOverride } from './profiles.js'
 export { DEEPSEEK_ACCOUNT_PROVIDER, deepSeekAccountFrom, deepSeekCallbackOrigin, deepSeekClientMetadata, loginDeepSeekAccount } from './deepseek.js'
+export { describeEvent, QuestionBridge } from './interaction.js'
+export type { AskFn, QuestionBridgeHelpers } from './interaction.js'
+export { copyToClipboard, openerFor, openInBrowser } from './opener.js'
+export { availableOAuthProviderIds, buildOAuthProfile, OAUTH_PROVIDER_IDS, type ModelOverride } from './profiles.js'
+export { createDshAuthApi } from './service.js'
+export type { DshAuthApi, DshAuthLoginResult, DshAuthService, DshAuthSignInStatus } from './service.js'
 
 /**
  * The ambient auth context providers may consult while resolving their own

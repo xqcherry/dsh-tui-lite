@@ -9,7 +9,7 @@ import {
 } from './terminal-image.js'
 import { cellAt, clearRegion, type Screen } from './screen.js'
 import type { Diff } from './frame.js'
-import { stringWidth } from './stringWidth.js'
+import { stringWidth } from '../utils/stringWidth.js'
 import { backgroundOpenCode } from './colorize.js'
 import type { Color } from './styles.js'
 

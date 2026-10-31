@@ -1,33 +1,11 @@
-/**
- * A channel's transcript feed, for any backend: the shared projector, the
- * session-batch router that is its only writer, and the bind that follows
- * the bound session.
- *
- * `bind(seed?)` advances the binding generation, resets input convergence,
- * links the session's prompts to the stores Chat renders, and subscribes the
- * router to the captured session. By default it also paints the session's
- * durable history and seeds the session-level facts from the session's
- * capabilities. The history is the `seed` the caller read before the
- * adoption (a resume reads `history()` ahead of the synchronous adopt). It
- * is painted synchronously before the subscription, so no live event can
- * land ahead of it. Without a seed the history is read once,
- * asynchronously, and dropped if live rows painted first. An extension that
- * owns those facts and replays its seed synchronously itself (DSH) sets
- * `ownsSessionFacts`, and adds its raw per-binding listeners through
- * `onBind`.
- */
+
 import type { Context } from '@deepseek-ai/cordis'
-import type { AgentEvent, AgentEventMeta, AgentEventOf } from '../../../agent/events.js'
-import type { AgentSession } from '../../../agent/session.js'
-import { attachInteraction } from '../../../channel/interaction.js'
-import { createChannelProjection, type ChannelProjection, type ChannelProjectionDeps } from '../../../channel/projection.js'
-import { logForDebugging } from '../../../utils/debug.js'
+import type { InputConvergence } from '../../../app/input/actions.js'
+import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
+import type { AgentEvent, AgentEventMeta, AgentEventOf } from '../../../app/session/events.js'
+import { createChannelProjection, type ChannelProjection, type ChannelProjectionDeps } from '../../../app/transcript/projection.js'
 import type { BindingCapture, ChannelBinding } from '../binding.js'
-import type { InputConvergence } from '../input-actions.js'
-import type { ChannelOwner } from '../owner.js'
-import type { ChannelLaunchOptions } from '../state.js'
 import type { ChannelState } from '../types.js'
-import type { SessionControls } from './session-controls.js'
 
 /** What one bind hands an extension's per-binding listeners. */
 export interface BindingScope {
@@ -48,7 +26,6 @@ export interface BindingFeedHooks {
   afterBind?(): void
   /** The extension maintains the session-level facts and replays its seed
    *  synchronously: no history repaint, no capability observer. */
-  readonly ownsSessionFacts?: boolean
   /** Forget the bound session's translator state with the projector's. */
   resetTranslation?(): void
 }
@@ -196,16 +173,7 @@ export function createSessionBinder(deps: {
   inputConvergence: InputConvergence
   route(batch: readonly AgentEvent[], meta: AgentEventMeta, current: () => boolean): void
   hooks(): BindingFeedHooks
-  /** The stores a session's prompts park in (`ChannelLaunchOptions.interaction`). */
-  interaction?: ChannelLaunchOptions['interaction']
-  /** The session-level facts kept unless the extension owns them. */
-  facts?: {
-    observe(batch: readonly AgentEvent[], session: AgentSession, current: () => boolean): void
-    /** Paint the history read ahead of the bind (before the subscription). */
-    replay(history: readonly AgentEvent[]): void
-    /** After the subscription: `replayed` = the history was already painted. */
-    seed(capture: BindingCapture, current: () => boolean, replayed: boolean): void
-  }
+
 }) {
   const { owner, binding, state, inputConvergence } = deps
   /**
@@ -213,9 +181,6 @@ export function createSessionBinder(deps: {
    * per binding: a replaced session (or a released channel) withdraws
    * everything it parked, so no panel outlives its session.
    */
-  let interactionLink: ReturnType<typeof attachInteraction> | undefined
-  if (deps.interaction !== undefined) owner.own(() => { interactionLink?.release() })
-
   /** Bind the current session: the one subscription feeding the projector. */
   const bind = (seed?: readonly AgentEvent[]): void => {
     const hooks = deps.hooks()
@@ -232,31 +197,7 @@ export function createSessionBinder(deps: {
         return dispose
       }
       hooks.onBind?.({ capture, current, register })
-      const interaction = deps.interaction
-      let link: ReturnType<typeof attachInteraction> | undefined
-      if (interaction !== undefined) {
-        interactionLink?.release()
-        link = attachInteraction({ ...interaction, debug: logForDebugging }, { sessionId: session.ref.sessionId, capabilities: session.capabilities })
-        interactionLink = link
-      }
-      const facts = hooks.ownsSessionFacts === true ? undefined : deps.facts
-      // The history read ahead of the adoption paints first, so every live
-      // event lands after it.
-      if (facts !== undefined && seed !== undefined) facts.replay(seed)
-      if (facts === undefined && link === undefined) {
-        register(session.subscribe((batch, meta) => deps.route(batch, meta, current)))
-      } else {
-        register(session.subscribe((batch, meta) => {
-          // Prompts first: a batch that also closes the turn must not leave
-          // a panel behind it; the generation fence applies to both halves.
-          if (current()) {
-            link?.apply(batch)
-            facts?.observe(batch, session, current)
-          }
-          deps.route(batch, meta, current)
-        }))
-      }
-      facts?.seed(capture, current, seed !== undefined)
+      register(session.subscribe((batch, meta) => deps.route(batch, meta, current)))
     } catch (error) {
       owner.dispose()
       throw error
@@ -270,18 +211,16 @@ export function createBindingFeed(ctx: Context, deps: {
   owner: ChannelOwner
   binding: ChannelBinding
   state: ChannelState
-  options: Pick<ChannelLaunchOptions, 'interaction'>
   inputConvergence: InputConvergence
   /** The projector's channel-side dependencies; `jobs` and `pricingWindow`
    *  stay writable until the channel starts (`configureProjection`). */
   projection: Omit<ChannelProjectionDeps, 'inputConvergence'>
   retireAttachment(messageId: string): void
-  controls: SessionControls
   hooks(): BindingFeedHooks
   /** A live `session.reset` (see createSessionBatchRouter). */
   onReset?(event: AgentEventOf<'session.reset'>): void
 }) {
-  const { owner, binding, state, inputConvergence, controls } = deps
+  const { owner, binding, state, inputConvergence } = deps
   // The projector reads its deps per use, so an extension can install its
   // job feed and pricing policy before any event is projected.
   const projectorDeps: ChannelProjectionDeps = { ...deps.projection, inputConvergence }
@@ -302,42 +241,6 @@ export function createBindingFeed(ctx: Context, deps: {
     deps.hooks().resetTranslation?.()
   }
 
-  /** Paint a settled history: no live toasts, no open turn left behind. */
-  const paintHistory = (events: readonly AgentEvent[]): void => {
-    if (events.length === 0) return
-    projector.apply(events, { replay: true })
-    projector.settleStreaming()
-    state.working = false
-    state.cancelPending = false
-  }
-
-  /**
-   * Fallback for a bind without a history read ahead of it (an embedder
-   * handing `createChannel` a session whose history it never read): read it
-   * once, asynchronously, and paint it only if nothing live has painted yet.
-   * Painting it after live rows that already arrived would misorder both.
-   * Every core adoption (`/new`, `/resume`, a rewind's fork) and the plugin's
-   * startup session pass the history in instead.
-   */
-  const replayHistory = (capture: BindingCapture, current: () => boolean): void => {
-    void capture.session.history().then(events => {
-      if (events.length === 0 || !current()) return
-      if (state.rows.length > 0) {
-        logForDebugging('channel: history arrived after live rows; not replayed')
-        return
-      }
-      paintHistory(events)
-      state.emit()
-    }).catch((error: unknown) => {
-      logForDebugging(`channel: history failed (${error instanceof Error ? error.message : String(error)})`)
-    })
-  }
-
-  const statusOf = (session: AgentSession): ChannelState['status'] =>
-    session.status === 'running' || session.status === 'requires-action'
-      ? 'running'
-      : session.status === 'disposed' ? 'disposed' : 'idle'
-
   const binder = createSessionBinder({
     owner,
     binding,
@@ -345,16 +248,7 @@ export function createBindingFeed(ctx: Context, deps: {
     inputConvergence,
     route: router.route,
     hooks: deps.hooks,
-    interaction: deps.options.interaction,
-    facts: {
-      observe: controls.observe,
-      replay: paintHistory,
-      seed(capture, current, replayed) {
-        state.status = statusOf(capture.session)
-        if (!replayed) replayHistory(capture, current)
-        controls.seed(capture.session, current)
-      },
-    },
+
   })
 
   return {

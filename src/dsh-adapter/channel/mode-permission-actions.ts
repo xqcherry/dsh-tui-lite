@@ -1,16 +1,16 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { t } from '../../i18n.js'
-import { modeDisplayName, type SessionModeSpec } from '../../sessionModes.js'
+import { t } from '../../app/i18n.js'
+import { modeDisplayName, type SessionModeSpec } from '../../app/session/modes.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
-import type { DshChannelBinding } from './binding.js'
+import type { ChannelBinding } from './binding.js'
 import { createModeActions, reportModeSwitchFailure } from './mode-actions.js'
 import { createPermissionIdentity, foldPermissionPreset, type PermissionIdentity } from './mode-permission.js'
 import type { PermissionModeRoster } from './mode-roster.js'
 import type { ChannelState } from './types.js'
 
-type Binding = DshChannelBinding
+type Binding = ChannelBinding
 type ModeState = Pick<ChannelState, 'mode' | 'modeIndex' | 'emit'>
 type ModeCapture = ReturnType<Binding['capture']>
 /** The composition seam `createModeActions` owns; this factory forwards every
@@ -90,7 +90,7 @@ function derivePermissionModeIndex(
  * Construction is inert. The returned shape is a superset of
  * `ReturnType<typeof createModeActions>`, so the composition root and
  * `createBindingEvents` can consume it unchanged, plus
- * `runPermissionPreset` for the public `ChannelUi` surface.
+ * `runPermissionPreset` for the public `Client` surface.
  */
 export function createPermissionModeActions(
   ctx: Context,

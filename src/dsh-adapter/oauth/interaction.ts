@@ -27,8 +27,8 @@
  * @module @deepseek-harness-tui/dsh-tui/oauth/interaction
  */
 
-import type { AskUserQuestionItem, AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
-import { t } from '../../i18n.js'
+import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
+import { t } from '../../app/i18n.js'
 import { copyToClipboard, openInBrowser } from './opener.js'
 import type { PiAiAuthEvent, PiAiAuthInteraction, PiAiAuthPrompt } from './pi-ai.js'
 

@@ -6,6 +6,8 @@ import { join } from 'node:path'
 
 export const checks = [
   'verify-boundaries.mjs',
+  'verify-upstream-contract.ts',
+  'verify-runtime-boot.mjs',
   'verify-minimal-config.ts',
   'verify-model-configuration.ts',
   'verify-host-preset.ts',
@@ -24,8 +26,6 @@ export const checks = [
   'verify-provider-wizard.mjs',
   'verify-oauth.mjs',
   'verify-launcher.mjs',
-  'verify-update.mjs',
-  'verify-update-recovery.mjs',
   'verify-markdown-render.tsx',
   'verify-streaming-markdown-blocks.tsx',
   'verify-table-layout.tsx',

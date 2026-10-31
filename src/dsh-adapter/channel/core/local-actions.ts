@@ -7,11 +7,11 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
-import { markChannelReadDirty } from '../../../adapter/channel/read-view.js'
-import { t } from '../../../i18n.js'
+import { t } from '../../../app/i18n.js'
+import type { ChannelOwner } from '../../../app/lifecycle/owner.js'
+import { markChannelReadDirty } from '../../../app/state/read-view.js'
 import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
 import type { ChannelBinding } from '../binding.js'
-import type { ChannelOwner } from '../owner.js'
 import { LOCAL_OUTPUT_LIMIT, preview } from '../transcript.js'
 import type { ChannelState } from '../types.js'
 
@@ -59,7 +59,6 @@ export function createCoreLocalActions(ctx: Context, deps: {
       for (const line of lines) state.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT) })
       state.emit()
     },
-
 
     /**
      * `!cmd` / `!!cmd`: the workspace's own command shell when it has one

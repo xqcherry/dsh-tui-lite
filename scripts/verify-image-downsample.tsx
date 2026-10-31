@@ -68,12 +68,12 @@ if (process.env.DSH_VERIFY_IMAGE_SPLIT_SHARP === '1') {
     write(join(hostSession, 'package.json'), '{"name":"@deepseek-ai/dsh-session"}')
     mkdirSync(join(profile, 'node_modules/@deepseek-ai'), { recursive: true })
     symlinkSync(hostSession, join(profile, 'node_modules/@deepseek-ai/dsh-session'), 'junction')
-    for (const file of ['dsh-adapter/sharp.ts', 'utils/imageResize.ts']) {
+    for (const file of ['utils/sharp.ts', 'utils/imageResize.ts']) {
       const target = join(profile, 'src', file)
       mkdirSync(dirname(target), { recursive: true })
       copyFileSync(new URL(`../src/${file}`, import.meta.url), target)
     }
-    const { loadSharp, sharpCandidatePaths } = await import(pathToFileURL(join(profile, 'src/dsh-adapter/sharp.ts')).href)
+    const { loadSharp, sharpCandidatePaths } = await import(pathToFileURL(join(profile, 'src/utils/sharp.ts')).href)
     assert.deepEqual(sharpCandidatePaths(), [host, profile].map(tree => join(tree, 'node_modules/sharp/index.js')))
     const shared = await loadSharp()
     assert.equal(typeof shared, 'function')
@@ -107,7 +107,7 @@ if (NO_SHARP) {
 
 const { probeImageSize, adaptImageForAdmission } = await import('../src/utils/imageResize.js')
 const { createComposerImages } = await import('../src/dsh-adapter/channel/composer-images.js')
-import type { StagedImageHandle } from '../src/adapter/ports/channel-view.js'
+import type { StagedImageHandle } from '../src/app/contracts/composer-view.js'
 
 const LIMITS = { maxImageDimension: 1024, maxImagePixels: 1_048_576 }
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']

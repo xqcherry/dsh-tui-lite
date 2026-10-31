@@ -1,5 +1,5 @@
 import sliceAnsi from '../utils/sliceAnsi.js'
-import { stringWidth } from './stringWidth.js'
+import { stringWidth } from '../utils/stringWidth.js'
 import type { Styles } from './styles.js'
 import { wrapAnsi } from './wrapAnsi.js'
 import { noteWrapCompute } from './render-stats.js'

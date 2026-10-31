@@ -9,9 +9,9 @@ import './lib/fake-home.mjs'
 import assert from 'node:assert/strict'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
-import { PromptInput } from '../src/components/PromptInput.js'
-import { render } from '../src/ui.js'
-import { loadHistory } from '../src/history.js'
+import { PromptInput } from '../src/tui/components/PromptInput.js'
+import { render } from '../src/tui/primitives.js'
+import { loadHistory } from '../src/app/input/history.js'
 import { settled, sleep } from './lib/term-test.mjs'
 
 const stdin = new PassThrough()

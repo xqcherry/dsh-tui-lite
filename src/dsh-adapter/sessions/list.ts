@@ -18,19 +18,19 @@
  * @module @deepseek-harness-tui/dsh-tui/sessions/list
  */
 import { basename } from 'node:path'
-import { beginListingSnapshot } from './snapshot.js'
+import { readLastUsed } from '../../app/session/sessionHistory.js'
+import { findSessionLogFile, resolveLocatedPath } from '../compat/sessionLog.js'
 import {
   digestAppendedSuffix,
   digestSession,
   sessionTitleAnchor,
 } from './digest.js'
 import { fileFacts } from './frames.js'
-import { scheduleMetadataRecovery, metadataRecoveryNeedsWork } from './recovery.js'
 import { classify, readHeader, type RawSessionHeader } from './header.js'
-import { findSessionLogFile, resolveLocatedPath } from '../compat/sessionLog.js'
+import { metadataRecoveryNeedsWork, scheduleMetadataRecovery } from './recovery.js'
+import { beginListingSnapshot } from './snapshot.js'
 import { indexFileStamp, readIndex, writeIndex, type DerivedEntry, type SessionIndex } from './store.js'
 import type { SessionSummary } from './types.js'
-import { readLastUsed } from '../../sessionHistory.js'
 
 /** A late overlapping listing must not write an older index over a newer one. */
 const listingVersions = new WeakMap<object | symbol, number>()

@@ -27,8 +27,8 @@ const [
   import('node:stream'),
   import('react'),
   import('@xterm/headless'),
-  import('../src/ui.js'),
-  import('../src/components/approvals/ApprovalPanel.js'),
+  import('../src/tui/primitives.js'),
+  import('../src/tui/components/approvals/ApprovalPanel.js'),
   import('../src/dsh-adapter/approvals.js'),
   import('./lib/term-test.mjs'),
 ])

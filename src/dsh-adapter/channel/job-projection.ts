@@ -1,8 +1,8 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { markChannelReadDirty } from '../../adapter/channel/read-view.js'
-import { t } from '../../i18n.js'
+import { t } from '../../app/i18n.js'
+import type { ChannelOwner } from '../../app/lifecycle/owner.js'
+import { markChannelReadDirty } from '../../app/state/read-view.js'
 import { BackgroundJobStore, formatJobDuration, type JobsRuntime } from '../jobs.js'
-import type { ChannelOwner } from './owner.js'
 import type { ChannelState, ChatRow, JobControl } from './types.js'
 
 /**
