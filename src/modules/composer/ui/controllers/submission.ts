@@ -12,7 +12,8 @@ import React from 'react'
 
 import type { ComposerImageRef } from '../../../../shared/protocol/composer.js'
 import { t } from '../../../../shared/i18n.js'
-import type { ComposerPort as Channel } from '../../contracts.js'
+import type { ComposerBinding } from '../../contracts.js'
+import type { ComposerContext } from '../types.js'
 
 
 import { type FileCandidate } from '../../../../shared/platform/file-suggestions.js'
@@ -24,7 +25,8 @@ interface Context {
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
   readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
-  readonly channel: Channel
+  readonly composer: ComposerBinding
+  readonly context: ComposerContext
   readonly beforeSubmit: (() => boolean) | undefined
   readonly imageRefsFor: (text: string) => ComposerImageRef[]
   readonly rememberHistory: (text: string, images: readonly ComposerImageRef[]) => void
@@ -79,16 +81,16 @@ const shellImagesUnsupported = (
     text: string,
     images: readonly ComposerImageRef[],
   ): boolean => {
-    const { channel } = getContext()
+    const { composer, context } = getContext()
 
 
     if (images.length === 0 || !text.startsWith('!')) return false
-    channel.notify(t('shell-images-unsupported'), { color: 'warning', timeoutMs: 4000 })
+    context.notify(t('shell-images-unsupported'), { color: 'warning', timeoutMs: 4000 })
     return true
   }
 
 const submitText = (text: string, notice?: string) => {
-    const { beforeSubmit, imageRefsFor, rememberHistory, channel } = getContext()
+    const { beforeSubmit, imageRefsFor, rememberHistory, composer, context } = getContext()
 
 
     if (beforeSubmit?.() === false) return
@@ -98,18 +100,18 @@ const submitText = (text: string, notice?: string) => {
     if (shellImagesUnsupported(trimmed, images)) return
     rememberHistory(trimmed, images)
     clearDeliveredDraft()
-    channel.submit(trimmed, images)
+    composer.commands.submit(trimmed, images)
     if (notice) {
-      channel.notify(notice, { timeoutMs: 2500 })
-    } else if (channel.working) {
+      context.notify(notice, { timeoutMs: 2500 })
+    } else if (context.sessions.getSnapshot().working) {
       // While the model is streaming, the message joins the DSH inbox and is
       // processed after the current turn — say so, or it looks "lost".
-      channel.notify(t('input-sent-after-turn'), { timeoutMs: 2500 })
+      context.notify(t('input-sent-after-turn'), { timeoutMs: 2500 })
     }
   }
 
 const steerSend = (text: string) => {
-    const { beforeSubmit, imageRefsFor, rememberHistory, channel } = getContext()
+    const { beforeSubmit, imageRefsFor, rememberHistory, composer, context } = getContext()
 
 
     if (beforeSubmit?.() === false) return
@@ -118,12 +120,12 @@ const steerSend = (text: string) => {
     const images = imageRefsFor(trimmed)
     rememberHistory(trimmed, images)
     clearDeliveredDraft()
-    channel.steer(trimmed, images)
-    channel.notify(t('input-interrupted-next'), { timeoutMs: 2500 })
+    composer.commands.steer(trimmed, images)
+    context.notify(t('input-interrupted-next'), { timeoutMs: 2500 })
   }
 
 const queueSend = (text: string) => {
-    const { beforeSubmit, imageRefsFor, rememberHistory, channel } = getContext()
+    const { beforeSubmit, imageRefsFor, rememberHistory, composer, context } = getContext()
 
 
     if (beforeSubmit?.() === false) return
@@ -133,55 +135,55 @@ const queueSend = (text: string) => {
     if (shellImagesUnsupported(trimmed, images)) return
     rememberHistory(trimmed, images)
     clearDeliveredDraft()
-    channel.submit(trimmed, images)
-    channel.notify(t('input-queued-after-turn'), { timeoutMs: 2500 })
+    composer.commands.submit(trimmed, images)
+    context.notify(t('input-queued-after-turn'), { timeoutMs: 2500 })
   }
 
 const sendDocked = (): void => {
-    const { beforeSubmit, channel, setDockSelected } = getContext()
+    const { beforeSubmit, composer, context, setDockSelected } = getContext()
 
 
     if (beforeSubmit?.() === false) return
-    const sent = channel.deliverDocked()
-    if (sent > 0) channel.notify(t('input-dock-sent', { n: sent }), { timeoutMs: 2500 })
+    const sent = composer.commands.deliverDocked()
+    if (sent > 0) context.notify(t('input-dock-sent', { n: sent }), { timeoutMs: 2500 })
     setDockSelected(null)
   }
 
 const interruptSend = () => {
-    const { beforeSubmit, value, channel, imageRefsFor, rememberHistory } = getContext()
+    const { beforeSubmit, value, composer, context, imageRefsFor, rememberHistory } = getContext()
 
 
     if (beforeSubmit?.() === false) return
     const trimmed = value.trim()
     if (!trimmed) {
-      channel.notify(t('input-empty'), { color: 'warning' })
+      context.notify(t('input-empty'), { color: 'warning' })
       return
     }
     // Abort the running turn and deliver: previously queued pending
     // messages first (FIFO), then the current input — all processed
     // immediately once the abort settles. Docked rows are NOT listed here:
-    // the channel's interruptAndDeliver takes the dock itself first (same
+    // the composer's interruptAndDeliver takes the dock itself first (same
     // FIFO order), so including them would send each docked text twice.
     const images = imageRefsFor(trimmed)
     const queued: ComposerSubmission[] = [
-      ...channel.pending.filter(item => item.docked !== true).map(item => ({ text: item.text, images: item.images ?? [] })),
+      ...composer.store.getSnapshot().pending.filter(item => item.docked !== true).map(item => ({ text: item.text, images: item.images ?? [] })),
       { text: value, images },
     ]
-    const count = channel.interruptAndDeliver(queued)
+    const count = composer.commands.interruptAndDeliver(queued)
     if (count === 0) return
     rememberHistory(trimmed, images)
     clearDeliveredDraft()
-    channel.notify(t('input-interrupt-immediate'), { timeoutMs: 2500 })
+    context.notify(t('input-interrupt-immediate'), { timeoutMs: 2500 })
   }
 
 const tryRunCommand = (text: string): boolean => {
-    const { channel, syncImageGeneration, draftRevisionRef, inputEditSequenceRef, pendingCommandRef, imageRefsFor, beforeSubmit, captureDraftImageLease, valueRef, onRunCommand, warnStaleImageTokens, rememberHistory, draftImageLeaseIsCurrent } = getContext()
+    const { composer, context, syncImageGeneration, draftRevisionRef, inputEditSequenceRef, pendingCommandRef, imageRefsFor, beforeSubmit, captureDraftImageLease, valueRef, onRunCommand, warnStaleImageTokens, rememberHistory, draftImageLeaseIsCurrent } = getContext()
 
 
     if (!text.startsWith('/')) return false
     const parsed = parseCommandName(text)
     if (parsed === undefined) return false
-    const command = channel.commandList.find(entry => entry.name === parsed.name)
+    const command = context.workbench.getSnapshot().commandList.find(entry => entry.name === parsed.name)
     if (command === undefined) return false
     const generation = syncImageGeneration()
     const revision = draftRevisionRef.current
@@ -191,7 +193,7 @@ const tryRunCommand = (text: string): boolean => {
       && pendingCommandRef.current.revision === revision
       && pendingCommandRef.current.editSequence === editSequence
     ) {
-      channel.notify(t('command-running'), { color: 'warning', timeoutMs: 2500 })
+      context.notify(t('command-running'), { color: 'warning', timeoutMs: 2500 })
       return true
     }
     if (pendingCommandRef.current !== null) pendingCommandRef.current = null
@@ -204,7 +206,7 @@ const tryRunCommand = (text: string): boolean => {
     if (command.skill === true && beforeSubmit?.() === false) return true
     if (modelRoutedSkill) return false
     if (images.length > 0 && !modelRoutedSkill && command?.acceptsImages !== true) {
-      channel.notify(t('command-images-unsupported', { name: parsed.name }), {
+      context.notify(t('command-images-unsupported', { name: parsed.name }), {
         color: 'warning',
         timeoutMs: 4000,
       })
@@ -241,7 +243,7 @@ const tryRunCommand = (text: string): boolean => {
         }
       }).catch((error: unknown) => {
         if (!draftImageLeaseIsCurrent(lease)) return
-        channel.notify(error instanceof Error ? error.message : String(error), {
+        context.notify(error instanceof Error ? error.message : String(error), {
           color: 'error',
           timeoutMs: 5000,
         })
@@ -253,16 +255,16 @@ const tryRunCommand = (text: string): boolean => {
   }
 
 const chooseCommand = (text: string): void => {
-    const { channel } = getContext()
+    const { composer, context } = getContext()
 
 
     if (tryRunCommand(text)) return
-    if (channel.working) steerSend(text)
+    if (context.sessions.getSnapshot().working) steerSend(text)
     else submitText(text)
   }
 
 const handleEnter = () => {
-    const { lastEnterAtRef, valueRef, dockSelectedRef, dockCount, editDocked, overlayOpen, suggestions, selectedCommand, fileOverlayOpen, fileMatches, fileSelected, acceptFile, channel } = getContext()
+    const { lastEnterAtRef, valueRef, dockSelectedRef, dockCount, editDocked, overlayOpen, suggestions, selectedCommand, fileOverlayOpen, fileMatches, fileSelected, acceptFile, composer, context } = getContext()
 
 
     // A single Enter can arrive as two events in cmd pipelines (`\r`
@@ -299,16 +301,16 @@ const handleEnter = () => {
     // progress keeps the ordinary submit path and the dock stays parked —
     // sending parked messages silently along with the next typed submit is
     // exactly the surprise the dock exists to prevent.
-    if (value.trim() === '' && !channel.working && dockCount > 0) {
+    if (value.trim() === '' && !context.sessions.getSnapshot().working && dockCount > 0) {
       sendDocked()
       return
     }
-    if (channel.working && value.trim() !== '') {
+    if (context.sessions.getSnapshot().working && value.trim() !== '') {
       // Host skill commands may run during a turn. Other model input steers
       // the active turn, while unsupported local commands are refused.
       const parsed = value.startsWith('/') ? parseCommandName(value) : undefined
       if (parsed !== undefined && (
-        channel.commandList.some(command => command.name === parsed.name && (parsed.name === 'skills' || command.skill === true))
+        context.workbench.getSnapshot().commandList.some(command => command.name === parsed.name && (parsed.name === 'skills' || command.skill === true))
         || 'usage' in resolveLocalCommandPath(parsed.name, parsed.rawInput)
 
       )) {

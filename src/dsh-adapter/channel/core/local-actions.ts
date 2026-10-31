@@ -1,3 +1,5 @@
+import { publishRuntime, type RuntimeCommands } from '../../module-runtime.js'
+import type { ModuleOwners } from '../../module-runtime.js'
 /**
  * Local-only transcript actions every session gets: `/clear`, local report
  * rows, `!cmd` / `!!cmd` through the session's workspace shell,
@@ -13,15 +15,14 @@ import { markChannelReadDirty } from '../../../shared/state/read-view.js'
 import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
 import type { ChannelBinding } from '../binding.js'
 import { LOCAL_OUTPUT_LIMIT, preview } from '../transcript.js'
-import type { ChannelState } from '../types.js'
 
 export function createCoreLocalActions(ctx: Context, deps: {
   owner: Pick<ChannelOwner, 'current'>
   binding: Pick<ChannelBinding, 'capture' | 'isCurrent'>
-  state: ChannelState
+  state: Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
   rowIds: { value: number }
   resetProjection(): void
-  notify: ChannelState['notify']
+  notify: RuntimeCommands['notify']
   unavailable(name: string): void
   /** Extension projections whose rows `/clear` drops with the transcript. */
   dropRows(): void
@@ -38,26 +39,26 @@ export function createCoreLocalActions(ctx: Context, deps: {
       const restore = deps.loadOlder()
       if (restore === undefined) return 0
       const restored = restore()
-      if (restored > 0) state.emit()
+      if (restored > 0) publishRuntime(state)
       return restored
     },
 
     clear(): void {
-      state.rows.length = 0
-      markChannelReadDirty(state.rows)
+      state.transcript.ingress.update(draft => { draft.rows.length = 0 })
+      state.transcript.ingress.update(draft => { markChannelReadDirty(draft.rows) })
       rowIds.value = 0
       deps.resetProjection()
       deps.dropRows()
-      state.activeToolCount = 0
-      state.responseChars = 0
-      state.rows.push({ id: rowIds.value++, kind: 'notice', text: t('session-cleared') })
-      state.emit()
+      state.transcript.ingress.update(draft => { draft.activeToolCount = 0 })
+      state.transcript.ingress.update(draft => { draft.responseChars = 0 })
+      state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'notice', text: t('session-cleared') }) })
+      publishRuntime(state)
     },
 
     pushLocal(title: string, lines: readonly string[]): void {
-      state.rows.push({ id: rowIds.value++, kind: 'local', text: title })
-      for (const line of lines) state.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT) })
-      state.emit()
+      state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local', text: title }) })
+      for (const line of lines) state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT) }) })
+      publishRuntime(state)
     },
 
     /**
@@ -80,9 +81,9 @@ export function createCoreLocalActions(ctx: Context, deps: {
   async function runLocal(command: string, includeInContext: boolean): Promise<void> {
     const capture = binding.capture()
     const current = (): boolean => owner.current() && binding.isCurrent(capture)
-    const cwd = state.cwd
-    state.rows.push({ id: rowIds.value++, kind: 'local', text: command, executionTarget: 'local' })
-    state.emit()
+    const cwd = state.sessions.ingress.read().cwd
+    state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local', text: command, executionTarget: 'local' }) })
+    publishRuntime(state)
     const executor = ctx.get('shell') as ForegroundShell | undefined
     if (!current()) return
     if (executor === undefined) {
@@ -97,8 +98,8 @@ export function createCoreLocalActions(ctx: Context, deps: {
       output = error instanceof Error ? error.message : String(error)
     }
     if (!current()) return
-    state.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(output, LOCAL_OUTPUT_LIMIT) })
-    state.emit()
+    state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(output, LOCAL_OUTPUT_LIMIT) }) })
+    publishRuntime(state)
     if (includeInContext) {
       // This runs detached (`void runLocalCommand`): a session that closed
       // meanwhile (a backend process that exited) must not surface as an

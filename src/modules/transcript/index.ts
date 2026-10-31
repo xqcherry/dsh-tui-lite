@@ -41,3 +41,5 @@ export { MessageList } from './ui/MessageList.js'
 export type * from './contracts.js'
 
 export { replaySelectionAttachment } from './model/selection-record.js'
+
+export { createTranscriptModule } from './model/module.js'

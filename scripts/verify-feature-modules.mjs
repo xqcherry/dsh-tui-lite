@@ -8,4 +8,10 @@ for (const name of ['composer', 'transcript', 'sessions', 'settings', 'decisions
   }
 }
 for (const legacy of ['src/app', 'src/tui']) assert.ok(!existsSync(legacy), `Remove migrated implementation: ${legacy}`)
-console.log('Feature modules expose explicit contracts and entries without legacy implementation trees')
+for (const name of ['composer', 'transcript', 'sessions', 'settings', 'activity', 'workbench']) {
+  assert.ok(existsSync(`src/modules/${name}/model/module.ts`), `${name} must own its state`)
+}
+for (const name of ['client', 'client-state', 'mutable-state', 'initial-state', 'ui-policy', 'services', 'ports']) {
+  assert.ok(!existsSync(`src/dsh-adapter/runtime/${name}.ts`), `Remove aggregated runtime: ${name}`)
+}
+console.log('Feature modules own state behind public entries without a legacy aggregate runtime')

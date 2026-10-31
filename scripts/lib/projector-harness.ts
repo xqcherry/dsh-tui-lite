@@ -1,40 +1,40 @@
 /**
- * Minimal shared-projector harness for translator gates: a fresh channel view
- * (`createInitialChannelView`) plus recording projector deps, so a script can
+ * Minimal shared-projector harness for translator gates: six real module owners plus recording projector deps, so a script can
  * fold translated `AgentEvent`s through the production reducer
- * (`src/channel/projection.ts`) and inspect the resulting rows/state without
+ * (`src/modules/transcript/model/projection.ts`) and inspect the resulting rows/state without
  * mounting a channel. The golden pipeline keeps its own richer harness
  * (scripts/lib/projection-golden.ts); this one is for focused assertions.
  *
  * Import from TypeScript scripts run with `node --import tsx/esm`.
  */
 import type { AgentEvent } from '../../src/shared/protocol/events.js'
-import { createChannelProjection } from '../../src/modules/transcript/model/projection.js'
-import { createInitialChannelView } from '../../src/dsh-adapter/runtime/initial-state.js'
+import { createRuntimeModulesFixture, readRuntimeFixture } from './runtime-modules-fixture.js'
+import type { RuntimeModules } from '../../src/dsh-adapter/module-runtime.js'
 
-type ProjectionArgs = Parameters<typeof createChannelProjection>
+type Projection = ReturnType<RuntimeModules['transcript']['ingress']['createProjection']>
 
 export interface ProjectorHarness {
-  readonly state: ProjectionArgs[0]
-  readonly projector: ReturnType<typeof createChannelProjection>
+  readonly state: ReturnType<typeof readRuntimeFixture>
+  readonly runtime: RuntimeModules
+  readonly projector: Projection
   readonly notices: string[]
   /** Fold one live batch (or a replay batch with `replay: true`). */
   apply(events: readonly AgentEvent[], replay?: boolean): void
 }
 
 export function createProjectorHarness(options: { agentPreset?: string; thinkingFold?: 'preview' | 'full'; model?: string; now?: () => number } = {}): ProjectorHarness {
-  const view = createInitialChannelView(
-    { model: options.model ?? 'fixture-model', provider: 'fixture', cwd: '/fixture', agentPreset: options.agentPreset, thinkingFold: options.thinkingFold },
-    { agentId: 'fixture-agent', sessionId: 'fixture-session', mode: { id: 'normal', name: 'Normal' } as never, cwdDescription: '/fixture' },
-  )
-  const state: ProjectionArgs[0] = { ...view, emit: () => undefined } as ProjectionArgs[0]
+  const runtime = createRuntimeModulesFixture(options)
   const notices: string[] = []
   const rowIds = { value: 0 }
   const notify = (text: string): (() => void) => {
     notices.push(text)
     return () => undefined
   }
-  const projector = createChannelProjection(state, {
+  const projector = runtime.transcript.ingress.createProjection({
+    sessions: runtime.sessions,
+    settings: runtime.settings,
+    composer: runtime.composer,
+  }, {
     rowIds,
     resetContextWarning: () => undefined,
     checkContextWarning: () => undefined,
@@ -47,7 +47,8 @@ export function createProjectorHarness(options: { agentPreset?: string; thinking
     selectionAttached: () => undefined,
   })
   return {
-    state,
+    runtime,
+    get state() { return readRuntimeFixture(runtime) },
     projector,
     notices,
     apply(events, replay = false) {

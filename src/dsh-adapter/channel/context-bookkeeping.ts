@@ -1,23 +1,19 @@
+import type { ModuleOwners } from '../module-runtime.js'
 import type { ContextOccupancy } from '../../shared/protocol/session.js'
 import type { ComposerImageRef, PendingMessage } from './types.js'
 
 /** Small mutable cells for Channel-local warning and pending-message state. */
 export function createContextBookkeeping(
-  state: () => {
-    /** The channel's single occupancy reading (projection first, sample
-     *  fallback) — the honest numerator for the context-low warning. */
-    contextOccupancy: ContextOccupancy | undefined
-    pending: PendingMessage[]
-    emit(): void
-  },
+  state: () => Pick<ModuleOwners, 'composer' | 'transcript'>,
   notify: (text: string, options: { color: 'warning'; timeoutMs: number }) => unknown,
   lowContextText: (percent: number) => string,
   warningBufferTokens: number,
+  readOccupancy?: () => ContextOccupancy | undefined,
 ) {
   const warning = { value: false }
   const checkContextWarning = (): void => {
     const channel = state()
-    const occupancy = channel.contextOccupancy
+    const occupancy = readOccupancy?.() ?? channel.transcript.ingress.read().contextOccupancy
     // No window (no route capacity) is the only reason to stay silent: the
     // numerator is now the projected occupancy, which exists as soon as a
     // meter (any normal deployment) or one settled request knows anything.
@@ -32,14 +28,11 @@ export function createContextBookkeeping(
   }
   const trackPending = (message: { id: string; text: string; images?: readonly ComposerImageRef[] }, placement: PendingMessage['placement']): void => {
     const channel = state()
-    channel.pending = [...channel.pending, { id: message.id, text: message.text, images: message.images ?? [], placement }]
-    channel.emit()
+    channel.composer.ingress.update(draft => { draft.pending = [...draft.pending, { id: message.id, text: message.text, images: message.images ?? [], placement }] })
   }
   const untrackPending = (messageId: string): void => {
     const channel = state()
-    const before = channel.pending.length
-    channel.pending = channel.pending.filter(item => item.id !== messageId)
-    if (channel.pending.length !== before) channel.emit()
+    channel.composer.ingress.update(draft => { draft.pending = draft.pending.filter(item => item.id !== messageId) })
   }
   const resetContextWarning = (): void => { warning.value = false }
   return { warning, resetContextWarning, checkContextWarning, trackPending, untrackPending }

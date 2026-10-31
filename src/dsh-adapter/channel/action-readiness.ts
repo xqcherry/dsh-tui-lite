@@ -1,11 +1,11 @@
-import type { ChannelState } from './types.js'
+import type { RuntimeCommands } from '../module-runtime.js'
 
 /**
  * The Channel installs its effectful command delegates atomically after every
  * specialist has been constructed.  Construction-time callers fail closed
  * rather than receiving a plausible no-op while the Channel is incomplete.
  */
-export type ChannelActionDelegates = Pick<ChannelState,
+export type ChannelActionDelegates = Pick<RuntimeCommands,
   | 'commandCompletions'
   | 'loadOlder'
   | 'resumeTo'
@@ -46,9 +46,9 @@ export type ChannelActionDelegates = Pick<ChannelState,
 }
 
 type ChannelActionMethodName = Exclude<keyof ChannelActionDelegates, 'runLocalCommand'>
-export type ChannelActionMethods = Pick<ChannelState, ChannelActionMethodName>
+export type ChannelActionMethods = Pick<RuntimeCommands, ChannelActionMethodName>
 
-/** The ChannelState-facing half of the readiness cell is deliberately pure:
+/** The RuntimeCommands-facing half of the readiness cell is deliberately pure:
  * one typed forwarding method per public action, with no service access. */
 export function createChannelActionMethods(
   getReadyActions: () => ChannelActionDelegates,

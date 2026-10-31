@@ -4,7 +4,22 @@
 import React from 'react'
 
 import type { ComposerImageRef } from '../../../shared/protocol/composer.js'
-import type { ComposerPort as Channel } from '../contracts.js'
+import type { ComposerBinding } from '../contracts.js'
+import type { SessionsSnapshot } from '../../sessions/contracts.js'
+import type { SettingsSnapshot } from '../../settings/contracts.js'
+import type { Notify } from '../../../shared/protocol/notifications.js'
+import type { LocalCommand } from '../../../shared/protocol/commands.js'
+import type { ReadableStore } from '../../../shared/state/module-store.js'
+import type { NotificationItem } from '../../../shared/protocol/session.js'
+
+/** Cross-module reads and the two explicit actions the input requires. */
+export interface ComposerContext {
+  readonly sessions: ReadableStore<SessionsSnapshot>
+  readonly settings: ReadableStore<SettingsSnapshot>
+  readonly workbench: ReadableStore<{ readonly notifications: readonly NotificationItem[]; readonly commandList: readonly LocalCommand[] }>
+  readonly notify: Notify
+  readonly cycleMode: () => Promise<void>
+}
 
 
 import { type PromptDraftCache } from '../model/promptDraftCache.js'
@@ -32,7 +47,8 @@ export interface PromptController {
 }
 
 export interface PromptInputProps {
-  channel: Channel
+  composer: ComposerBinding
+  context: ComposerContext
   /** Keep the draft mounted while another prompt-slot panel owns the UI. */
   suspended?: boolean
   /**
@@ -41,7 +57,7 @@ export interface PromptInputProps {
    * render (not via an effect-written ledger) so toast and bubble swap in
    * the same commit without a one-frame flash. Errors are never suppressed.
    */
-  toastSuppressed?: (item: Channel['notifications'][number]) => boolean
+  toastSuppressed?: (item: NotificationItem) => boolean
   /**
    * Owner-held slot for the unsent draft.
    *

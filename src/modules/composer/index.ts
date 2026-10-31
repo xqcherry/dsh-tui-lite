@@ -10,6 +10,10 @@ export { HistorySearchDialog } from './ui/HistorySearchDialog.js'
 
 export { PromptInput } from './ui/PromptInput.js'
 
-export type { PromptController } from './ui/PromptInput.js'
+export type { PromptController, PromptInputProps } from './ui/PromptInput.js'
+
+export type { ComposerContext } from './ui/types.js'
 
 export type * from './contracts.js'
+
+export { createComposerModule } from './model/module.js'

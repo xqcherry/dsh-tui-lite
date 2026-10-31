@@ -49,3 +49,7 @@ export { publishMounts } from './model/sessionMounts.js'
 export { readLastUsed } from './model/sessionHistory.js'
 
 export type * from './contracts.js'
+
+export { createSessionsModule } from './model/module.js'
+
+export { createSessionHandoff } from './model/session-switch.js'

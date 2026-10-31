@@ -27,7 +27,10 @@ export interface ChatProps {
 
 export function Chat({ ports, questionStore, approvalStore, modelConfigured, initialPrompt, onExit }: ChatProps): React.ReactNode {
   const { composer, sessions, settings, transcript, workbench } = ports
-  React.useSyncExternalStore(listener => workbench.subscribe(listener), () => workbench.version)
+  const session = React.useSyncExternalStore(sessions.store.subscribe, sessions.store.getSnapshot)
+  const setting = React.useSyncExternalStore(settings.store.subscribe, settings.store.getSnapshot)
+  const conversation = React.useSyncExternalStore(transcript.store.subscribe, transcript.store.getSnapshot)
+  const composerState = React.useSyncExternalStore(composer.store.subscribe, composer.store.getSnapshot)
   const question = React.useSyncExternalStore(listener => questionStore.subscribe(listener), () => questionStore.getSnapshot())
   const approval = React.useSyncExternalStore(listener => approvalStore.subscribe(listener), () => approvalStore.getSnapshot())
   const { rows: terminalRows } = useTerminalSize()
@@ -57,17 +60,17 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   const lastExit = React.useRef(0)
   const loading = React.useRef(false)
   const configurationCheck = React.useRef(0)
-  const generation = sessions.agentBindingGeneration
+  const generation = session.agentBindingGeneration
   const refreshConfiguration = React.useCallback(async () => {
     if (!modelConfigured) return
-    const current = sessions.agentBindingGeneration
-    const provider = settings.provider
-    const model = settings.model
+    const current = sessions.store.getSnapshot().agentBindingGeneration
+    const provider = settings.store.getSnapshot().provider
+    const model = settings.store.getSnapshot().model
     const check = ++configurationCheck.current
     setConfigured(false)
     const stillCurrent = (): boolean => check === configurationCheck.current
-      && current === sessions.agentBindingGeneration
-      && provider === settings.provider && model === settings.model
+      && current === sessions.store.getSnapshot().agentBindingGeneration
+      && provider === settings.store.getSnapshot().provider && model === settings.store.getSnapshot().model
     try {
       const ready = await modelConfigured()
       if (stillCurrent()) setConfigured(ready)
@@ -75,10 +78,10 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       if (stillCurrent()) setConfigured(false)
     }
   }, [sessions, settings, modelConfigured])
-  React.useEffect(() => { void refreshConfiguration() }, [refreshConfiguration, generation, settings.model, settings.provider])
+  React.useEffect(() => { void refreshConfiguration() }, [refreshConfiguration, generation, setting.model, setting.provider])
   React.useEffect(() => { setExpandedRows(new Set()); setShowAll(false) }, [generation])
   const report = (error: unknown): void => {
-    workbench.notify(error instanceof Error ? error.message : String(error), { color: 'error' })
+    workbench.commands.notify(error instanceof Error ? error.message : String(error), { color: 'error' })
   }
   const perform = (operation: () => unknown | Promise<unknown>): void => {
     void Promise.resolve().then(operation).catch(report)
@@ -88,37 +91,37 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     setMenu({ title, items })
   }
   const openModels = async (): Promise<void> => {
-    const models = await settings.listModels()
+    const models = await settings.commands.listModels()
     openMenu('Model', [
       { label: 'Configure a provider or API key', run: configureProvider },
       ...models.map(model => ({
         label: `${model.provider} / ${model.name || model.id}`,
-        run: async () => { await settings.switchModel(model.provider, model.id); await refreshConfiguration() },
+        run: async () => { await settings.commands.switchModel(model.provider, model.id); await refreshConfiguration() },
       })),
     ])
   }
   const configureProvider = async (): Promise<void> => {
-    const host = settings.providerSetup()
-    if (!host) { workbench.notify('Provider configuration is unavailable in this host', { color: 'warning' }); return }
+    const host = settings.commands.providerSetup()
+    if (!host) { workbench.commands.notify('Provider configuration is unavailable in this host', { color: 'warning' }); return }
     if (loading.current) return
     loading.current = true
     try {
       await runProviderWizard({
         host,
         ask: (request, options) => questionStore.ask(request, options),
-        notify: (text, options) => workbench.notify(text, options),
-        pushLocal: (title, lines) => transcript.pushLocal(title, lines),
-        working: () => transcript.working,
-        switchModel: (provider, model) => settings.switchModel(provider, model),
+        notify: (text, options) => workbench.commands.notify(text, options),
+        pushLocal: (title, lines) => transcript.commands.pushLocal(title, lines),
+        working: () => sessions.store.getSnapshot().working,
+        switchModel: (provider, model) => settings.commands.switchModel(provider, model),
       })
       await refreshConfiguration()
     } finally { loading.current = false }
   }
   const openSessions = async (): Promise<void> => {
-    const savedSessions = await sessions.listSessions()
-    openMenu('Resume session', savedSessions.filter(session => session.cwd === sessions.cwd && session.id !== sessions.agentId).map(session => ({
+    const savedSessions = await sessions.commands.listSessions()
+    openMenu('Resume session', savedSessions.filter(saved => saved.cwd === sessions.store.getSnapshot().cwd && saved.id !== sessions.store.getSnapshot().agentId).map(session => ({
       label: typeof session.title === 'string' ? session.title : session.id,
-      run: () => sessions.resumeTo(session.id),
+      run: () => sessions.commands.resumeTo(session.id),
     })))
   }
   const runCommand = async (name: string, raw: string, images: readonly ComposerImageRef[]): Promise<boolean> => {
@@ -126,33 +129,33 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     switch (name) {
       case 'exit': onExit(); break
       case 'help': setHelp(value => !value); break
-      case 'new': await sessions.newSession(); break
+      case 'new': await sessions.commands.newSession(); break
       case 'resume':
       case 'session':
-        if (argument && argument !== 'list') await sessions.resumeTo(argument)
+        if (argument && argument !== 'list') await sessions.commands.resumeTo(argument)
         else await openSessions()
         break
       case 'model':
         if (argument.includes('/')) {
           const separator = argument.indexOf('/')
-          await settings.switchModel(argument.slice(0, separator), argument.slice(separator + 1))
+          await settings.commands.switchModel(argument.slice(0, separator), argument.slice(separator + 1))
           await refreshConfiguration()
         } else await openModels()
         break
       case 'provider': await configureProvider(); break
       case 'auth': {
         if (argument !== '' && argument !== 'login') {
-          const outcome = await workbench.runExternalCommandOutcome('auth', raw, images)
-          if (outcome?.text) workbench.notify(outcome.text, { color: outcome.kind === 'error' ? 'error' : undefined })
+          const outcome = await workbench.commands.runExternalCommandOutcome('auth', raw, images)
+          if (outcome?.text) workbench.commands.notify(outcome.text, { color: outcome.kind === 'error' ? 'error' : undefined })
           await refreshConfiguration()
           return outcome?.consumeDraft === true
         }
-        const oauth = settings.providerSetup()?.oauth
-        if (!oauth) { workbench.notify('Account login is unavailable in this host', { color: 'warning' }); break }
+        const oauth = settings.commands.providerSetup()?.oauth
+        if (!oauth) { workbench.commands.notify('Account login is unavailable in this host', { color: 'warning' }); break }
         const deps = {
           ask: (request: Parameters<QuestionStore['ask']>[0], options?: { redact?: boolean }) => questionStore.ask(request, options),
-          notify: (text: string, options?: { color?: 'error' | 'warning' | 'success'; timeoutMs?: number }) => workbench.notify(text, options),
-          pushLocal: (title: string, lines: readonly string[]) => transcript.pushLocal(title, lines),
+          notify: (text: string, options?: { color?: 'error' | 'warning' | 'success'; timeoutMs?: number }) => workbench.commands.notify(text, options),
+          pushLocal: (title: string, lines: readonly string[]) => transcript.commands.pushLocal(title, lines),
         }
         openMenu('Account login', (await oauth.providers()).map(status => ({
           label: `${status.label}${status.signedIn ? ' (signed in)' : ''}`,
@@ -162,39 +165,39 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
         break
       }
       case 'effort': {
-        if (argument) await settings.setEffort(argument)
-        else openMenu('Reasoning effort', (await settings.listEfforts()).efforts.map(option => ({
-          label: option.name, run: () => settings.setEffort(option.id),
+        if (argument) await settings.commands.setEffort(argument)
+        else openMenu('Reasoning effort', (await settings.commands.listEfforts()).efforts.map(option => ({
+          label: option.name, run: () => settings.commands.setEffort(option.id),
         })))
         break
       }
       case 'permission': {
-        if (argument) await settings.runPermissionPreset(argument)
-        else openMenu('Permissions', settings.permissionPresets().options.map(option => ({
-          label: `${option.name} — ${option.description}`, run: () => settings.runPermissionPreset(option.value),
+        if (argument) await sessions.commands.runPermissionPreset(argument)
+        else openMenu('Permissions', sessions.commands.permissionPresets().options.map(option => ({
+          label: `${option.name} — ${option.description}`, run: () => sessions.commands.runPermissionPreset(option.value),
         })))
         break
       }
-      case 'rename': if (argument) await sessions.renameSession(argument); else workbench.notify('Usage: /rename <title>'); break
+      case 'rename': if (argument) await sessions.commands.renameSession(argument); else workbench.commands.notify('Usage: /rename <title>'); break
       case 'export': {
-        const path = transcript.exportSession()
-        workbench.notify(path ? `Exported: ${path}` : 'Session export failed', { color: path ? 'success' : 'error' })
+        const path = transcript.commands.exportSession()
+        workbench.commands.notify(path ? `Exported: ${path}` : 'Session export failed', { color: path ? 'success' : 'error' })
         break
       }
-      case 'compact': if (configured) await transcript.compact(); else workbench.notify('Configure a model first: /provider or /auth'); break
+      case 'compact': if (configured) await transcript.commands.compact(); else workbench.commands.notify('Configure a model first: /provider or /auth'); break
       case 'thinking': setThinking(value => !value); break
-      case 'mcp': transcript.pushLocal('MCP', workbench.mcpStatus()); break
-      case 'status': transcript.pushLocal('Status', [transcript.status, `${settings.provider}/${settings.model}`, sessions.cwd]); break
-      case 'doctor': transcript.pushLocal('Diagnostics', await workbench.doctorInfo()); break
+      case 'mcp': transcript.commands.pushLocal('MCP', workbench.commands.mcpStatus()); break
+      case 'status': transcript.commands.pushLocal('Status', [session.status, `${setting.provider}/${setting.model}`, session.cwd]); break
+      case 'doctor': transcript.commands.pushLocal('Diagnostics', await workbench.commands.doctorInfo()); break
       default: {
-        const outcome = await workbench.runExternalCommandOutcome(name, raw, images)
-        if (outcome?.text) workbench.notify(outcome.text, { color: outcome.kind === 'error' ? 'error' : undefined })
+        const outcome = await workbench.commands.runExternalCommandOutcome(name, raw, images)
+        if (outcome?.text) workbench.commands.notify(outcome.text, { color: outcome.kind === 'error' ? 'error' : undefined })
         return outcome?.consumeDraft === true
       }
     }
     return true
   }
-  const history = historyQuery === null ? [] : loadHistory(sessions.cwd).filter(entry => entry.text.toLowerCase().includes(historyQuery.toLowerCase()))
+  const history = historyQuery === null ? [] : loadHistory(session.cwd).filter(entry => entry.text.toLowerCase().includes(historyQuery.toLowerCase()))
   const panelOpen = question !== null || approval !== null || menu !== null || historyQuery !== null
 
   useInput((input, key) => {
@@ -214,7 +217,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       return
     }
     if (historyQuery !== null) {
-      const history = loadHistory(sessions.cwd).filter(entry => entry.text.toLowerCase().includes(historyQuery.toLowerCase()))
+      const history = loadHistory(session.cwd).filter(entry => entry.text.toLowerCase().includes(historyQuery.toLowerCase()))
       if (key.escape || (key.ctrl && input === 'c')) { setHistoryQuery(null); return }
       if (key.upArrow) setFocus(index => Math.max(0, index - 1))
       else if (key.downArrow || (key.ctrl && input === 'r')) setFocus(index => Math.min(history.length - 1, index + 1))
@@ -228,43 +231,43 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     }
     if (key.ctrl && input === 'r') { setHistoryQuery(''); setFocus(0); return }
     if (key.ctrl && input === 'o') { setExpanded(value => !value); return }
-    if (key.escape && transcript.working) {
-      if (!controller.current?.consumeEscape()) composer.cancel()
+    if (key.escape && session.working) {
+      if (!controller.current?.consumeEscape()) composer.commands.cancel()
       return
     }
     if (key.ctrl && (input === 'c' || input === 'd')) {
       if (controller.current?.consumeSelectionCopy()) return
-      if (transcript.working) {
-        if (transcript.cancelPending) onExit()
-        else composer.cancel()
+      if (session.working) {
+        if (composerState.cancelPending) onExit()
+        else composer.commands.cancel()
       } else if (controller.current?.hasText()) controller.current.clear()
       else {
         if (Date.now() - lastExit.current < 1500) onExit()
-        else { lastExit.current = Date.now(); workbench.notify('Press Ctrl+C again to exit') }
+        else { lastExit.current = Date.now(); workbench.commands.notify('Press Ctrl+C again to exit') }
       }
     }
   })
   const start = Math.max(0, focus - Math.max(2, Math.floor((terminalRows - 8) / 2)))
   return <Box flexDirection="column">
     <MessageList
-      rows={transcript.rows}
+      rows={conversation.rows}
       expanded={expanded}
       expandedRows={expandedRows}
       selectedId={null}
       onToggleRow={id => setExpandedRows(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
-      model={settings.model}
+      model={setting.model}
       showAll={showAll}
       onToggleAll={() => setShowAll(value => !value)}
-      olderHistory={transcript.olderHistory}
-      onLoadOlder={() => perform(() => transcript.loadOlder())}
+      olderHistory={conversation.olderHistory}
+      onLoadOlder={() => perform(() => transcript.commands.loadOlder())}
       thinkingVisible={thinking}
     />
     <Text dimColor wrap="truncate-end">{[
-      transcript.working ? 'Working' : 'Ready',
-      settings.model,
-      settings.mode?.id,
-      transcript.contextOccupancy ? `ctx ${transcript.contextOccupancy.usedTokens}/${transcript.contextWindow ?? '?'}` : undefined,
-      sessions.displayCwd || sessions.cwd,
+      session.working ? 'Working' : 'Ready',
+      setting.model,
+      session.mode?.id,
+      conversation.contextOccupancy ? `ctx ${conversation.contextOccupancy.usedTokens}/${setting.contextWindow ?? '?'}` : undefined,
+      session.displayCwd || session.cwd,
     ].filter(Boolean).join(' · ')}</Text>
     {!configured ? <Text color="warning">Configure a model with /provider, /auth or /model to get started.</Text> : null}
     {menu && !question && !approval ? <Box flexDirection="column">
@@ -275,7 +278,14 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     {historyQuery !== null && !question && !approval ? <HistorySearchDialog query={historyQuery} cursorOffset={historyQuery.length} matches={history} focusIndex={focus} /> : null}
     <PromptInput
       key={generation}
-      channel={composer}
+      composer={composer}
+      context={{
+        sessions: sessions.store,
+        settings: settings.store,
+        workbench: workbench.store,
+        notify: workbench.commands.notify,
+        cycleMode: sessions.commands.cycleMode,
+      }}
       suspended={panelOpen}
       helpOpen={help}
       onToggleHelp={() => setHelp(value => !value)}
@@ -286,11 +296,11 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       controllerRef={controller}
       beforeSubmit={() => {
         if (configured) return true
-        workbench.notify('Configure a model first: /provider or /auth', { color: 'warning' })
+        workbench.commands.notify('Configure a model first: /provider or /auth', { color: 'warning' })
         return false
       }}
     />
-    {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== sessions.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} />
+    {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} />
       : question ? <AskUserQuestionPanel
         key={question.key}
         question={question.question}

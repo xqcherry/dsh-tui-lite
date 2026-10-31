@@ -13,7 +13,8 @@ import { unlink } from 'node:fs/promises'
 
 import type { ComposerImageRef } from '../../../../shared/protocol/composer.js'
 import { t } from '../../../../shared/i18n.js'
-import type { ComposerPort as Channel } from '../../contracts.js'
+import type { ComposerBinding } from '../../contracts.js'
+import type { ComposerContext } from '../types.js'
 
 
 import { formatClipboardInsert, readClipboard } from '../../../../shared/platform/clipboard.js'
@@ -49,7 +50,8 @@ interface Context {
   readonly stageImagePath: (path: string, lease: DraftImageLease) => Promise<StagedImageHandle>
   readonly bindStagedImage: (handle: StagedImageHandle, lease: DraftImageLease) => string
   readonly insertClipboardAtCaret: (text: string) => { next: string; at: number; }
-  readonly channel: Channel
+  readonly composer: ComposerBinding
+  readonly context: ComposerContext
   readonly stagedImageNotice: (token: string, handle: StagedImageHandle) => string
   readonly draftImageLeaseIsCurrent: (lease: DraftImageLease) => boolean
   readonly clipboardBusyRef: React.RefObject<boolean>
@@ -96,7 +98,7 @@ interface Context {
 
 export function createComposerKeyboard(getContext: () => Context) {
   return (input: string, key: Key, event: InputEvent) => {
-const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setSelectedCommand, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, channel, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, chooseCommand, tryRunCommand, submitText, interruptSend, fileOverlayOpen, overlayOpen, fileMatches, fileSelected, acceptFile, suggestions, selectedCommand, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
+const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setSelectedCommand, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, chooseCommand, tryRunCommand, submitText, interruptSend, fileOverlayOpen, overlayOpen, fileMatches, fileSelected, acceptFile, suggestions, selectedCommand, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
 
     if (selectionActive) return
     // The editor round-trip ends by resuming stdin one microtask before the
@@ -211,7 +213,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
           // Bind and insert share this synchronous continuation: setInput's
           // sidecar pruning can never observe a bound-but-not-visible token.
           insertClipboardAtCaret(`${token} `)
-          channel.notify(stagedImageNotice(token, handle), { timeoutMs: 2500 })
+          context.notify(stagedImageNotice(token, handle), { timeoutMs: 2500 })
         })
           .catch(() => {
             if (!draftImageLeaseIsCurrent(lease)) return
@@ -253,16 +255,16 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
           try {
             if (!draftImageLeaseIsCurrent(lease)) return
             if (content === null) {
-              channel.notify(t('input-clipboard-empty'), { color: 'warning' })
+              context.notify(t('input-clipboard-empty'), { color: 'warning' })
               return
             }
             if (content.kind === 'unavailable') {
-              channel.notify(t(content.wsl === true ? 'input-clipboard-unavailable-wsl' : 'input-clipboard-unavailable'), { color: 'warning' })
+              context.notify(t(content.wsl === true ? 'input-clipboard-unavailable-wsl' : 'input-clipboard-unavailable'), { color: 'warning' })
               return
             }
             if (content.kind === 'image') {
               if (imagePathMediaType(content.path) === undefined) {
-                channel.notify(t('input-image-format-unsupported'), { color: 'warning', timeoutMs: 5000 })
+                context.notify(t('input-image-format-unsupported'), { color: 'warning', timeoutMs: 5000 })
                 return
               }
               try {
@@ -270,12 +272,12 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
                   const handle = await stageImagePath(content.path, lease)
                   const token = bindStagedImage(handle, lease)
                   insertClipboardAtCaret(`${token} `)
-                  channel.notify(stagedImageNotice(token, handle), { timeoutMs: 2500 })
+                  context.notify(stagedImageNotice(token, handle), { timeoutMs: 2500 })
                 })
               } catch (error: unknown) {
                 if (!draftImageLeaseIsCurrent(lease)) return
                 const message = error instanceof Error ? error.message : String(error)
-                channel.notify(t('input-image-paste-failed', { err: message }), { color: 'warning', timeoutMs: 5000 })
+                context.notify(t('input-image-paste-failed', { err: message }), { color: 'warning', timeoutMs: 5000 })
               }
               return
             }
@@ -288,7 +290,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
               let insertedStaged = false
               try {
                 insertedStaged = await enqueueImageWork(async () => {
-                  const maxImages = channel.stagedImageLimits?.()?.maxImagesPerMessage ?? 0
+                  const maxImages = composer.commands.stagedImageLimits?.()?.maxImagesPerMessage ?? 0
                   const { parts, staged, failure, failureCode } = await stageClipboardFilePaths(
                     content.paths,
                     path => stageImagePath(path, lease),
@@ -309,7 +311,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
                     })
                     if (failure !== '') {
                       const message = failureCode === 'image-limit' ? t('input-image-paste-limit') : failure
-                      channel.notify(t('input-image-paste-failed', { err: message }), { color: 'warning', timeoutMs: 5000 })
+                      context.notify(t('input-image-paste-failed', { err: message }), { color: 'warning', timeoutMs: 5000 })
                     }
                     if (boundTokens.length === 0) return false
                     // All bindings and their visible labels enter together;
@@ -318,7 +320,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
                     // A batch cannot itemise every image in one line, but it must
                     // still say that some of them were not stored as pasted.
                     const adapted = staged.filter(handle => handle.adjustment !== undefined).length
-                    channel.notify(
+                    context.notify(
                       boundTokens.length === 1
                         ? stagedImageNotice(boundTokens[0]!, staged[0]!)
                         : adapted > 0
@@ -336,7 +338,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
               } catch (error: unknown) {
                 if (!draftImageLeaseIsCurrent(lease)) return
                 const message = error instanceof Error ? error.message : String(error)
-                channel.notify(t('input-image-paste-failed', { err: message }), { color: 'warning', timeoutMs: 5000 })
+                context.notify(t('input-image-paste-failed', { err: message }), { color: 'warning', timeoutMs: 5000 })
               }
               if (insertedStaged) return
               // Nothing staged: fall through to the verbatim files insert.
@@ -359,7 +361,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
         })
         .catch(() => {
           if (!draftImageLeaseIsCurrent(lease)) return
-          channel.notify(t('input-clipboard-read-failed'), { color: 'warning' })
+          context.notify(t('input-clipboard-read-failed'), { color: 'warning' })
         })
         .finally(() => {
           // A rejected read must never wedge Ctrl+V for the rest of the
@@ -413,15 +415,15 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
             setSelectedCommand(0)
             setFileSelected(0)
           } else if (outcome.kind === 'unavailable') {
-            channel.notify(t('input-editor-unavailable'), { color: 'warning' })
+            context.notify(t('input-editor-unavailable'), { color: 'warning' })
           } else if (outcome.kind === 'failed') {
-            channel.notify(t('input-editor-failed', { name: outcome.message }), {
+            context.notify(t('input-editor-failed', { name: outcome.message }), {
               color: 'warning',
             })
           }
         } catch {
           if (!draftImageLeaseIsCurrent(editorLease)) return
-          channel.notify(t('input-editor-failed', { name: 'unknown' }), {
+          context.notify(t('input-editor-failed', { name: 'unknown' }), {
             color: 'warning',
           })
         } finally {
@@ -453,7 +455,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       const line = (value + input).trim()
       setInput(line, line.length)
       if (line.startsWith('/')) {
-        const matches = channel.commandCompletions(line)
+        const matches = composer.commands.commandCompletions(line)
         if (matches.length === 1) {
           chooseCommand(matches[0]!.commandLine)
           return
@@ -499,13 +501,13 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
     // see the `modes` config). Backtab is key.tab + key.shift.
     if (key.tab && key.shift) {
       // The key is consumed either way. `cycleMode` is best-effort inside the
-      // channel, but a dropped rejection here would be an unhandledRejection
+      // composer, but a dropped rejection here would be an unhandledRejection
       // (the process guard rethrows everything that is not React #185), and
       // an unhandled rejection kills the TUI with the session still open —
       // so the caller keeps a catch of its own rather than `void`ing the
       // promise (the sibling `/permission` entry point does the same).
-      void channel.cycleMode().catch((error: unknown) => {
-        channel.notify(t('mode-switch-failed', { err: error instanceof Error ? error.message : String(error) }), {
+      void context.cycleMode().catch((error: unknown) => {
+        context.notify(t('mode-switch-failed', { err: error instanceof Error ? error.message : String(error) }), {
           color: 'error',
           timeoutMs: 8000,
         })
@@ -527,7 +529,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
     }
     // Tab while the model is working = queue for AFTER the turn (followup),
     // distinct from Enter's steer (Codex's "tab to queue message").
-    if (key.tab && channel.working && value.trim() !== '') {
+    if (key.tab && context.sessions.getSnapshot().working && value.trim() !== '') {
       queueSend(value)
       return
     }
@@ -633,7 +635,7 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       // selector, ahead of the history walk (Claude Code parity). Any draft
       // keeps ↑ as cursor movement; the menus above keep their priority.
       if (
-        value === '' && !channel.working
+        value === '' && !context.sessions.getSnapshot().working
         && !overlayOpen && !fileOverlayOpen && dockCount > 0
       ) {
         setDockSelected(dockCount - 1)
@@ -878,17 +880,17 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
         return
       }
       // With pending messages while working, Esc = interrupt and DOCK the
-      // queue (Claude Code parity): the previews park channel-side and the
+      // queue (Claude Code parity): the previews park composer-side and the
       // dock hint offers ↑ to edit one / ⏎ to send them all — nothing
       // auto-sends. A queue already fully docked docks nothing new; the
       // turn still needs its plain abort.
-      if (channel.working && channel.pending.length > 0) {
+      if (context.sessions.getSnapshot().working && composer.store.getSnapshot().pending.length > 0) {
         event.stopImmediatePropagation()
-        if (channel.interruptAndDock() === 0) channel.cancel()
+        if (composer.commands.interruptAndDock() === 0) composer.commands.cancel()
         return
       }
       // Chat owns a plain working-turn interrupt. Preserve the draft.
-      if (channel.working) return
+      if (context.sessions.getSnapshot().working) return
       event.stopImmediatePropagation()
       // A single Esc clears the current input (if any); the double-tap
       // path below handles rewind/clear on an already-empty input. A BIG

@@ -15,7 +15,8 @@ import React from 'react'
 import { basename, resolve } from 'node:path'
 
 import { t } from '../../../../shared/i18n.js'
-import type { ComposerPort as Channel } from '../../contracts.js'
+import type { ComposerBinding } from '../../contracts.js'
+import type { ComposerContext } from '../types.js'
 
 
 import { sanitizeEditableText } from '../../../../shared/platform/inputPaste.js'
@@ -32,7 +33,8 @@ interface Context {
   readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
   readonly draftImageLeaseIsCurrent: (lease: DraftImageLease) => boolean
-  readonly channel: Channel
+  readonly composer: ComposerBinding
+  readonly context: ComposerContext
   readonly draftImagesRef: React.RefObject<Map<string, string>>
   readonly imageStageChainRef: React.RefObject<Promise<void>>
   readonly nextImageNumberRef: React.RefObject<number>
@@ -58,17 +60,17 @@ const insertClipboardAtCaret = (text: string): { next: string; at: number } => {
   }
 
 const stageImagePath = async (path: string, lease: DraftImageLease): Promise<StagedImageHandle> => {
-    const { draftImageLeaseIsCurrent, channel, draftImagesRef } = getContext()
+    const { draftImageLeaseIsCurrent, composer, context, draftImagesRef } = getContext()
 
 
     if (!draftImageLeaseIsCurrent(lease)) {
       throw new Error('the draft changed while the image was being staged')
     }
-    const limits = channel.stagedImageLimits?.()
+    const limits = composer.commands.stagedImageLimits?.()
     if (limits === undefined) throw new Error('image attachments are unavailable in this profile')
     // One-image paste operations are serialized, so this is the cumulative
     // draft count (not merely the current Finder batch). Refuse before the
-    // descriptor read/save and never let the channel's 128-capability cache
+    // descriptor read/save and never let the composer's 128-capability cache
     // become an accidental per-command batch size.
     if (draftImagesRef.current.size >= limits.maxImagesPerMessage) {
       throw new Error('image count exceeds this profile\'s per-message limit')
@@ -77,7 +79,7 @@ const stageImagePath = async (path: string, lease: DraftImageLease): Promise<Sta
     if (!draftImageLeaseIsCurrent(lease)) {
       throw new Error('the draft changed while the image was being staged')
     }
-    return channel.stageComposerImage({
+    return composer.commands.stageComposerImage({
       data,
       // Callers gate on imagePathMediaType; the assertion is unreachable.
       mediaType: imagePathMediaType(path) ?? 'image/png',
@@ -124,26 +126,26 @@ const stagedImageNotice = (token: string, handle: StagedImageHandle): string => 
   }
 
 const discardStagedHandles = (handles: readonly StagedImageHandle[]): void => {
-    const { channel } = getContext()
+    const { composer, context } = getContext()
 
 
     for (const stageId of new Set(handles.map(handle => handle.stageId))) {
-      channel.discardStagedImage(stageId)
+      composer.commands.discardStagedImage(stageId)
     }
   }
 
 const bindStagedImage = (handle: StagedImageHandle, lease: DraftImageLease): string => {
-    const { draftImageLeaseIsCurrent, channel, nextImageNumberRef, valueRef, draftImagesRef } = getContext()
+    const { draftImageLeaseIsCurrent, composer, context, nextImageNumberRef, valueRef, draftImagesRef } = getContext()
 
 
     if (!draftImageLeaseIsCurrent(lease)) {
       // The save completed, but its initiating draft was already submitted,
-      // replaced, or unmounted. Reclaim this otherwise-unreachable channel
+      // replaced, or unmounted. Reclaim this otherwise-unreachable composer
       // capability instead of waiting for the session FIFO to evict it.
-      channel.discardStagedImage(handle.stageId)
+      composer.commands.discardStagedImage(handle.stageId)
       throw new Error('the draft changed while the image was being staged')
     }
-    if (channel.hasStagedImage?.(handle.stageId) !== true) {
+    if (composer.commands.hasStagedImage?.(handle.stageId) !== true) {
       throw new Error('the draft changed while the image was being staged')
     }
     let token = `[Image #${nextImageNumberRef.current}]`

@@ -1,3 +1,5 @@
+import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -7,10 +9,9 @@ import { modeDisplayName, type SessionModeSpec } from '../../modules/sessions/in
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { ChannelBinding } from './binding.js'
 import { agentCapabilityEvidence, resolveAgentCapabilities } from './capabilities.js'
-import type { ChannelState } from './types.js'
 
 type Binding = ChannelBinding
-type ModeState = Pick<ChannelState, 'mode' | 'modeIndex' | 'emit'>
+type ModeState = Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
 
 /**
  * Fail-soft reporting for a session-mode write. The mutation path reaches
@@ -26,7 +27,7 @@ type ModeState = Pick<ChannelState, 'mode' | 'modeIndex' | 'emit'>
  */
 export function reportModeSwitchFailure(
   ctx: Context,
-  notify: ChannelState['notify'],
+  notify: RuntimeCommands['notify'],
   refreshMode: () => void,
   error: unknown,
 ): void {
@@ -50,7 +51,7 @@ export function createModeActions(
     binding: Pick<Binding, 'agent' | 'capture' | 'isCurrent'>
     sessionModes: readonly SessionModeSpec[]
     executeRegistryCommand(name: string, input: string): Promise<string | undefined>
-    notify: ChannelState['notify']
+    notify: RuntimeCommands['notify']
   },
 ) {
   const { owner, binding, sessionModes, executeRegistryCommand, notify } = deps
@@ -114,8 +115,8 @@ const deriveModeIndex = (events: readonly SessionEvent[]): number => {
 /** Re-derive the current mode from the live session log (boot, every
  *  agent re-bind, and after mode-affecting session events). */
 const refreshMode = (): void => {
-  state.modeIndex = deriveModeIndex(snapshotLiveSessionEvents(binding.agent.session))
-  state.mode = sessionModes[state.modeIndex]!
+  state.sessions.ingress.update(draft => { draft.modeIndex = deriveModeIndex(snapshotLiveSessionEvents(binding.agent.session)) })
+  state.sessions.ingress.update(draft => { draft.mode = sessionModes[draft.modeIndex]! })
 }
 
   // Session.append rejects observer reentry; restore after publication
@@ -261,8 +262,8 @@ const prePlanModeSpec = (log: readonly SessionEvent[]): SessionModeSpec | undefi
   if (!current(capture)) return
   refreshMode()
   if (!current(capture)) return
-  notify(t('mode-switched', { name: modeDisplayName(state.mode) }))
-  state.emit()
+  notify(t('mode-switched', { name: modeDisplayName(state.sessions.ingress.read().mode) }))
+  publishRuntime(state)
 }
 
 /** Shift+Tab: advance to the next configured session mode. Cycling starts

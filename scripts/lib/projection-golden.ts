@@ -38,13 +38,12 @@ const CLOCK_BASE = Date.UTC(2026, 0, 5, 0, 0, 0)
 let clock = CLOCK_BASE
 Date.now = () => clock++
 
-const { createChannelProjection } = await import('../../src/modules/transcript/model/projection.js')
 const { createDshTranslator, dshPricingWindow } = await import('../../src/dsh-adapter/backend/translate.js')
-const { createInitialChannelView } = await import('../../src/dsh-adapter/runtime/initial-state.js')
+const { createRuntimeModulesFixture, readRuntimeFixture } = await import('./runtime-modules-fixture.js')
 const { FIXTURE_DIR, buildFixtures, staleFixtureFiles } = await import('../fixtures/dsh/generate.js')
 
 type Translator = ReturnType<typeof createDshTranslator>
-type ProjectionArgs = Parameters<typeof createChannelProjection>
+type ProjectionArgs = Parameters<ReturnType<typeof createRuntimeModulesFixture>['transcript']['ingress']['createProjection']>
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 
 export interface GoldenVariant {
@@ -131,11 +130,7 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
   const recorder: Recorder = {
     calls: { notify: [], jobsOnStarted: [], jobsOnOutputSeen: [], rendererRender: [], checkContextWarning: 0, resetContextWarning: 0, agent: 0 },
   }
-  const view = createInitialChannelView(
-    { model: 'fixture-model-a', provider: 'fixture', cwd: '/fixture', agentPreset: 'ptc', thinkingFold: variant.thinkingFold },
-    { agentId: 'fixture-agent', sessionId: 'fixture-session', mode: { id: 'normal', name: 'Normal' } as never, cwdDescription: '/fixture' },
-  )
-  const state: ProjectionArgs[0] = { ...view, emit: () => undefined }
+  const runtime = createRuntimeModulesFixture({ model: 'fixture-model-a', agentPreset: 'ptc', thinkingFold: variant.thinkingFold })
   const rowIds = { value: 0 }
   const inputConvergence = { cancelInFlight: true }
   const translator = createDshTranslator({
@@ -173,13 +168,18 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
     selectionAttached: () => undefined,
     pricingWindow: dshPricingWindow,
   }
-  const projector = createChannelProjection(state, deps)
+  const projector = runtime.transcript.ingress.createProjection({
+    sessions: runtime.sessions,
+    settings: runtime.settings,
+    composer: runtime.composer,
+  }, deps)
   // The transient view after each live input: spinner phase, open streaming
   // rows and live counters are behaviour the end snapshot cannot show (when a
   // thinking row folds, when the spinner leaves tool-use, …).
   const timeline: string[] = []
   const mark = (input: string): void => {
     if (mode === 'replay') return
+    const state = readRuntimeFixture(runtime)
     const streamingIds = state.rows.filter(row => row.streaming === true).map(row => row.id).join(',')
     const goal = state.goal === undefined ? '-' : `${state.goal.id}:${state.goal.phase}:${state.goal.roundsStarted}`
     timeline.push(`${input} | rows=${state.rows.length} streaming=[${streamingIds}] spin=${state.spinnerMode} working=${state.working ? 1 : 0} tools=${state.activeToolCount} chars=${state.responseChars} goal=${goal} todos=${state.todos.length} compaction=${state.compaction?.phase ?? '-'}`)
@@ -197,6 +197,7 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
   }
   projector.settleStreaming()
   mark('settleStreaming')
+  const state = readRuntimeFixture(runtime)
   const snapshot = toJson({
     rows: state.rows,
     tokens: state.tokens,
@@ -224,6 +225,7 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
     inputConvergence,
     calls: recorder.calls,
   })
+  runtime.dispose()
   return { snapshot, timeline }
 }
 

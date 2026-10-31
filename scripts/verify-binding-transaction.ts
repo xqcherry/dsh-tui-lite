@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { createDshSession } from '../src/dsh-adapter/backend/session.js'
 import { createChannelBinding } from '../src/dsh-adapter/channel/binding.js'
 import { createChannelOwner } from '../src/shared/lifecycle/owner.js'
+import { createModuleStore, createPublication } from '../src/shared/state/module-store.js'
 
 /** The binding holds sessions: a borrowed agent, or an owned handle. Wrapping
  *  touches no host service, so no context is needed. */
@@ -157,6 +158,32 @@ function handle(id: string) {
   assert.equal(old.disposeCount, 0)
   owner.dispose()
   assert.equal(next.disposeCount, 0, 'ordinary owner teardown preserves live-handle ownership')
+}
+
+// A failed setup must revoke authority before publication can expose a
+// partially reset session to listeners.
+for (const kind of ['adopt', 'switch'] as const) {
+  const owner = createChannelOwner()
+  const publication = createPublication()
+  owner.own(publication.dispose)
+  const state = createModuleStore({ session: 'old' }, publication)
+  let publications = 0
+  state.store.subscribe(() => { publications++ })
+  const binding = createChannelBinding(live(agent('old')), owner, publication)
+  const candidate = session(handle('new'))
+  const failSetup = (): never => {
+    state.patch({ session: 'partially-reset' })
+    throw new Error('setup failed')
+  }
+  if (kind === 'adopt') {
+    const capture = binding.capture()
+    const prepared = await binding.prepare(capture, async () => candidate)
+    assert.throws(() => binding.adopt(prepared, capture, failSetup), /setup failed/)
+  } else assert.throws(() => binding.switchTo(candidate, failSetup), /setup failed/)
+  assert.equal(owner.current(), false)
+  assert.equal(publications, 0, `${kind} must not publish a failed setup`)
+  assert.equal(state.store.getSnapshot().session, 'old')
+  state.dispose()
 }
 
 console.log('verify:binding-transaction OK (synchronous adoption/revocation/disposition)')

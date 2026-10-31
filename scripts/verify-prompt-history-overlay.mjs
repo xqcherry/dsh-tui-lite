@@ -13,6 +13,7 @@
  *
  * Run after build: `node scripts/verify-prompt-history-overlay.mjs`.
  */
+import { composerFixture } from './lib/module-fixtures.mjs'
 import './lib/fake-home.mjs'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
@@ -86,7 +87,7 @@ const term = new XTerm({ cols: 100, rows: 30, scrollback: 100, allowProposedApi:
 const { stdout, stderr, stdin } = makeStreams(term)
 await render(
   React.createElement(PromptInput, {
-    channel,
+    ...composerFixture(channel),
     helpOpen: false,
     onToggleHelp() {},
     onRunCommand(name) { commands.push(name); return true },

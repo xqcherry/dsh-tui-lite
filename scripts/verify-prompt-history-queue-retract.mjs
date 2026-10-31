@@ -15,6 +15,7 @@
  *
  * Run after build: `node scripts/verify-prompt-history-queue-retract.mjs`.
  */
+import { composerFixture } from './lib/module-fixtures.mjs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -103,7 +104,7 @@ async function mountComposer() {
   stdin.unref = () => stdin
   const instance = await render(
     React.createElement(PromptInput, {
-      channel,
+      ...composerFixture(channel),
       helpOpen: false,
       onToggleHelp() {},
       onRunCommand: () => false,

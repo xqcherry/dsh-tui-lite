@@ -1,3 +1,5 @@
+import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId, type LlmModelInfo } from '@deepseek-ai/dsh-llm'
@@ -6,7 +8,7 @@ import { t, tOr, type I18nKey } from '../../shared/i18n.js'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
 import { nearestLowerEffort, readEffortPref, resolveEffortDefault, STANDARD_EFFORT_LADDER, writeEffortPref } from '../../modules/settings/index.js'
 import type { ChannelBinding } from './binding.js'
-import type { ChannelState, EffortOption } from './types.js'
+import type { EffortOption } from './types.js'
 
 type Binding = ChannelBinding
 
@@ -17,14 +19,14 @@ type Binding = ChannelBinding
  */
 export function createModelActions(
   ctx: Context,
-  state: Pick<ChannelState, 'provider' | 'model' | 'reasoningEffort' | 'effortLevels' | 'agentPreset' | 'working' | 'contextWindow' | 'emit'>,
+  state: Pick<ModuleOwners, 'settings' | 'sessions' | 'transcript' | 'publication'>,
   deps: {
     owner: Pick<ChannelOwner, 'current'>
     binding: Pick<Binding, 'capture' | 'isCurrent'>
     selection: ModelSelectionRef
     initialEffort?: string
     agent(): Agent
-    notify: ChannelState['notify']
+    notify: RuntimeCommands['notify']
     /** Re-check the context-low warning after a refreshed route metadata
      * answer carries a newer contextWindow than the session started with. */
     checkContextWarning(): void
@@ -47,7 +49,7 @@ export function createModelActions(
   let lastEffortFallbackNotice: { preferred: string; applied: string | undefined } | undefined
   // State construction cannot call this factory yet; seed the visible value
   // before the root starts binding or exposes the completed ChannelState.
-  state.reasoningEffort = preferredEffort
+  state.settings.ingress.update(draft => { draft.reasoningEffort = preferredEffort })
   let effortLevelsGeneration = 0
   let effortOperation = 0
   const effortWarm = { tried: false }
@@ -56,11 +58,11 @@ export function createModelActions(
   type EffortResult = { efforts: ReadonlyArray<{ id: string; name: string; description?: string }>; defaultEffort: string | undefined }
   type EffortCapture = { readonly binding: ReturnType<Binding['capture']>; readonly provider: string; readonly model: string; readonly operation: number }
   const captureEffort = (): EffortCapture => ({
-    binding: deps.binding.capture(), provider: state.provider, model: state.model, operation: ++effortOperation,
+    binding: deps.binding.capture(), provider: state.settings.ingress.read().provider, model: state.settings.ingress.read().model, operation: ++effortOperation,
   })
   const effortCurrent = (capture: EffortCapture): boolean =>
     owner.current() && deps.binding.isCurrent(capture.binding) &&
-    state.provider === capture.provider && state.model === capture.model && effortOperation === capture.operation
+    state.settings.ingress.read().provider === capture.provider && state.settings.ingress.read().model === capture.model && effortOperation === capture.operation
   /** Route-level metadata shared by every resolveModelInfo consumer. The
    * context window follows the route, not the binding: a resume rebuilds
    * the binding (effortCurrent goes false) while the capacity answer for
@@ -71,8 +73,8 @@ export function createModelActions(
    * context-low warning through checkContextWarning. */
   const applyRouteMetadata = (capture: EffortCapture, info: { context?: { contextWindow: number } }): void => {
     if (!owner.current()) return
-    if (state.provider === capture.provider && state.model === capture.model && info.context !== undefined) {
-      state.contextWindow = info.context.contextWindow
+    if (state.settings.ingress.read().provider === capture.provider && state.settings.ingress.read().model === capture.model && info.context !== undefined) {
+      state.settings.ingress.patch({ contextWindow: info.context.contextWindow })
       deps.checkContextWarning()
     }
   }
@@ -113,7 +115,7 @@ export function createModelActions(
       applyRouteMetadata(capture, info)
       if (!effortCurrent(capture)) return 'stale'
       const efforts = tiersOf(info.reasoning)
-      state.effortLevels = efforts.map(level => level.id)
+      state.settings.ingress.update(draft => { draft.effortLevels = efforts.map(level => level.id) })
       return { efforts, defaultEffort: typeof info.reasoning === 'object' && info.reasoning !== null ? info.reasoning.defaultEffort : undefined }
     } catch (error) {
       if (!effortCurrent(capture)) return 'stale'
@@ -150,9 +152,9 @@ export function createModelActions(
       // the default into selection.current would put a tier the user never chose
       // onto the wire, which is exactly what "never up" forbids.
       const shipped = resolved.defaultEffort
-      if (state.reasoningEffort !== shipped) {
-        state.reasoningEffort = shipped
-        state.emit()
+      if (state.settings.ingress.read().reasoningEffort !== shipped) {
+        state.settings.ingress.update(draft => { draft.reasoningEffort = shipped })
+        publishRuntime(state)
       }
       // An effort pin installed earlier (an exact hit, /effort <id>) survives
       // every path that is NOT a bind: /settings' effortDefault hands the level
@@ -180,9 +182,9 @@ export function createModelActions(
       notify(t('effort-preference-downgraded', { preferred: preferredEffort, applied }), { color: 'warning' })
     }
     if (applied === preferredEffort) lastEffortFallbackNotice = undefined
-    state.reasoningEffort = applied
+    state.settings.ingress.update(draft => { draft.reasoningEffort = applied })
     selection.current = { provider: capture.provider, model: capture.model, reasoningEffort: ReasoningEffortId(applied) }
-    state.emit()
+    publishRuntime(state)
   }
   const refreshEffortLevels = (): void => {
     if (llmRuntime === undefined || typeof llmRuntime.resolveModelInfo !== 'function') return
@@ -192,18 +194,18 @@ export function createModelActions(
       if (generation !== effortLevelsGeneration) return
       applyRouteMetadata(capture, info)
       if (!effortCurrent(capture)) return
-      state.effortLevels = tiersOf(info.reasoning).map(level => level.id)
-      state.emit()
+      state.settings.ingress.update(draft => { draft.effortLevels = tiersOf(info.reasoning).map(level => level.id) })
+      publishRuntime(state)
     }).catch(() => undefined)
   }
   const applyEffort = (effort: { id: string; name: string }, capture: EffortCapture): void => {
     if (!effortCurrent(capture)) return
     selection.current = { provider: capture.provider, model: capture.model, reasoningEffort: ReasoningEffortId(effort.id) }
     preferredEffort = effort.id
-    state.reasoningEffort = effort.id
+    state.settings.ingress.update(draft => { draft.reasoningEffort = effort.id })
     writeEffortPref(effort.id)
     notify(t('effort-switched', { name: effort.name }))
-    state.emit()
+    publishRuntime(state)
   }
   const listEfforts = async (): Promise<{ efforts: readonly EffortOption[]; defaultEffort: string | undefined }> => {
     const capture = captureEffort()
@@ -243,13 +245,13 @@ export function createModelActions(
     void applyPreferredEffort()
   }
   const warmEffortLevels = (): void => {
-    if (state.effortLevels !== undefined || effortWarm.tried) return
+    if (state.settings.ingress.read().effortLevels !== undefined || effortWarm.tried) return
     effortWarm.tried = true
     const capture = captureEffort()
     void resolveEfforts(capture).then(result => {
       if (result !== 'unavailable' && result !== 'error' && result !== 'stale' && effortCurrent(capture)) {
         effortWarm.tried = false
-        state.emit()
+        publishRuntime(state)
       } else if (effortOperation === capture.operation) {
         // A stale route/binding has its own next bind warm; a transient
         // unavailable/error may be retried on a later explicit completion.
@@ -268,8 +270,8 @@ export function createModelActions(
     const generation = modelNodeCache.generation
     modelNodeCache.load = listModels().then(list => {
       if (!owner.current() || generation !== modelNodeCache.generation) return
-      modelNodeCache.nodes = list.map(model => ({ name: `${model.provider}/${model.id}`, description: model.name, ...(state.provider === model.provider && state.model === model.id ? { tag: 'current' } : {}) }))
-      state.emit()
+      modelNodeCache.nodes = list.map(model => ({ name: `${model.provider}/${model.id}`, description: model.name, ...(state.settings.ingress.read().provider === model.provider && state.settings.ingress.read().model === model.id ? { tag: 'current' } : {}) }))
+      publishRuntime(state)
     }).catch(() => { if (owner.current() && generation === modelNodeCache.generation) modelNodeCache.nodes = [] })
   }
   return { selection, applyPreferredEffort, refreshEffortLevels, listEfforts, setEffort, setDefaultEffort, warmEffortLevels, listModels, listProviders, dropModelNodeCache, warmModelNodes, modelNodes: () => modelNodeCache.nodes ?? [] }

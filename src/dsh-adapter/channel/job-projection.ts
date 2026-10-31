@@ -1,9 +1,8 @@
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import { t } from '../../shared/i18n.js'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
-import { markChannelReadDirty } from '../../shared/state/read-view.js'
-import { BackgroundJobStore, formatJobDuration, type JobsRuntime } from '../jobs.js'
-import type { ChannelState, ChatRow, JobControl } from './types.js'
+import { formatJobDuration, type JobsRuntime } from '../jobs.js'
+import type { ActivityRuntime, ActivityProjectionHost, ActivityTranscriptTarget } from '../../modules/activity/index.js'
+import type { JobControl } from '../../shared/protocol/jobs.js'
 
 /**
  * Current-binding background-job projection. The registry can publish every
@@ -11,16 +10,16 @@ import type { ChannelState, ChatRow, JobControl } from './types.js'
  * are still current before they read a service or mutate projected rows.
  */
 export function createJobProjection(
-  getState: () => Pick<ChannelState, 'backgroundJobs' | 'rows' | 'emit'>,
+  activity: ActivityRuntime,
+  transcript: ActivityTranscriptTarget,
   deps: {
     owner: Pick<ChannelOwner, 'current' | 'own'>
     notify(text: string, options?: { color?: 'success' | 'error' | 'warning'; timeoutMs?: number }): unknown
-    rowIds: { value: number }
-    agent(): Agent
+    emit(): void
+    agent(): ActivityProjectionHost
     steer(text: string): void
   },
 ) {
-  const jobRowsByJobId = new Map<string, ChatRow>()
   let jobsRuntime: JobsRuntime | undefined
   /** The live attachment's conditional roster re-read (see `reanchor`). */
   let reanchorActive: (() => void) | undefined
@@ -28,18 +27,12 @@ export function createJobProjection(
   let attachmentToken: symbol | undefined
   let attachmentCurrent = (): boolean => false
 
-  const syncRows = (): void => {
+  const syncRows = (): void => activity.ingress.batch(() => {
     if (!attachmentCurrent()) return
-    const state = getState()
-    state.backgroundJobs = store.snapshot()
-    for (const job of state.backgroundJobs) {
-      let row = jobRowsByJobId.get(job.id)
-      if (!row) {
-        row = { id: deps.rowIds.value++, kind: 'job', text: job.label, job: undefined }
-        jobRowsByJobId.set(job.id, row)
-        state.rows.push(row)
-      }
-      row.job = {
+    const snapshot = store.snapshot()
+    activity.ingress.patch({ backgroundJobs: [...snapshot] })
+    for (const job of snapshot) {
+      const view = {
         id: job.id,
         kind: job.kind,
         label: job.label,
@@ -50,13 +43,11 @@ export function createJobProjection(
         ...(job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt }),
         outputLines: job.outputLines,
       }
-      row.text = job.label
-      markChannelReadDirty(row)
-      markChannelReadDirty(state.rows)
+      transcript.ingress.upsertActivityRow(`job:${job.id}`, { kind: 'job', text: job.label, job: view })
     }
-  }
+  })
 
-  const store = new BackgroundJobStore({
+  const store = activity.ingress.createJobs({
     onSettled(job) {
       deps.notify(
         t(job.status === 'completed' ? 'jobs-toast-completed' : job.status === 'failed' ? 'jobs-toast-failed' : 'jobs-toast-killed', {
@@ -71,7 +62,7 @@ export function createJobProjection(
     onChanged() {
       if (!attachmentCurrent()) return
       syncRows()
-      if (attachmentCurrent()) getState().emit()
+      if (attachmentCurrent()) deps.emit()
     },
   })
 
@@ -199,13 +190,13 @@ export function createJobProjection(
         // pull is readAt(id, cursor, caller), both fenced with the caller AT
         // CALL TIME, so another session's jobs fall out (and a foreign ring
         // read throws into the contained catch).
-        disposers.push(bus.subscribe({ owners: 'all' }, event => {
+        disposers.push(bus.subscribe({ owners: 'all' }, event => activity.ingress.batch(() => {
           if (!current()) return
           try {
             if (event.type === 'output') pullOutput(event.id)
             else refresh()
           } catch { /* contained per-event; the next event re-syncs */ }
-        }))
+        })))
       }
       if (typeof jobs.onJobsChanged === 'function') disposers.push(jobs.onJobsChanged(refresh))
       if (typeof jobs.onJobDone === 'function') disposers.push(jobs.onJobDone(refresh))
@@ -218,7 +209,7 @@ export function createJobProjection(
     }
   }
 
-  const dropRows = (): void => { jobRowsByJobId.clear() }
+  const dropRows = (): void => { transcript.ingress.resetActivityRows('job') }
   const reset = (): void => { dropRows(); store.reset() }
 
   /**

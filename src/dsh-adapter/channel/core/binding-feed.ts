@@ -1,3 +1,5 @@
+import { publishRuntime } from '../../module-runtime.js'
+import type { ModuleOwners } from '../../module-runtime.js'
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { InputConvergence } from '../../../modules/composer/contracts.js'
@@ -5,7 +7,6 @@ import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import type { AgentEvent, AgentEventMeta, AgentEventOf } from '../../../shared/protocol/events.js'
 import { createChannelProjection, type ChannelProjection, type ChannelProjectionDeps } from '../../../modules/transcript/index.js'
 import type { BindingCapture, ChannelBinding } from '../binding.js'
-import type { ChannelState } from '../types.js'
 
 /** What one bind hands an extension's per-binding listeners. */
 export interface BindingScope {
@@ -37,7 +38,7 @@ export interface BindingFeedHooks {
  * projector and the renderer wake the backend asked for.
  */
 export function createSessionBatchRouter(deps: {
-  state: ChannelState
+  state: Pick<ModuleOwners, 'sessions' | 'settings' | 'composer' | 'transcript' | 'publication'>
   projector: ChannelProjection
   inputConvergence: InputConvergence
   /** Drop channel-side context attached to a discarded input (DSH pre-step
@@ -50,12 +51,12 @@ export function createSessionBatchRouter(deps: {
   warn(message: string): void
 }) {
   const reconcileRetiredProjection = (status: 'idle' | 'disposed'): void => {
-    if (!deps.state.working) return
+    if (!deps.state.sessions.ingress.read().working) return
     deps.warn(`dsh-tui: agent became ${status} while the channel still projected an open turn; releasing volatile UI gates`)
     deps.inputConvergence.cancelInFlight = false
-    deps.state.cancelPending = false
-    deps.state.working = false
-    deps.state.activeToolCount = 0
+    deps.state.composer.ingress.update(draft => { draft.cancelPending = false })
+    deps.state.sessions.ingress.update(draft => { draft.working = false })
+    deps.state.transcript.ingress.update(draft => { draft.activeToolCount = 0 })
     deps.projector.settleStreaming()
     deps.projector.updateSpinnerMode()
   }
@@ -63,15 +64,15 @@ export function createSessionBatchRouter(deps: {
   /** `session.status` as the backend reports it. */
   const applyStatus = (status: 'idle' | 'running' | 'requires-action' | 'disposed'): void => {
     if (status === 'disposed') {
-      deps.state.status = 'disposed'
+      deps.state.sessions.ingress.update(draft => { draft.status = 'disposed' })
       reconcileRetiredProjection('disposed')
-      deps.state.emit()
+      publishRuntime(deps.state)
       return
     }
     // The channel's status is idle/running only; a parked prompt is mid-turn.
-    deps.state.status = status === 'idle' ? 'idle' : 'running'
+    deps.state.sessions.ingress.update(draft => { draft.status = status === 'idle' ? 'idle' : 'running' })
     if (status === 'idle') reconcileRetiredProjection('idle')
-    deps.state.emit()
+    publishRuntime(deps.state)
   }
   /**
    * The backend queue lost inputs. A claim and a discard both retire the
@@ -88,10 +89,10 @@ export function createSessionBatchRouter(deps: {
     // retires the row: a fallback backend that kept its queue ran it.
     const dockedDiscards = new Set(event.discarded ?? [])
     for (const messageId of [...event.claimed ?? [], ...event.discarded ?? []]) {
-      const before = deps.state.pending.length
-      deps.state.pending = deps.state.pending.filter(item =>
-        item.id !== messageId || (item.docked === true && dockedDiscards.has(messageId)))
-      if (deps.state.pending.length !== before) deps.state.emit()
+      const before = deps.state.composer.ingress.read().pending.length
+      deps.state.composer.ingress.update(draft => { draft.pending = draft.pending.filter(item =>
+        item.id !== messageId || (item.docked === true && dockedDiscards.has(messageId))) })
+      if (deps.state.composer.ingress.read().pending.length !== before) publishRuntime(deps.state)
     }
   }
 
@@ -121,7 +122,7 @@ export function createSessionBatchRouter(deps: {
         case 'compaction.progress':
           // Summary output only advances a compaction row that is open; a
           // stale stream after the row closed finds nothing to advance.
-          if (deps.state.compaction === undefined) {
+          if (deps.state.sessions.ingress.read().compaction === undefined) {
             admitted ??= batch.slice(0, index)
             continue
           }
@@ -137,7 +138,7 @@ export function createSessionBatchRouter(deps: {
       // Pure summary progress: frame-coalesced like the stream it counts.
       if (events.length === 0) return
       deps.projector.apply(events, meta)
-      deps.state.emitStream()
+      publishRuntime(deps.state, 'stream')
       return
     }
     // The one writer of the foreground transcript. A live conversation
@@ -155,11 +156,20 @@ export function createSessionBatchRouter(deps: {
     } else {
       deps.projector.apply(events, meta)
     }
-    if (meta.wake === 'frame') deps.state.emitStream()
-    else if (meta.wake !== 'none') deps.state.emit()
+    if (meta.wake === 'frame') publishRuntime(deps.state, 'stream')
+    else if (meta.wake !== 'none') publishRuntime(deps.state)
   }
 
-  return { route, reconcileRetiredProjection, turnStarts: (): number => turnStarts }
+  return {
+    route(batch: readonly AgentEvent[], meta: AgentEventMeta, current: () => boolean): void {
+      const progressOnly = batch.length > 0 && batch.every(event => event.type === 'compaction.progress')
+      const mode = progressOnly || meta.wake === 'frame' ? 'stream'
+        : meta.wake === 'none' ? 'silent' : 'immediate'
+      deps.state.publication.batch(() => route(batch, meta, current), mode)
+    },
+    reconcileRetiredProjection,
+    turnStarts: (): number => turnStarts,
+  }
 }
 
 /**
@@ -169,7 +179,7 @@ export function createSessionBatchRouter(deps: {
 export function createSessionBinder(deps: {
   owner: ChannelOwner
   binding: Pick<ChannelBinding, 'bind' | 'capture' | 'isCurrent' | 'subscribe'>
-  state: Pick<ChannelState, 'agentBindingGeneration' | 'status'>
+  state: Pick<ModuleOwners, 'sessions' | 'settings' | 'composer' | 'transcript' | 'publication'>
   inputConvergence: InputConvergence
   route(batch: readonly AgentEvent[], meta: AgentEventMeta, current: () => boolean): void
   hooks(): BindingFeedHooks
@@ -185,7 +195,7 @@ export function createSessionBinder(deps: {
   const bind = (seed?: readonly AgentEvent[]): void => {
     const hooks = deps.hooks()
     try {
-      state.agentBindingGeneration = binding.bind()
+      deps.state.sessions.ingress.update(draft => { draft.agentBindingGeneration = binding.bind() })
       hooks.onGeneration?.()
       inputConvergence.cancelInFlight = false
       inputConvergence.interruptSeq += 1
@@ -204,13 +214,13 @@ export function createSessionBinder(deps: {
     }
     hooks.afterBind?.()
   }
-  return { bind }
+  return { bind: (seed?: readonly AgentEvent[]) => state.publication.batch(() => bind(seed)) }
 }
 
 export function createBindingFeed(ctx: Context, deps: {
   owner: ChannelOwner
   binding: ChannelBinding
-  state: ChannelState
+  state: Pick<ModuleOwners, 'sessions' | 'settings' | 'composer' | 'transcript' | 'publication'>
   inputConvergence: InputConvergence
   /** The projector's channel-side dependencies; `jobs` and `pricingWindow`
    *  stay writable until the channel starts (`configureProjection`). */
@@ -224,7 +234,7 @@ export function createBindingFeed(ctx: Context, deps: {
   // The projector reads its deps per use, so an extension can install its
   // job feed and pricing policy before any event is projected.
   const projectorDeps: ChannelProjectionDeps = { ...deps.projection, inputConvergence }
-  const projector = createChannelProjection(state, projectorDeps)
+  const projector = state.transcript.ingress.createProjection({ sessions: state.sessions, settings: state.settings, composer: state.composer }, projectorDeps)
   const router = createSessionBatchRouter({
     state,
     projector,

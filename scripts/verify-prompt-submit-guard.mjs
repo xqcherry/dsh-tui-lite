@@ -6,6 +6,7 @@
  * Run: node --import tsx/esm scripts/verify-prompt-submit-guard.mjs
  */
 import './lib/fake-home.mjs'
+import { composerFixture } from './lib/module-fixtures.mjs'
 import assert from 'node:assert/strict'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
@@ -67,7 +68,7 @@ const channel = {
 }
 
 const props = {
-  channel,
+  ...composerFixture(channel),
   controllerRef,
   helpOpen: false,
   onToggleHelp() {},

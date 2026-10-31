@@ -29,6 +29,7 @@
  *
  * Run after build: `node scripts/verify-prompt-undo.mjs`
  */
+import { composerFixture } from './lib/module-fixtures.mjs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -116,7 +117,7 @@ const channel = {
 
 const controllerRef = { current: null }
 const baseProps = {
-  channel,
+  ...composerFixture(channel),
   helpOpen: false,
   onToggleHelp() {},
   onRunCommand: () => false,

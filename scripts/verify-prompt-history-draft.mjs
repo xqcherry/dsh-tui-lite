@@ -9,6 +9,7 @@
  *
  * Run after build: `node scripts/verify-prompt-history-draft.mjs`.
  */
+import { composerFixture } from './lib/module-fixtures.mjs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -63,7 +64,7 @@ const channel = {
 const { stdout, stderr, stdin } = makeStreams()
 const instance = await render(
   React.createElement(PromptInput, {
-    channel,
+    ...composerFixture(channel),
     helpOpen: false,
     onToggleHelp() {},
     onRunCommand: () => false,

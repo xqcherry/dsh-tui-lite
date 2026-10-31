@@ -1,3 +1,5 @@
+import type { RuntimeCommands } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { ChannelSelection, SelectionAttachment } from '../../shared/protocol/composer.js'
@@ -16,7 +18,6 @@ import { attachIdeSelection } from './ide-selection.js'
 import { mentionAttachments, mentionFs } from './mentions.js'
 import type {
   ChannelImageBlock,
-  ChannelState,
   ComposerImageRef,
   MentionAttachments,
   MentionFs,
@@ -46,8 +47,8 @@ export interface UserTextOrigin {
 /** Input FIFO, staged attachments and decision notice timers share one lifetime. */
 export function createInputDelivery(
  ctx: Context, owner: ChannelOwner, binding: { readonly session: AgentSession },
- state: () => Pick<ChannelState, 'cwd' | 'agentId' | 'agentBindingGeneration'>,
- notify: ChannelState['notify'],
+ state: () => Pick<ModuleOwners, 'sessions'>,
+ notify: RuntimeCommands['notify'],
  trackPending: (message: { id: string; text: string; images?: readonly ComposerImageRef[] }, placement: PendingMessage['placement']) => void,
  untrackPending: (id: string) => void,
  composer: ComposerImages,
@@ -129,7 +130,7 @@ export function createInputDelivery(
    *  bound session object plus the binding generation every adoption
    *  advances; works for any backend, no DSH agent needed). */
   const current = (origin: UserTextOrigin): boolean =>
-    owner.current() && binding.session === origin.session && state().agentBindingGeneration === origin.generation
+    owner.current() && binding.session === origin.session && state().sessions.ingress.read().agentBindingGeneration === origin.generation
 
   /** D-6: bind the submission to the session it was typed in AT ENQUEUE
    *  TIME. The FIFO chain may park this task behind a slow predecessor
@@ -139,9 +140,9 @@ export function createInputDelivery(
   const captureOrigin = (): UserTextOrigin => {
     return {
     session: binding.session,
-    agentId: state().agentId,
-    generation: state().agentBindingGeneration,
-    cwd: state().cwd,
+    agentId: state().sessions.ingress.read().agentId,
+    generation: state().sessions.ingress.read().agentBindingGeneration,
+    cwd: state().sessions.ingress.read().cwd,
     fs: mentionFs(ctx) ?? fallbackFs?.(),
     attachments: mentionAttachments(ctx),
     stagedImages: composer.snapshot(),

@@ -11,7 +11,9 @@ import React from 'react'
 
 
 import { t } from '../../../shared/i18n.js'
-import type { ComposerPort as Channel } from '../contracts.js'
+import type { ComposerBinding } from '../contracts.js'
+import type { ComposerContext } from './types.js'
+import type { NotificationItem } from '../../../shared/protocol/session.js'
 import type { ClickEvent } from '../../../ink/events/click-event.js'
 import type { DragEvent } from '../../../ink/events/drag-event.js'
 import { noteAuxNumber } from '../../../ink/geometry-trace.js'
@@ -42,7 +44,8 @@ import { listWindow } from '../../../ui/listWindow.js'
 
 interface Context {
   readonly onOpenSessions: (() => void) | undefined
-  readonly channel: Channel
+  readonly composer: ComposerBinding
+  readonly context: ComposerContext
   readonly columns: number
   readonly foldBlock: { start: number; end: number; } | null
   readonly value: string
@@ -56,7 +59,7 @@ interface Context {
   readonly updateFoldBlock: (block: { start: number; end: number; } | null) => void
   readonly hoverEnter: () => void
   readonly hoverLeave: () => void
-  readonly toastSuppressed: ((item: Channel["notifications"][number]) => boolean) | undefined
+  readonly toastSuppressed: ((item: NotificationItem) => boolean) | undefined
   readonly suspended: boolean
   readonly lastClickAtRef: React.RefObject<number>
   readonly lastClickColRef: React.RefObject<number>
@@ -97,11 +100,11 @@ interface Context {
   readonly homeHovered: boolean
 }
 
-export function useComposerView(context: Context): React.ReactNode {
-const { onOpenSessions, channel, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, overlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, suggestions, selectedCommand, chooseCommand, setSelectedCommand, setHovered, setHomeHovered, homeHovered } = context
+export function useComposerView(view: Context): React.ReactNode {
+const { onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, overlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, suggestions, selectedCommand, chooseCommand, setSelectedCommand, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
-const sessionAccent = sessionColorHex(channel.sessionColor ?? '')
-const promptAccent = channel.mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
+const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
+const promptAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
 const inputWidth = Math.max(1, columns - 3 - homeButtonCols)
 const block = foldBlock
 const foldText = block ? value.slice(block.start, block.end) : value
@@ -290,7 +293,7 @@ React.useLayoutEffect(() => {
     prevContentRowsRef.current = contentRows
   }, [contentRows])
 const lastNotification =
-    channel.notifications[channel.notifications.length - 1]
+    context.workbench.getSnapshot().notifications[context.workbench.getSnapshot().notifications.length - 1]
 const toastVisible =
     lastNotification !== undefined && (toastSuppressed?.(lastNotification) ?? false) !== true
 const valueBoxRef = useDeclaredCursor({
@@ -440,10 +443,10 @@ const handleDragMove = (e: DragEvent, colOffset = 0) => {
 const handleDragEnd = () => {
     dragAnchorRef.current = null
   }
-const steerPreviewCount = channel.pending.filter(
+const steerPreviewCount = composer.store.getSnapshot().pending.filter(
     item => item.placement === 'steer' && item.docked !== true,
   ).length
-const followupPreviewCount = channel.pending.filter(
+const followupPreviewCount = composer.store.getSnapshot().pending.filter(
     item => item.placement === 'followup' && item.docked !== true,
   ).length
 const dockWindowRows = useOverlayListRows(
@@ -459,13 +462,13 @@ const { start: dockStart, end: dockEnd } = listWindow(
   )
 const floatersOpen =
     !suspended &&
-    (helpOpen || channel.pending.length > 0 || fileOverlayOpen || overlayOpen || peekOpen)
-const sessionTitle = channel.sessionTitle ?? ''
+    (helpOpen || composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || overlayOpen || peekOpen)
+const sessionTitle = context.sessions.getSnapshot().sessionTitle ?? ''
 const topRightLabel: InputBorderLabel | undefined =
-    channel.promptSessionLabel === true && sessionTitle !== ''
+    context.settings.getSnapshot().promptSessionLabel === true && sessionTitle !== ''
       ? {
           text: truncateToWidth(sessionTitle, Math.max(8, Math.min(28, columns - 8))),
-          color: channel.mode.plan === true ? 'planMode' : (sessionAccent ?? 'accent'),
+          color: context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'accent'),
           ink: 'inverseText',
         }
       : undefined
@@ -488,7 +491,7 @@ return (
         {helpOpen && (
           <Box marginBottom={1}>
             <HelpMenu
-              commands={channel.commandList}
+              commands={context.workbench.getSnapshot().commandList}
               viewportHeight={helpViewportHeight}
               viewportWidth={columns}
               scrollRef={helpScrollRef}
@@ -502,12 +505,12 @@ return (
             />
           </Box>
         )}
-        {!helpOpen && channel.pending.length > 0 && (
+        {!helpOpen && composer.store.getSnapshot().pending.length > 0 && (
           <Box flexDirection="column" paddingLeft={2} paddingBottom={1}>
-            {channel.pending.some(item => item.placement === 'steer' && item.docked !== true) && (
+            {composer.store.getSnapshot().pending.some(item => item.placement === 'steer' && item.docked !== true) && (
               <Box flexDirection="column">
                 <Text dimColor>⚡ {t('input-pending-steer-label')}</Text>
-                {channel.pending
+                {composer.store.getSnapshot().pending
                   .filter(item => item.placement === 'steer' && item.docked !== true)
                   .map(item => (
                     <Text key={item.id} dimColor wrap="truncate">
@@ -516,10 +519,10 @@ return (
                   ))}
               </Box>
             )}
-            {channel.pending.some(item => item.placement === 'followup' && item.docked !== true) && (
+            {composer.store.getSnapshot().pending.some(item => item.placement === 'followup' && item.docked !== true) && (
               <Box flexDirection="column">
                 <Text dimColor>⏳ {t('input-pending-queue-label')}</Text>
-                {channel.pending
+                {composer.store.getSnapshot().pending
                   .filter(item => item.placement === 'followup' && item.docked !== true)
                   .map(item => (
                     <Text key={item.id} dimColor wrap="truncate">
@@ -654,8 +657,8 @@ return (
           EffortInputBorder). Idle colour keeps the plan-mode accent the old
           Box border carried. */}
       <EffortInputBorder
-        effort={channel.reasoningEffort}
-        levels={channel.effortLevels}
+        effort={context.settings.getSnapshot().reasoningEffort}
+        levels={context.settings.getSnapshot().effortLevels}
         columns={columns}
         idleColor={promptAccent}
         topRightLabel={topRightLabel}
@@ -688,9 +691,9 @@ return (
             </Box>
           )}
           <EffortChargeGlyph
-            effort={channel.reasoningEffort}
-            levels={channel.effortLevels}
-            working={channel.working}
+            effort={context.settings.getSnapshot().reasoningEffort}
+            levels={context.settings.getSnapshot().effortLevels}
+            working={context.sessions.getSnapshot().working}
           />
           <Box
             ref={valueBoxRef}
@@ -712,8 +715,8 @@ return (
                     时不显示）。3 = 行内 `❯ `（2 列）+ 空输入块光标（1
                     列）；行首 ⌂ 入口渲染时徽标之前还要多占它的列数。 */}
                 <EffortTierBadge
-                  effort={channel.reasoningEffort}
-                  levels={channel.effortLevels}
+                  effort={context.settings.getSnapshot().reasoningEffort}
+                  levels={context.settings.getSnapshot().effortLevels}
                   columns={columns}
                   leadingColumns={3 + homeButtonCols}
                 />

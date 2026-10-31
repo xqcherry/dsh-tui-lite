@@ -8,7 +8,7 @@ import { explicitModelRoute, resolveModelRoute } from '../modules/settings/index
 import { registerProcessGuardFatalSink } from '../ink/update-overflow-guard.js'
 import { finishExit } from '../terminal/shutdown.js'
 import { render } from '../terminal/index.js'
-import { createWorkbenchPorts } from './runtime/ports.js'
+import { createWorkbenchBindings } from './workbench-bindings.js'
 import { Chat } from '../modules/workbench/index.js'
 import { appendCrashLog } from '../shared/platform/crashDetail.js'
 import { logForDebugging } from '../shared/platform/debug.js'
@@ -80,8 +80,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     contextPressure: contextStore,
     seedContextOccupancy: session => contextStore.seed(session),
   })
-  if (answerer.kind === 'waterfall') answerer.register(channel)
-  ctx.effect(() => () => { channel.releaseContributions() })
+  if (answerer.kind === 'waterfall') answerer.register({ get agentId() { return channel.sessions.store.getSnapshot().agentId } })
+  ctx.effect(() => () => { channel.dispose() })
   ctx.effect(() => startSessionMountHeartbeat(ctx))
 
   const approvals = new ApprovalStore()
@@ -91,7 +91,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }
   ctx.effect(() => () => approvals.settleAll('cancelled'))
 
-  const stderrReporter = createChildStderrReporter(line => channel.notify(line, { color: 'warning' }))
+  const stderrReporter = createChildStderrReporter(line => channel.workbench.commands.notify(line, { color: 'warning' }))
   ctx.effect(() => {
     const restore = installChildStderrGuard(line => stderrReporter.push(line))
     return () => { restore(); stderrReporter.dispose() }
@@ -106,13 +106,13 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         appendLog: appendCrashLog,
         logRestart: logForDebugging,
         logDebug: logForDebugging,
-        writeResumeMarkers: () => writeResumeTarget(channel.agentId),
+        writeResumeMarkers: () => writeResumeTarget(channel.sessions.store.getSnapshot().agentId),
         finish: notice => { void finishExit(ctx, instance, false, notice, undefined, () => disposeRootAndExit(ctx, 1)) },
       })
       return
     }
-    try { writeResumeTarget(channel.agentId) } catch { /* best effort */ }
-    const notice = `Resume: dsh-tui --resume ${channel.agentId}`
+    try { writeResumeTarget(channel.sessions.store.getSnapshot().agentId) } catch { /* best effort */ }
+    const notice = `Resume: dsh-tui --resume ${channel.sessions.store.getSnapshot().agentId}`
     void finishExit(ctx, instance, false, notice, undefined, () => {
       disposeRootAndExit(ctx, 0)
     })
@@ -128,11 +128,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     settings: ctx.get('settings') as ModelConfigurationHost['settings'],
     credentials: ctx.get('credentials') as ModelConfigurationHost['credentials'],
     auth: (ctx.get('dshAuth') as { api?: ModelConfigurationHost['auth'] } | undefined)?.api,
-  }, channel.provider, channel.model)
+  }, channel.settings.store.getSnapshot().provider, channel.settings.store.getSnapshot().model)
   const prompt = initialPromptFromCmdlineArgs(args)
   const ready = prompt ? await modelConfigured().catch(() => false) : false
   const tree = React.createElement(Chat, {
-    ports: createWorkbenchPorts(channel),
+    ports: createWorkbenchBindings(channel),
     questionStore,
     approvalStore: approvals,
     modelConfigured,
@@ -141,7 +141,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   })
   instance = await render(tree, { exitOnCtrlC: false, terminalImages: false })
   void instance.waitUntilExit().then(funnel.handleExit, funnel.handleExit)
-  if (prompt && ready) channel.submit(prompt)
+  if (prompt && ready) channel.composer.commands.submit(prompt)
 }
 
 /** Deferred runtime failures must restore the terminal and fail the process. */

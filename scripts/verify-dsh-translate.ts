@@ -17,6 +17,7 @@ import type { AgentEvent } from '../src/shared/protocol/events.js'
 import { createDshTranslator, dshPricingWindow } from '../src/dsh-adapter/backend/translate.js'
 import { FIXTURE_DIR, buildFixtures } from './fixtures/dsh/generate.js'
 import { createProjectorHarness } from './lib/projector-harness.js'
+import { markChannelReadDirty } from '../src/shared/state/read-view.js'
 
 type Translator = ReturnType<typeof createDshTranslator>
 const readJsonl = (path: string): unknown[] => {
@@ -125,13 +126,18 @@ check('compaction bracket → compaction.start/end', of(live, 'compaction.start'
     { type: 'turn.start', turn: 1, origin: 'user', time: 0 },
     { type: 'tool.call', seq: 1, turn: 1, step: 1, callId: 'fold-1', name: 'Bash', argsJson: '{"command":"ls"}', time: 0 },
   ])
-  const card = harness.state.rows.find(row => row.kind === 'tool')!
-  card.folded = true
+  harness.runtime.transcript.ingress.update(draft => {
+    const card = draft.rows.find(row => row.kind === 'tool')!
+    card.folded = true
+    markChannelReadDirty(card)
+    markChannelReadDirty(draft.rows)
+  })
   harness.apply([{
     type: 'tool.result', seq: 2, turn: 1, step: 1, callId: 'fold-1', isError: false, time: 0,
     content: [{ type: 'text', text: 'listing' }], text: 'listing',
     presentation: { card: 'terminal', output: 'listing', exitCode: 0 },
   }])
+  const card = harness.state.rows.find(row => row.kind === 'tool')!
   check('folded running card: the result keeps the preview, no full payload or view', card.tool?.status === 'ok' && card.tool.resultText === 'listing' && card.tool.resultFull === undefined && card.tool.resultView === undefined)
 }
 // The projector's reset forgets every per-session ledger: replaying a second
@@ -152,7 +158,7 @@ check('compaction bracket → compaction.start/end', of(live, 'compaction.start'
   reused.apply(history, true)
   reused.apply([{ type: 'tool.call', seq: 3, turn: 2, step: 1, callId: 'todo-1', name: 'TodoWrite', argsJson: '{}', presentation: { card: 'todo' }, time: 4 }])
   reused.projector.reset()
-  reused.state.rows.length = 0
+  reused.runtime.transcript.ingress.update(draft => { draft.rows.length = 0 })
   reused.apply(history, true)
   check('reset + replay paints what a fresh projector paints (the turn summary names its model)', shape(reused.state.rows) === shape(fresh.state.rows) && fresh.state.rows.some(row => row.turnUsage?.noteModel === true))
   reused.apply([{ type: 'tool.result', seq: 4, turn: 2, step: 1, callId: 'todo-1', isError: true, time: 5, content: [], text: '', errorText: 'stale' }])
@@ -175,7 +181,7 @@ check('compaction bracket → compaction.start/end', of(live, 'compaction.start'
   check('a re-delivered chunk reuses the row it opened', harness.state.rows.filter(row => row.kind === 'assistant').length === 1)
   // "Load earlier" prepends rows from a separate projection whose seqs can
   // collide with live ones; a live settlement must never land on them.
-  harness.state.rows.unshift({ id: -1, kind: 'assistant', seq: 7, text: 'older answer', restored: true })
+  harness.runtime.transcript.ingress.update(draft => { draft.rows.unshift({ id: -1, kind: 'assistant', seq: 7, text: 'older answer', restored: true }) })
   harness.apply([{ type: 'assistant.message', seq: 7, anchor: 'live-7', attemptId: 'live-7', time: 9, canonical: true, blocks: [{ type: 'text', text: 'live answer' }] }])
   const assistants = harness.state.rows.filter(row => row.kind === 'assistant')
   check('a live settlement never overwrites a restored row with the same seq', assistants[0]?.text === 'older answer' && assistants.at(-1)?.text === 'live answer')

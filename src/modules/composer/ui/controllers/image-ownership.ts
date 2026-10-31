@@ -11,7 +11,8 @@ import React from 'react'
 
 import type { ComposerImageRef } from '../../../../shared/protocol/composer.js'
 
-import type { ComposerPort as Channel } from '../../contracts.js'
+import type { ComposerBinding } from '../../contracts.js'
+import type { ComposerContext } from '../types.js'
 
 
 interface Context {
@@ -21,7 +22,8 @@ interface Context {
   readonly draftUndoRef: React.RefObject<DraftUndoEntry[]>
   readonly history: React.RefObject<PromptHistoryEntry[]>
   readonly historyDraft: React.RefObject<PromptHistoryEntry>
-  readonly channel: Channel
+  readonly composer: ComposerBinding
+  readonly context: ComposerContext
   readonly draftImagesGenerationRef: React.RefObject<number>
   readonly nextImageNumberRef: React.RefObject<number>
   readonly draftRevisionRef: React.RefObject<number>
@@ -39,7 +41,7 @@ const detachDraftImages = (): void => {
   }
 
 const stageIdIsRetained = (stageId: string): boolean => {
-    const { draftImagesRef, draftUndoRef, history, historyDraft, channel } = getContext()
+    const { draftImagesRef, draftUndoRef, history, historyDraft, composer, context } = getContext()
 
 
     for (const current of draftImagesRef.current.values()) {
@@ -48,15 +50,15 @@ const stageIdIsRetained = (stageId: string): boolean => {
     return draftUndoRef.current.some(entry => entry.images.some(image => image.stageId === stageId))
       || history.current.some(entry => entry.images.some(image => image.stageId === stageId))
       || historyDraft.current.images.some(image => image.stageId === stageId)
-      || channel.pending.some(item => item.images?.some(image => image.stageId === stageId) === true)
+      || composer.store.getSnapshot().pending.some(item => item.images?.some(image => image.stageId === stageId) === true)
   }
 
 const discardUnretainedImages = (stageIds: Iterable<string>): void => {
-    const { channel } = getContext()
+    const { composer, context } = getContext()
 
 
     for (const stageId of new Set(stageIds)) {
-      if (!stageIdIsRetained(stageId)) channel.discardStagedImage(stageId)
+      if (!stageIdIsRetained(stageId)) composer.commands.discardStagedImage(stageId)
     }
   }
 
@@ -74,13 +76,13 @@ const discardDraftImages = (options?: { keepUndo?: boolean }): void => {
   }
 
 const replaceDraftImages = (images: readonly ComposerImageRef[]): void => {
-    const { draftImagesRef, channel } = getContext()
+    const { draftImagesRef, composer, context } = getContext()
 
 
     const previous = [...draftImagesRef.current.values()]
     draftImagesRef.current.clear()
     for (const ref of images) {
-      if (channel.hasStagedImage?.(ref.stageId) === true) {
+      if (composer.commands.hasStagedImage?.(ref.stageId) === true) {
         draftImagesRef.current.set(ref.token, ref.stageId)
       }
     }
@@ -88,18 +90,18 @@ const replaceDraftImages = (images: readonly ComposerImageRef[]): void => {
   }
 
 const syncImageGeneration = (): number => {
-    const { channel, draftImagesGenerationRef, draftUndoRef, nextImageNumberRef } = getContext()
+    const { composer, context, draftImagesGenerationRef, draftUndoRef, nextImageNumberRef } = getContext()
 
 
-    const generation = channel.stagedImageGeneration?.() ?? 0
+    const generation = composer.commands.stagedImageGeneration?.() ?? 0
     if (draftImagesGenerationRef.current !== generation) {
-      // The channel has already cleared every old-generation capability.
+      // The composer has already cleared every old-generation capability.
       // Only detach the UI sidecar; calling discard would be redundant.
       draftUndoRef.current = []
 
       detachDraftImages()
       draftImagesGenerationRef.current = generation
-      // Presentation numbering is session-local like the old channel-owned
+      // Presentation numbering is session-local like the old composer-owned
       // sequence. Any stale token still visible in the retained draft is
       // skipped by bindStagedImage, so resetting cannot recreate an alias.
       nextImageNumberRef.current = 1

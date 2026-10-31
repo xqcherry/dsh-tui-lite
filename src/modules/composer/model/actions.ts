@@ -1,3 +1,4 @@
+import type { createComposerModule } from './module.js'
 /** Input actions own cancellation/requeue convergence, not session binding. */
 import { randomUUID } from 'node:crypto'
 import type { ComposerActions } from './actions-contract.js'
@@ -6,11 +7,10 @@ import type { PendingMessage } from '../../../shared/protocol/composer.js'
 import type { ComposerImageRef, ComposerSubmission } from '../../../shared/protocol/composer.js'
 import { t } from '../../../shared/i18n.js'
 import type { AgentSession, CancelOutcome } from '../../../shared/protocol/agent-session.js'
-interface ChannelState extends ComposerActions {
-  agentId: string
-  pending: PendingMessage[]
-  cancelPending: boolean
-  emit(): void
+
+export interface InputActionsHost {
+  readonly composer: ReturnType<typeof createComposerModule>
+  agentId(): string
   notify: Notify
 }
 
@@ -40,7 +40,7 @@ export interface InputConvergence {
   provisionalDockIds?: string[]
 }
 export function createInputActions(
-  getState: () => Pick<ChannelState, 'agentId' | 'pending' | 'cancelPending' | 'emit' | 'notify'>,
+  getState: () => InputActionsHost,
   getSession: () => AgentSession,
   owner: { assertActive(): void },
   input: InputConvergence,
@@ -50,7 +50,7 @@ export function createInputActions(
   /** Move the used session to the front of the `/resume` MRU (DSH session
    *  history); a backend whose sessions that list cannot open passes a no-op. */
   touch: (sessionId: string) => void = () => undefined,
-): Pick<ChannelState, 'submit' | 'steer' | 'removePending' | 'cancel' | 'interruptAndDeliver' | 'interruptAndDock' | 'deliverDocked' | 'swapDockedForDraft'> {
+): Pick<ComposerActions, 'submit' | 'steer' | 'removePending' | 'cancel' | 'interruptAndDeliver' | 'interruptAndDock' | 'deliverDocked' | 'swapDockedForDraft'> {
   return {
     submit(text, images = []) {
       owner.assertActive()
@@ -78,7 +78,7 @@ export function createInputActions(
       }
       // The current session is being used — move it to the MRU front
       // (/resume sorts by last-used).
-      touch(state.agentId)
+      touch(state.agentId())
       dispatchUserText(trimmed, 'followup', submittedImages)
     },
 
@@ -90,7 +90,7 @@ export function createInputActions(
       const state = getState()
       const trimmed = text.trim()
       if (!trimmed) return
-      touch(state.agentId)
+      touch(state.agentId())
       // Same tui/input decision pass as submit; the delivery re-validates
       // the live agent after the await. Official dsh-agent rc.6: steer() is
       // synchronous void — the message enters the next-step inbox; a
@@ -106,28 +106,26 @@ export function createInputActions(
       owner.assertActive()
       const state = getState()
       const session = getSession()
-      const index = state.pending.findIndex(item => item.id === id)
+      const index = state.composer.ingress.read().pending.findIndex(item => item.id === id)
       if (index === -1) return false
       // A docked preview is a channel-side asset: the backend dropped its
       // queued copy with the aborted turn, so pulling it back is purely
       // local and works on every backend, including backends without
       // pending-message withdrawal; the gate below only governs live queue items.
-      if (state.pending[index]!.docked === true) {
+      if (state.composer.ingress.read().pending[index]!.docked === true) {
         // A dock the pending receipt has not vouched for is view-only:
         // its backend copy may still run, so editing the row out now would
         // strand a copy the late revocation can no longer reach. The caller
         // keeps the row queued and says it cannot be retracted.
         if (input.provisionalDockIds?.includes(id) === true) return false
-        state.pending = state.pending.filter(item => item.id !== id)
-        state.emit()
+        state.composer.ingress.update(draft => { draft.pending = draft.pending.filter(item => item.id !== id) })
         return true
       }
       const retraction = session.capabilities.pendingRetraction
       if (retraction === undefined) return false
       const removed = retraction.remove(id)
       if (!removed) return false
-      state.pending = state.pending.filter(item => item.id !== id)
-      state.emit()
+      state.composer.ingress.update(draft => { draft.pending = draft.pending.filter(item => item.id !== id) })
       return true
     },
 
@@ -143,7 +141,7 @@ export function createInputActions(
       if (input.cancelInFlight) return
       input.cancelInFlight = true
       input.cancelCause = 'user'
-      state.cancelPending = true
+      state.composer.ingress.update(draft => { draft.cancelPending = true })
       void session.cancel('user')
     },
 
@@ -162,16 +160,15 @@ export function createInputActions(
       owner.assertActive()
       const state = getState()
       const session = getSession()
-      const dockable = state.pending.filter(item => item.docked !== true)
+      const dockable = state.composer.ingress.read().pending.filter(item => item.docked !== true)
       const dockedNow = dockable.map(item => item.id)
       if (dockable.length > 0) {
         // Mark before the cancel fires: the discard events the backend's
         // queue drop produces must not delete the previews (binding-feed
         // keeps `docked` rows alive on discard; the dock owns them now).
-        state.pending = state.pending.map(item => item.docked === true ? item : { ...item, docked: true })
-        state.emit()
+        state.composer.ingress.update(draft => { draft.pending = draft.pending.map(item => item.docked === true ? item : { ...item, docked: true }) })
       }
-      state.cancelPending = true
+      state.composer.ingress.update(draft => { draft.cancelPending = true })
       if (input.cancelInFlight && input.cancelCause === 'interrupt' && input.interruptReceiptPending === true) {
         // The in-flight receipt's queue snapshot predates these rows: it
         // cannot vouch for their backend copies. They join its uncovered
@@ -236,13 +233,11 @@ export function createInputActions(
           }
         }
         if (revoke.size > 0) {
-          let undocked = false
-          state.pending = state.pending.map(item => {
-            if (item.docked !== true || !revoke.has(item.id)) return item
-            undocked = true
-            return { ...item, docked: undefined }
-          })
-          if (undocked) state.emit()
+          const pending = state.composer.ingress.read().pending
+          if (pending.some(item => item.docked === true && revoke.has(item.id))) {
+            state.composer.ingress.patch({ pending: pending.map(item =>
+              item.docked === true && revoke.has(item.id) ? { ...item, docked: undefined } : item) })
+          }
         }
         // The unconfirmed legs are loud: a failed or answerless interrupt
         // must not leave a success-shaped dock (or a silently failed Esc).
@@ -269,7 +264,7 @@ export function createInputActions(
       owner.assertActive()
       const state = getState()
       const held = (id: string): boolean => input.provisionalDockIds?.includes(id) === true
-      const docked = state.pending.filter(item => item.docked === true)
+      const docked = state.composer.ingress.read().pending.filter(item => item.docked === true)
       if (docked.length === 0) return 0
       // Provisional rows are always the newest dock batches, so the confirmed
       // remainder is a FIFO prefix; holding the tail never reorders anyone.
@@ -278,10 +273,9 @@ export function createInputActions(
         state.notify(t('input-dock-confirming', { n: docked.length - ready.length }), { color: 'warning', timeoutMs: 4000 })
       }
       if (ready.length === 0) return 0
-      state.pending = state.pending.filter(item => item.docked !== true || held(item.id))
-      state.emit()
+      state.composer.ingress.update(draft => { draft.pending = draft.pending.filter(item => item.docked !== true || held(item.id)) })
       for (const entry of ready) {
-        touch(state.agentId)
+        touch(state.agentId())
         dispatchUserText(entry.text, 'followup', entry.images)
       }
       return ready.length
@@ -298,27 +292,26 @@ export function createInputActions(
      * retired it, another editor took it) or while an unsettled interrupt
      * receipt holds it: the caller keeps its draft and says so.
      */
-    swapDockedForDraft(id: string, draft: { text: string; images?: readonly ComposerImageRef[] }): boolean {
+    swapDockedForDraft(id: string, nextDraft: { text: string; images?: readonly ComposerImageRef[] }): boolean {
       owner.assertActive()
       const state = getState()
-      const index = state.pending.findIndex(item => item.id === id)
-      if (index === -1 || state.pending[index]!.docked !== true) return false
+      const index = state.composer.ingress.read().pending.findIndex(item => item.id === id)
+      if (index === -1 || state.composer.ingress.read().pending[index]!.docked !== true) return false
       // The clicked row's backend copy may still run while its receipt
       // is in flight; swapping its text into the composer now would hand
       // the user a second copy the late revocation cannot reach.
       if (input.provisionalDockIds?.includes(id) === true) return false
       // A docked retract is purely local on every backend (see removePending).
-      state.pending = [
-        ...state.pending.filter(item => item.id !== id),
+      state.composer.ingress.update(draft => { draft.pending = [
+        ...draft.pending.filter(item => item.id !== id),
         {
           id: `dock-swap-${randomUUID()}`,
-          text: draft.text,
-          images: [...(draft.images ?? [])],
+          text: nextDraft.text,
+          images: [...(nextDraft.images ?? [])],
           placement: 'followup',
           docked: true,
         },
-      ]
-      state.emit()
+      ] })
       return true
     },
 
@@ -347,7 +340,7 @@ export function createInputActions(
         input.cancelCause = 'interrupt'
         void session.cancel('interrupt')
       }
-      state.cancelPending = true
+      state.composer.ingress.update(draft => { draft.cancelPending = true })
       const token = ++input.interruptSeq
       const deliver = (): void => {
         // A second interrupt while the abort is still settling must not
@@ -359,13 +352,12 @@ export function createInputActions(
         // Rows still awaiting their receipt stay parked for the verdict:
         // their backend copies may still run.
         const heldHere = (id: string): boolean => input.provisionalDockIds?.includes(id) === true
-        const docked = state.pending.filter(item => item.docked === true && !heldHere(item.id))
+        const docked = state.composer.ingress.read().pending.filter(item => item.docked === true && !heldHere(item.id))
         if (docked.length > 0) {
-          state.pending = state.pending.filter(item => item.docked !== true || heldHere(item.id))
-          state.emit()
-        }
+          state.composer.ingress.update(draft => { draft.pending = draft.pending.filter(item => item.docked !== true || heldHere(item.id)) })
+          }
         for (const entry of [...docked, ...queued]) {
-          touch(state.agentId)
+          touch(state.agentId())
           // Same tui/input decision pass as a typed submit: Ctrl+Enter must
           // not bypass a plugin's cancel/transform policy, and re-queued
           // texts keep submission order through the one FIFO chain.

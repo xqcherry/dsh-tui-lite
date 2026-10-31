@@ -147,7 +147,8 @@ export { sanitizeEditableText, sanitizePastedText } from '../../../shared/platfo
  * aborts the turn and sends the current input immediately.
  */
 export function PromptInput({
-  channel,
+  composer,
+  context,
   toastSuppressed,
   suspended = false,
   draftCache,
@@ -162,6 +163,10 @@ export function PromptInput({
   controllerRef,
   now = Date.now,
 }: PromptInputProps) {
+  React.useSyncExternalStore(composer.store.subscribe, composer.store.getSnapshot)
+  React.useSyncExternalStore(context.sessions.subscribe, context.sessions.getSnapshot)
+  React.useSyncExternalStore(context.settings.subscribe, context.settings.getSnapshot)
+  React.useSyncExternalStore(context.workbench.subscribe, context.workbench.getSnapshot)
   const [themeName] = useTheme()
   /**
    * Caret fill. The face is self-drawn (the native cursor is hidden), and it
@@ -213,7 +218,7 @@ export function PromptInput({
     adoptDraft.current = false
     const snapshot = draftCache.current
     draftCache.current = null
-    if (!isUsableDraftSnapshot(snapshot, String(channel.agentId), resolveBindingGeneration(channel))) return
+    if (!isUsableDraftSnapshot(snapshot, String(context.sessions.getSnapshot().agentId), resolveBindingGeneration({ agentBindingGeneration: context.sessions.getSnapshot().agentBindingGeneration, stagedImageGeneration: composer.commands.stagedImageGeneration }))) return
     const text = snapshot.value
     // Restore the fold before adopting text and its caret.
     updateFoldBlock(snapshot.foldBlock)
@@ -221,7 +226,7 @@ export function PromptInput({
     const restoredCursor = normalizeCursorOffset(text, snapshot.cursor)
     replaceDraftImages(filterLiveImageBindings(
       snapshot.images,
-      stageId => channel.hasStagedImage?.(stageId) === true,
+      stageId => composer.commands.hasStagedImage?.(stageId) === true,
     ).map(([token, stageId]) => ({ token, stageId })))
     valueRef.current = text
     cursorRef.current = restoredCursor
@@ -265,7 +270,7 @@ export function PromptInput({
   /** Pointer over the input box (drives the hover peek card). */
   const [hovered, setHovered] = React.useState(false)
   /** Highlighted row of the docked-queue selector (null = inactive; the
-   *  index runs over the docked subset of `channel.pending`, oldest first).
+   *  index runs over the docked subset of `composer.store.getSnapshot().pending`, oldest first).
    *  The ref mirrors it for the deferred consumeEscape controller closure. */
   const [dockSelected, setDockSelectedState] = React.useState<number | null>(null)
   const dockSelectedRef = React.useRef<number | null>(null)
@@ -301,7 +306,7 @@ export function PromptInput({
    * the non-reusable capability for the current draft. History/rewind text
    * restored without this map can never bind to a later image by accident. */
   const draftImagesRef = React.useRef(new Map<string, string>())
-  const draftImagesGenerationRef = React.useRef(channel.stagedImageGeneration?.() ?? 0)
+  const draftImagesGenerationRef = React.useRef(composer.commands.stagedImageGeneration?.() ?? 0)
   /** Session generation fences one agent transcript; revision fences one
    * logical composer draft inside that session. Ordinary typing deliberately
    * keeps the revision so an async paste lands at the live caret, while any
@@ -328,7 +333,7 @@ export function PromptInput({
     draftRevisionRef.current += 1
     imageStageChainRef.current = Promise.resolve()
   }
-  const { detachDraftImages, stageIdIsRetained, discardUnretainedImages, discardDraftImages, replaceDraftImages, syncImageGeneration, captureDraftImageLease, draftImageLeaseIsCurrent, restoreDraftImages } = createImageOwnership(() => ({ advanceDraftRevision, draftImagesRef, clearDraftUndo, draftUndoRef, history, historyDraft, channel, draftImagesGenerationRef, nextImageNumberRef, draftRevisionRef }))
+  const { detachDraftImages, stageIdIsRetained, discardUnretainedImages, discardDraftImages, replaceDraftImages, syncImageGeneration, captureDraftImageLease, draftImageLeaseIsCurrent, restoreDraftImages } = createImageOwnership(() => ({ advanceDraftRevision, draftImagesRef, clearDraftUndo, draftUndoRef, history, historyDraft, composer, context, draftImagesGenerationRef, nextImageNumberRef, draftRevisionRef }))
 
 
 
@@ -468,7 +473,7 @@ export function PromptInput({
        *
        * The stageIds the DRAFT holds are deliberately NOT revoked — they are
        * part of the snapshot the slot now keeps, and the restore filters out
-       * whatever the channel revoked in the meantime. Revoking them here is why
+       * whatever the composer revoked in the meantime. Revoking them here is why
        * an image draft used to come back as inert text.
        */
       advanceDraftRevision()
@@ -488,8 +493,8 @@ export function PromptInput({
         return
       }
       draftCache.current = {
-        ownerAgentId: String(channel.agentId),
-        bindingGeneration: resolveBindingGeneration(channel),
+        ownerAgentId: String(context.sessions.getSnapshot().agentId),
+        bindingGeneration: resolveBindingGeneration({ agentBindingGeneration: context.sessions.getSnapshot().agentBindingGeneration, stagedImageGeneration: composer.commands.stagedImageGeneration }),
         value: text,
         cursor: cursorRef.current,
         foldBlock: foldBlockRef.current,
@@ -522,7 +527,7 @@ export function PromptInput({
   // snapshot's cherry-pick resurrected the old formula.)
   const helpViewportHeight = Math.max(3, Math.min(terminalRows - 7, 15))
 
-  const suggestions = value.startsWith('/') ? channel.commandCompletions(value) : []
+  const suggestions = value.startsWith('/') ? composer.commands.commandCompletions(value) : []
   const overlayOpen =
     suggestions.length > 0 &&
     !helpOpen &&
@@ -551,12 +556,12 @@ export function PromptInput({
     // within the same token must NOT refetch, and `selectedFile`/`fileSelected`
     // are read as their render-time values only to seed selection preservation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    void channel.listFileCandidates(mention.query, { topK: 50 }).then(next => {
+    void composer.commands.listFileCandidates(mention.query, { topK: 50 }).then(next => {
       if (requestId !== fileRequestId.current) return
       setFileMatches(next)
       setFileSelected(preserveSelection(previous, next, fileSelected))
     })
-  }, [channel, mention?.query, atTrigger])
+  }, [composer, mention?.query, atTrigger])
   // Esc dismisses the overlay for the token being edited (it reopens once the
   // text changes); it must NOT clear a mid-message input.
   const fileEscRef = React.useRef(-1)
@@ -577,7 +582,7 @@ export function PromptInput({
    * the caret cluster when the caret sits at its start). A raw token typed
    * or restored without a capability is ordinary text.
    */
-  const { boundImageSpans, placeCaret, updateFoldBlock, setInput, deleteInputRange, updateSelection, clearSelection, imageRefsFor, warnStaleImageTokens } = createDraftEditing(() => ({ draftImagesRef, valueRef, cursorRef, setCursor, foldBlockRef, setFoldBlock, dockSelectedRef, setDockSelected, clearDraftUndo, recordDraftEdit, inputEditSequenceRef, stageIdIsRetained, channel, selectionRef, setSelection, setValue, syncImageGeneration }))
+  const { boundImageSpans, placeCaret, updateFoldBlock, setInput, deleteInputRange, updateSelection, clearSelection, imageRefsFor, warnStaleImageTokens } = createDraftEditing(() => ({ draftImagesRef, valueRef, cursorRef, setCursor, foldBlockRef, setFoldBlock, dockSelectedRef, setDockSelected, clearDraftUndo, recordDraftEdit, inputEditSequenceRef, stageIdIsRetained, composer, context, selectionRef, setSelection, setValue, syncImageGeneration }))
 
 
   /** Move the caret to `offset`, snapped off any token interior. */
@@ -635,7 +640,7 @@ export function PromptInput({
   /**
    * Warn once when the text carries an `[Image #N]` placeholder that will
    * not attach an image: unbound in this draft (history, rewind, typed) or
-   * bound to a staging the channel has since dropped. Channel routes
+   * bound to a staging the composer has since dropped. Channel routes
    * (submit, steer, registry commands) warn on their own; this covers the
    * lines the screen consumes locally, where the text is otherwise dropped
    * without a word.
@@ -650,7 +655,7 @@ export function PromptInput({
    * lists to merge at recall time. Restored text carries no image capability
    * (the file stores text only), which is also what keeps a recalled entry
    * from binding to a later staged image by accident. The walk is scoped to
-   * the channel's workspace, keyed the same way the store keys it
+   * the composer's workspace, keyed the same way the store keys it
    * (historyProjectKey), so a workspace switch re-seeds it with that
    * project's history instead of carrying the previous one over — and a
    * respelled path to the same directory is not a switch.
@@ -658,7 +663,7 @@ export function PromptInput({
    * then shows a recalled entry of the previous project while the draft that
    * walk started from is still held in `historyDraft`.
    */
-  const { seedHistory, restoreHistoryDraft, rememberHistory, pullBackLast, retractRecalledCopy, editDocked } = createHistoryNavigation(() => ({ channel, historySeededProject, historyIndex, history, updateFoldBlock, restoreDraftImages, historyDraft, setInput, setDockSelected, setSelectedCommand, setFileSelected, dockedPending, valueRef, imageRefsFor, foldBlockRef, replaceDraftImages }))
+  const { seedHistory, restoreHistoryDraft, rememberHistory, pullBackLast, retractRecalledCopy, editDocked } = createHistoryNavigation(() => ({ composer, context, historySeededProject, historyIndex, history, updateFoldBlock, restoreDraftImages, historyDraft, setInput, setDockSelected, setSelectedCommand, setFileSelected, dockedPending, valueRef, imageRefsFor, foldBlockRef, replaceDraftImages }))
 
 
   /** End the walk and put back the draft it started from. */
@@ -666,7 +671,7 @@ export function PromptInput({
 
 
 
-  const { clearDeliveredDraft, sameImageRefs, shellImagesUnsupported, submitText, steerSend, queueSend, sendDocked, interruptSend, tryRunCommand, chooseCommand, handleEnter } = createSubmission(() => ({ syncImageGeneration, detachDraftImages, setInput, setSelectedCommand, setFileSelected, channel, beforeSubmit, imageRefsFor, rememberHistory, setDockSelected, value, draftRevisionRef, inputEditSequenceRef, pendingCommandRef, captureDraftImageLease, valueRef, onRunCommand, warnStaleImageTokens, draftImageLeaseIsCurrent, lastEnterAtRef, dockSelectedRef, dockCount, editDocked, overlayOpen, suggestions, selectedCommand, fileOverlayOpen, fileMatches, fileSelected, acceptFile }))
+  const { clearDeliveredDraft, sameImageRefs, shellImagesUnsupported, submitText, steerSend, queueSend, sendDocked, interruptSend, tryRunCommand, chooseCommand, handleEnter } = createSubmission(() => ({ syncImageGeneration, detachDraftImages, setInput, setSelectedCommand, setFileSelected, composer, context, beforeSubmit, imageRefsFor, rememberHistory, setDockSelected, value, draftRevisionRef, inputEditSequenceRef, pendingCommandRef, captureDraftImageLease, valueRef, onRunCommand, warnStaleImageTokens, draftImageLeaseIsCurrent, lastEnterAtRef, dockSelectedRef, dockCount, editDocked, overlayOpen, suggestions, selectedCommand, fileOverlayOpen, fileMatches, fileSelected, acceptFile }))
 
 
 
@@ -723,11 +728,11 @@ export function PromptInput({
    * previews the composer keeps until the user sends them all (⏎ on an empty
    * draft / the clickable hint) or retracts items (the ↑ selector / Alt+↑).
    */
-  const dockedPending = channel.pending.filter(item => item.docked === true)
+  const dockedPending = composer.store.getSnapshot().pending.filter(item => item.docked === true)
   const dockCount = dockedPending.length
 
   /** Send the whole dock now (⏎ on an empty draft, or the hint row click):
-   *  FIFO, exactly once, through the channel's own delivery chain. */
+   *  FIFO, exactly once, through the composer's own delivery chain. */
 
 
   /** Retract one docked row into the draft for editing (selector ⏎, row
@@ -802,10 +807,10 @@ export function PromptInput({
    * typing while PowerShell owns the clipboard never gets overwritten.
    * An active selection is replaced by the insert. Returns the resulting
    * value and the insertion offset so callers can apply the paste fold. */
-  const { insertClipboardAtCaret, stageImagePath, enqueueImageWork, stagedImageNotice, discardStagedHandles, bindStagedImage } = createAttachments(() => ({ valueRef, selectionRef, cursorRef, setInput, setSelectedCommand, setFileSelected, draftImageLeaseIsCurrent, channel, draftImagesRef, imageStageChainRef, nextImageNumberRef }))
+  const { insertClipboardAtCaret, stageImagePath, enqueueImageWork, stagedImageNotice, discardStagedHandles, bindStagedImage } = createAttachments(() => ({ valueRef, selectionRef, cursorRef, setInput, setSelectedCommand, setFileSelected, draftImageLeaseIsCurrent, composer, context, draftImagesRef, imageStageChainRef, nextImageNumberRef }))
 
 
-  /** Read one local image file and stage it through the channel, returning
+  /** Read one local image file and stage it through the composer, returning
    *  an opaque capability. Shared by every image paste path:
    *  clipboard bitmap export, Finder-copied files, and pasted drop paths.
    *  A Finder/drop path is untrusted input: one bounded descriptor read
@@ -847,7 +852,7 @@ export function PromptInput({
   const head = foldBlock ? value.slice(0, foldBlock.start) : ''
   const tail = foldBlock ? value.slice(foldBlock.end) : ''
 
-  useInput(createComposerKeyboard(() => ({ selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setSelectedCommand, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, channel, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, chooseCommand, tryRunCommand, submitText, interruptSend, fileOverlayOpen, overlayOpen, fileMatches, fileSelected, acceptFile, suggestions, selectedCommand, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
+  useInput(createComposerKeyboard(() => ({ selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setSelectedCommand, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, chooseCommand, tryRunCommand, submitText, interruptSend, fileOverlayOpen, overlayOpen, fileMatches, fileSelected, acceptFile, suggestions, selectedCommand, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
 
   // === Render: hard-wrap every logical line at the input width, then show
   // the window of visual lines with the caret row always visible.
@@ -858,7 +863,7 @@ export function PromptInput({
   // （既有调用方的可用列数逐列不变）。用实测常量而不是 stringWidth：该字符
   // 是 U+1F3E0+VS15，stringWidth 按码点算 2（含 VS15 仍是 2），终端只给 1，
   // 见 HOME_BUTTON_COLS 的说明。
-  return useComposerView({ onOpenSessions, channel, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, overlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, suggestions, selectedCommand, chooseCommand, setSelectedCommand, setHovered, setHomeHovered, homeHovered })
+  return useComposerView({ onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, overlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, suggestions, selectedCommand, chooseCommand, setSelectedCommand, setHovered, setHomeHovered, homeHovered })
 }
 
 /**

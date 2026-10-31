@@ -1,45 +1,32 @@
-import type { SpinnerMode } from '../../../shared/protocol/display.js'
+import type { ChatRow, SessionCostByModel, SubagentCostEntry, TokenUsage, TurnUsageSummary } from '../../../shared/protocol/transcript.js'
 import type { PendingMessage } from '../../../shared/protocol/composer.js'
-import type { ChannelCostReport } from '../../../shared/protocol/session.js'
-import type { ChannelGoal } from '../../../shared/protocol/session.js'
-import type { CompactionStatus } from '../../../shared/protocol/session.js'
-import type { TodoPanelItem } from '../../../shared/protocol/session.js'
-import type { ChatRow } from '../../../shared/protocol/transcript.js'
-import type { SessionCostByModel } from '../../../shared/protocol/transcript.js'
-import type { SubagentCostEntry } from '../../../shared/protocol/transcript.js'
-import type { TokenUsage } from '../../../shared/protocol/transcript.js'
-import type { TurnUsageSummary } from '../../../shared/protocol/transcript.js'
+import type { ChannelGoal, ChannelCostReport, CompactionStatus, TodoPanelItem } from '../../../shared/protocol/session.js'
+import type { SpinnerMode } from '../../../shared/protocol/display.js'
+import type { MutableSnapshot } from '../../../shared/state/module-store.js'
 
-/** Explicit ResetFacts capability; no access to unrelated client operations. */
-export interface ResetFacts {
-  rows: ChatRow[]
-  todos: TodoPanelItem[]
-  pending: PendingMessage[]
-  goal: ChannelGoal | undefined
-  sessionTitle: string
-  sessionColor: string
-  tokens: TokenUsage
-  mainCost: SessionCostByModel
-  subagentCost: readonly SubagentCostEntry[]
-  responseChars: number
-  activeToolCount: number
-  lastUserText: string
-  working: boolean
-  compaction: CompactionStatus | undefined
-  cancelPending: boolean
-  spinnerMode: SpinnerMode
-  tps: number | undefined
-  tpsSamples: { tps: number; at: number }[]
-  lastUsage:
-    | { input: number; output: number; cacheRead: number; cacheWrite: number; at: number }
-    | undefined
-  turnUsage: TurnUsageSummary | undefined
-  contextSegments: {
-    system: number
-    prompt: number
-    assistant: number
-    thinking: number
-    tools: number
-  }
-  costReport: ChannelCostReport | undefined
+type ResetPort<Snapshot extends object> = {
+  readonly ingress: { update(work: (draft: MutableSnapshot<Snapshot>) => void): void }
+}
+/** Session adoption resets only these facts across the participating owners. */
+export interface SessionResetPorts {
+  readonly sessions: ResetPort<{ sessionTitle: string; sessionColor: string; working: boolean; compaction: CompactionStatus | undefined }>
+  readonly composer: ResetPort<{ pending: readonly PendingMessage[]; cancelPending: boolean }>
+  readonly transcript: ResetPort<{
+    rows: readonly ChatRow[]
+    todos: readonly TodoPanelItem[]
+    goal: ChannelGoal | undefined
+    tokens: TokenUsage
+    mainCost: SessionCostByModel
+    responseChars: number
+    activeToolCount: number
+    lastUserText: string
+    spinnerMode: SpinnerMode
+    tps: number | undefined
+    tpsSamples: readonly { tps: number; at: number }[]
+    lastUsage: { input: number; output: number; cacheRead: number; cacheWrite: number; at: number } | undefined
+    turnUsage: TurnUsageSummary | undefined
+    costReport: ChannelCostReport | undefined
+    contextSegments: { system: number; prompt: number; assistant: number; thinking: number; tools: number }
+  }>
+  readonly activity: ResetPort<{ subagentCost: readonly SubagentCostEntry[] }>
 }

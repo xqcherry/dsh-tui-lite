@@ -8,7 +8,6 @@ export type { CredentialStatus, EffortOption, PermissionPresetAvailability, Perm
 export type { AgentViewDispatchResult, AgentViewRow, AgentViewStatus, BackgroundResult, ChannelGoal, ExternalCommandOutcome, LoadedContext, LoadedContextEntry, LoadedContextFile, LoadedContextSkill, LoadedContextTool, NotificationItem, ResumeResult, TodoPanelItem, TrajectorySource } from '../../shared/protocol/session.js'
 export type { SubagentControl, SubagentRow, SubagentTranscriptView } from '../../shared/protocol/subagents.js'
 export type { ChatRow, CostTokenBuckets, SessionCostByModel, SubagentCostEntry, TokenBucket, TokenUsage, ToolCallView, ToolFileDiff, ToolResultView, ToolRow } from '../../shared/protocol/transcript.js'
-export type { ClientState as ChannelState } from '../runtime/mutable-state.js'
 
 export type PermissionPresetService = {
   names?: unknown

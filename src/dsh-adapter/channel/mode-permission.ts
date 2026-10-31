@@ -7,7 +7,7 @@ import { modeDisplayName, type SessionModeSpec } from '../../modules/sessions/in
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { PermissionModeRoster } from './mode-roster.js'
 import { PERMISSION_PRESET_CUSTOM, permissionPresetRuntime } from './permissions.js'
-import type { ChannelState } from './types.js'
+import type { RuntimeCommands } from '../module-runtime.js'
 
 /** Last durable permission preset identity (`permission/preset`), if any.
  *  Registered by the harness permission preset service, never manufactured
@@ -117,7 +117,7 @@ export function createPermissionIdentity(
     roster: PermissionModeRoster
     commandService?: { find(agent: Agent, name: string): unknown }
     executeRegistryCommand(name: string, input: string): Promise<string | undefined>
-    notify: ChannelState['notify']
+    notify: RuntimeCommands['notify']
   },
 ): PermissionIdentity {
   /** Durable preset identity captured when plan mode starts; an implicit plan

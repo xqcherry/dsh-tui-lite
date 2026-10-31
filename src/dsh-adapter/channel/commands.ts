@@ -1,17 +1,20 @@
-/** Internal command composition follows the same production UI dispatcher.
- * A bare createChannel embedder intentionally keeps its direct local API.
- */
-import type { Client } from '../runtime/ui-policy.js'
-import type { ChannelState } from './types.js'
+import type { ModuleOwners } from '../module-runtime.js'
+import type { RuntimeCommands } from '../module-runtime.js'
 
-const dispatchers = new WeakMap<ChannelState, Client>()
+const dispatchers = new WeakMap<ModuleOwners, RuntimeCommands>()
 
-export function bindChannelCommands(state: ChannelState, commands: Client): void {
-  dispatchers.set(state, commands)
-  // Keep the revoked dispatcher installed: late async work must fail closed,
-  // not revert to the bare-embedder path after production teardown.
+/** Keep a revoked dispatcher installed so late continuations fail closed. */
+export function bindChannelCommands(runtime: ModuleOwners, commands: RuntimeCommands): void {
+  dispatchers.set(runtime, commands)
 }
 
-export function channelCommands(state: ChannelState): Client | ChannelState {
-  return dispatchers.get(state) ?? state
+export function channelCommands(runtime: ModuleOwners): RuntimeCommands {
+  return dispatchers.get(runtime) ?? {
+    ...runtime.sessions.commands,
+    ...runtime.settings.commands,
+    ...runtime.composer.commands,
+    ...runtime.transcript.commands,
+    ...runtime.activity.commands,
+    ...runtime.workbench.commands,
+  }
 }

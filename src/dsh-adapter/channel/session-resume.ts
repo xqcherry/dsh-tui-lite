@@ -1,3 +1,5 @@
+import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
@@ -25,27 +27,10 @@ import { composePreset, resolvePersistedPreset, resolvePersistedRoute } from '..
 import { attachSessionToWorkspace } from '../workspace.js'
 import type { ChannelBinding } from './binding.js'
 import type { NewSessionOpener, NewSessionPlan } from './core/session-switch.js'
-import type { ChannelState, ResumeResult } from './types.js'
+import type { ResumeResult } from './types.js'
 
 type Binding = ChannelBinding
-type ResumeState = Pick<
-  ChannelState,
-  | 'working'
-  | 'status'
-  | 'agentId'
-  | 'sessionId'
-  | 'cwd'
-  | 'displayCwd'
-  | 'agentPreset'
-  | 'provider'
-  | 'model'
-  | 'loadedContext'
-  | 'contextWindow'
-  | 'effortLevels'
-  | 'reasoningEffort'
-  | 'working'
-  | 'emit'
-> & Parameters<typeof resetSessionProjection>[0]
+type ResumeState = Pick<ModuleOwners, 'sessions' | 'settings' | 'composer' | 'transcript' | 'activity' | 'publication'>
 
 export type { NewSessionTarget } from './core/session-switch.js'
 
@@ -93,7 +78,7 @@ export function createSessionResumeActions(
      *  the one the selection was made in. */
     resetIdeSelection(): void
     settleCompaction(): Promise<void>
-    notify: ChannelState['notify']
+    notify: RuntimeCommands['notify']
   },
 ) {
   const resetAndBind = (
@@ -103,23 +88,23 @@ export function createSessionResumeActions(
     replay: boolean,
   ): void => {
     resetSessionProjection(state, deps.rowIds, deps.resetProjector, deps.resetSubagents, deps.resetJobs)
-    state.status = handle.agent.status
-    state.agentId = handle.agent.id
-    state.sessionId = handle.agent.session.id
-    state.agentPreset = agentPreset
+    state.sessions.ingress.update(draft => { draft.status = handle.agent.status })
+    state.sessions.ingress.update(draft => { draft.agentId = handle.agent.id })
+    state.sessions.ingress.update(draft => { draft.sessionId = handle.agent.session.id })
+    state.sessions.ingress.update(draft => { draft.agentPreset = agentPreset })
     if (route !== undefined) {
-      state.provider = route.provider
-      state.model = route.model
+      state.settings.ingress.update(draft => { draft.provider = route.provider })
+      state.settings.ingress.update(draft => { draft.model = route.model })
     }
-    state.loadedContext = undefined
-    state.contextWindow = undefined
-    state.effortLevels = undefined
-    state.reasoningEffort = undefined
+    state.transcript.ingress.update(draft => { draft.loadedContext = undefined })
+    state.settings.ingress.update(draft => { draft.contextWindow = undefined })
+    state.settings.ingress.update(draft => { draft.effortLevels = undefined })
+    state.settings.ingress.update(draft => { draft.reasoningEffort = undefined })
     if (replay) {
       deps.replay(snapshotLiveSessionEvents(handle.agent.session))
       deps.settleReplay()
       // A resumed log can end mid-turn; mirror boot's post-replay status.
-      state.working = handle.agent.status === 'running'
+      state.sessions.ingress.update(draft => { draft.working = handle.agent.status === 'running' })
     }
     deps.bindAgent()
     deps.refreshCommands()
@@ -188,7 +173,7 @@ export function createSessionResumeActions(
         return { ok: false, reason: 'cancelled' }
       }
       try {
-        await attachSessionToWorkspace(ctx, handle.agent.session.header.cwd ?? state.cwd, SessionId(sessionId))
+        await attachSessionToWorkspace(ctx, handle.agent.session.header.cwd ?? state.sessions.ingress.read().cwd, SessionId(sessionId))
       } catch (error) {
         deps.notify(t('resume-attach-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'warning', timeoutMs: 8000 })
       }
@@ -202,8 +187,8 @@ export function createSessionResumeActions(
       // normal return is a commit, which is what the outer finally keys on.
       const result = deps.binding.adopt<ResumeResult>(candidate, adoption, (committedBinding, disposePrevious) => {
         const previousSessionId = String(committedBinding.agent.session.id)
-        state.cwd = handle.agent.session.header.cwd ?? state.cwd
-        state.displayCwd = state.cwd
+        state.sessions.ingress.update(draft => { draft.cwd = handle.agent.session.header.cwd ?? draft.cwd })
+        state.sessions.ingress.update(draft => { draft.displayCwd = draft.cwd })
         deps.resetIdeSelection()
         deps.refreshGitBranch()
         // Reset the input FIFO and pending-decision indicators BEFORE the first
@@ -212,7 +197,7 @@ export function createSessionResumeActions(
         resetAndBind(handle, composed.agentPreset, explicitRoute ?? recordedModelRoute(snapshotLiveSessionEvents(handle.agent.session)), true)
         writeResumeTarget(sessionId)
         touchSession(sessionId)
-        state.emit()
+        publishRuntime(state)
         disposePrevious('dispose')
         return { ok: true }
       })
@@ -282,7 +267,7 @@ export function createSessionResumeActions(
     // the awaits below yield cannot be adopted over.
     const entrySession = deps.binding.agent.session
     if (String(sessionId) === String(entrySession.id)) return { ok: true }
-    if (state.working) {
+    if (state.sessions.ingress.read().working) {
       deps.notify(t('resume-while-working'), { color: 'warning' })
       return { ok: false, reason: 'cancelled' }
     }
@@ -301,7 +286,7 @@ export function createSessionResumeActions(
       reservation?.abandon()
       return { ok: false, reason: 'cancelled' }
     }
-    if (agents.get?.(SessionId(sessionId)) !== undefined || state.working) {
+    if (agents.get?.(SessionId(sessionId)) !== undefined || state.sessions.ingress.read().working) {
       reservation.abandon()
       return { ok: false, reason: 'cancelled' }
     }

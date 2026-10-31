@@ -12,7 +12,8 @@ import React from 'react'
 
 import type { ComposerImageRef } from '../../../../shared/protocol/composer.js'
 import { t } from '../../../../shared/i18n.js'
-import type { ComposerPort as Channel } from '../../contracts.js'
+import type { ComposerBinding } from '../../contracts.js'
+import type { ComposerContext } from '../types.js'
 
 
 import { sanitizeEditableText } from '../../../../shared/platform/inputPaste.js'
@@ -31,7 +32,8 @@ interface Context {
   readonly recordDraftEdit: (prev: string, prevCursor: number, block: DraftUndoEntry["block"], next: string, nextCursor: number, mode: "group" | "step") => void
   readonly inputEditSequenceRef: React.RefObject<number>
   readonly stageIdIsRetained: (stageId: string) => boolean
-  readonly channel: Channel
+  readonly composer: ComposerBinding
+  readonly context: ComposerContext
   readonly selectionRef: React.RefObject<{ start: number; end: number; } | null>
   readonly setSelection: React.Dispatch<React.SetStateAction<{ start: number; end: number; } | null>>
   readonly setValue: React.Dispatch<React.SetStateAction<string>>
@@ -76,7 +78,7 @@ const setInput = (
     undo: UndoMode = 'group',
     snapshotBlock?: DraftUndoEntry['block'],
   ) => {
-    const { valueRef, cursorRef, foldBlockRef, dockSelectedRef, setDockSelected, clearDraftUndo, recordDraftEdit, inputEditSequenceRef, draftImagesRef, stageIdIsRetained, channel, selectionRef, setSelection, setValue, setCursor } = getContext()
+    const { valueRef, cursorRef, foldBlockRef, dockSelectedRef, setDockSelected, clearDraftUndo, recordDraftEdit, inputEditSequenceRef, draftImagesRef, stageIdIsRetained, composer, context, selectionRef, setSelection, setValue, setCursor } = getContext()
 
 
     // Apply the same ingress normalization to fills/history/editor results as
@@ -146,7 +148,7 @@ const setInput = (
     for (const [token, stageId] of draftImagesRef.current) {
       if (next.includes(token)) continue
       draftImagesRef.current.delete(token)
-      if (!stageIdIsRetained(stageId)) channel.discardStagedImage(stageId)
+      if (!stageIdIsRetained(stageId)) composer.commands.discardStagedImage(stageId)
     }
     // Every real edit drops the selection: its offsets describe the OLD
     // text. Selection-consuming callers (delete/replace) read it first.
@@ -217,17 +219,17 @@ const imageRefsFor = (text: string): ComposerImageRef[] => {
   }
 
 const warnStaleImageTokens = (text: string, images: readonly ComposerImageRef[]): void => {
-    const { channel } = getContext()
+    const { composer, context } = getContext()
 
 
     const live = new Set(
       images
-        .filter(image => channel.stagedImage(image.stageId) !== undefined)
+        .filter(image => composer.commands.stagedImage(image.stageId) !== undefined)
         .map(image => image.token),
     )
     for (const match of text.matchAll(COMPOSER_IMAGE_TOKEN)) {
       if (live.has(match[0])) continue
-      channel.notify(t('input-image-token-stale', { token: match[0] }), { color: 'warning', timeoutMs: 5000 })
+      context.notify(t('input-image-token-stale', { token: match[0] }), { color: 'warning', timeoutMs: 5000 })
       return
     }
   }

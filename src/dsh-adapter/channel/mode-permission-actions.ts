@@ -1,3 +1,5 @@
+import { publishRuntime } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -8,10 +10,9 @@ import type { ChannelBinding } from './binding.js'
 import { createModeActions, reportModeSwitchFailure } from './mode-actions.js'
 import { createPermissionIdentity, foldPermissionPreset, type PermissionIdentity } from './mode-permission.js'
 import type { PermissionModeRoster } from './mode-roster.js'
-import type { ChannelState } from './types.js'
 
 type Binding = ChannelBinding
-type ModeState = Pick<ChannelState, 'mode' | 'modeIndex' | 'emit'>
+type ModeState = Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
 type ModeCapture = ReturnType<Binding['capture']>
 /** The composition seam `createModeActions` owns; this factory forwards every
  *  member verbatim so both stay in lockstep. */
@@ -136,8 +137,8 @@ export function createPermissionModeActions(
   const refreshMode = (): void => {
     roster.rebuild(binding.agent)
     const index = derivePermissionModeIndex(sessionModes, snapshotLiveSessionEvents(binding.agent.session))
-    state.modeIndex = index
-    state.mode = sessionModes[index]!
+    state.sessions.ingress.update(draft => { draft.modeIndex = index })
+    state.sessions.ingress.update(draft => { draft.mode = sessionModes[index]! })
   }
 
   /** Apply the configured atoms; an explicit exit owns its target mode.
@@ -188,9 +189,9 @@ export function createPermissionModeActions(
     if (!owner.current() || !binding.isCurrent(capture) || session !== agent.session) return
     await base.applyMode(spec, capture)
     if (!owner.current() || !binding.isCurrent(capture)) return
-    const before = state.modeIndex
+    const before = state.sessions.ingress.read().modeIndex
     refreshMode()
-    if (state.modeIndex !== before) state.emit()
+    if (state.sessions.ingress.read().modeIndex !== before) publishRuntime(state)
   }
 
   /** Shift+Tab: advance from the mode DERIVED from the session log (never a
@@ -227,8 +228,8 @@ export function createPermissionModeActions(
       void permission.applyPermissionIdentity(remembered).then((ok) => {
         if (!ok || subject !== binding.agent.session) return
         refreshMode()
-        notify(t('mode-switched', { name: modeDisplayName(state.mode) }))
-        state.emit()
+        notify(t('mode-switched', { name: modeDisplayName(state.sessions.ingress.read().mode) }))
+        publishRuntime(state)
       }).catch(() => {
         // Best-effort; failures already surfaced through applyPermissionIdentity.
       })

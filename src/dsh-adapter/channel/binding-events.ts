@@ -1,3 +1,4 @@
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AssistantStreamFrame, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { carrierKeyOf } from '@deepseek-ai/dsh-scope'
@@ -9,7 +10,6 @@ import { runningPresetOf } from '../presets.js'
 import type { ChannelBinding } from './binding.js'
 import { agentCapabilityEvidence, resolveAgentCapabilities } from './capabilities.js'
 import { createSessionBatchRouter, createSessionBinder, type BindingFeedHooks, type BindingScope } from './core/binding-feed.js'
-import type { ChannelState } from './types.js'
 
 /**
  * Foreground transcript listeners capture a binding generation: the bound
@@ -23,7 +23,7 @@ import type { ChannelState } from './types.js'
 export function createBindingEvents(ctx: Context, deps: {
   owner: ChannelOwner
   binding: ChannelBinding
-  state: ChannelState
+  state: Pick<ModuleOwners, 'settings' | 'sessions' | 'composer' | 'transcript' | 'workbench' | 'publication'>
   /** Read the activity projection's current value for a freshly bound session.
    *  A projection value only arrives when it changes, so a resumed or
    *  reattached session needs this read to show its line before the next event.
@@ -54,6 +54,7 @@ export function createBindingEvents(ctx: Context, deps: {
    *  channel.ts always wires it. */
   retireAttachment?(messageId: string): void
 }) {
+  const state = deps.state
   let subagentsInstalled = false
   /**
    * Preset of the last binding we announced a capability gap for. The gap is a
@@ -85,7 +86,7 @@ export function createBindingEvents(ctx: Context, deps: {
       : capabilities.pruner
         ? 'capability-gap-compaction'
         : 'capability-gap-compaction-pruner'
-    deps.state.notify(t(key), { color: 'warning', timeoutMs: 12000 })
+    state.workbench.commands.notify(t(key), { color: 'warning', timeoutMs: 12000 })
   }
   const installSubagents = (): void => {
     if (subagentsInstalled) return
@@ -131,8 +132,8 @@ export function createBindingEvents(ctx: Context, deps: {
       deps.seedContextOccupancy?.(deps.binding.agent.session)
       deps.modelActions.selection.current = undefined
       deps.modelActions.selection.assembled = undefined
-      if (deps.binding.agent.options?.model === undefined && deps.state.provider !== '' && deps.state.model !== '') {
-        deps.modelActions.selection.current = { provider: deps.state.provider, model: deps.state.model }
+      if (deps.binding.agent.options?.model === undefined && state.settings.ingress.read().provider !== '' && state.settings.ingress.read().model !== '') {
+        deps.modelActions.selection.current = { provider: state.settings.ingress.read().provider, model: state.settings.ingress.read().model }
       }
       void deps.modelActions.applyPreferredEffort()
       deps.modeActions.refreshMode()

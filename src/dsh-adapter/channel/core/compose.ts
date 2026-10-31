@@ -6,7 +6,15 @@ import { t } from '../../../shared/i18n.js'
 import { createInputActions, type InputConvergence } from '../../../modules/composer/index.js'
 import { registerChannelOwner, type ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import { DEFAULT_SESSION_MODES } from '../../../modules/sessions/index.js'
-import { createInitialChannelView } from '../../runtime/initial-state.js'
+import { createPublication } from '../../../shared/state/module-store.js'
+import { swallowNestedUpdateOverflow } from '../../../ink/update-overflow-guard.js'
+import { bindRuntimePublisher, publishRuntime, type RuntimeModules, type RuntimeCommands } from '../../module-runtime.js'
+import { createSessionsModule } from '../../../modules/sessions/index.js'
+import { createSettingsModule } from '../../../modules/settings/index.js'
+import { createComposerModule } from '../../../modules/composer/index.js'
+import { createTranscriptModule } from '../../../modules/transcript/index.js'
+import { createActivityModule } from '../../../modules/activity/index.js'
+import { createWorkbenchModule } from '../../../modules/workbench/index.js'
 import { createChannelNotifications } from '../../../modules/workbench/index.js'
 import { markChannelReadDirty } from '../../../shared/state/read-view.js'
 import type { DshSession as AgentSession } from '../../backend/session.js'
@@ -23,7 +31,6 @@ import { createInputDelivery } from '../input-delivery.js'
 import { unavailablePermissionPresetSnapshot } from '../permissions.js'
 import { createSettingsHosts } from '../settings-host.js'
 import type { ChannelLaunchOptions } from '../state.js'
-import type { ChannelState } from '../types.js'
 import { installChannelActions } from './actions.js'
 import { createBindingFeed, type BindingFeedHooks } from './binding-feed.js'
 import { createCoreFiles, NO_COMPLETION_CATALOG, type CompletionCatalog } from './files.js'
@@ -63,13 +70,112 @@ export function createCoreChannel(
   owner: ChannelOwner,
 ) {
   const rowIds = { value: 0 }
-  const binding: ChannelBinding = createChannelBinding(initialSession, owner)
+  let emitter: ReturnType<typeof createChannelEmitter> | undefined
+  const publication = createPublication({
+    onListenerError(error) {
+      if (!swallowNestedUpdateOverflow(error, 'module.publish')) throw error
+    },
+    schedule(callback) {
+      const timer = setTimeout(() => {
+        publication.batch(() => { emitter?.flushStream() }, 'silent')
+        callback()
+      }, 16)
+      timer.unref()
+      return () => clearTimeout(timer)
+    },
+  })
+  const binding: ChannelBinding = createChannelBinding(initialSession, owner, publication)
   // Release the session and its subscriptions when this runtime ends.
 
   let services: ChannelServices = {}
   let started = false
 
-  const emitter = createChannelEmitter(() => state, () => services.flushDeferred?.() ?? false, {
+  let actions: RuntimeCommands
+  const launch = { options, input: { agentId: initialSession.sessionId, sessionId: initialSession.sessionId, mode: DEFAULT_SESSION_MODES[0]!, cwdDescription: options.cwd } }
+  const state: RuntimeModules = {
+    publication,
+    sessions: createSessionsModule(launch, {
+      resumeTo: (...args) => publication.batch(() => actions.resumeTo(...args)),
+      newSession: (...args) => publication.batch(() => actions.newSession(...args)),
+      cachedSessions: (...args) => publication.batch(() => actions.cachedSessions(...args)),
+      listSessions: (...args) => publication.batch(() => actions.listSessions(...args)),
+      previewSession: (...args) => publication.batch(() => actions.previewSession(...args)),
+      setResumeTarget: (...args) => publication.batch(() => actions.setResumeTarget(...args)),
+      renameSession: (...args) => publication.batch(() => actions.renameSession(...args)),
+      deleteSession: (...args) => publication.batch(() => actions.deleteSession(...args)),
+      renameSessionTo: (...args) => publication.batch(() => actions.renameSessionTo(...args)),
+      capabilities: (...args) => publication.batch(() => actions.capabilities(...args)),
+      cycleMode: (...args) => publication.batch(() => actions.cycleMode(...args)),
+      permissionPresets: (...args) => publication.batch(() => actions.permissionPresets(...args)),
+      runPermissionPreset: (...args) => publication.batch(() => actions.runPermissionPreset(...args)),
+    }, publication),
+    settings: createSettingsModule(launch, {
+      switchModel: (...args) => publication.batch(() => actions.switchModel(...args)),
+      listEfforts: (...args) => publication.batch(() => actions.listEfforts(...args)),
+      setEffort: (...args) => publication.batch(() => actions.setEffort(...args)),
+      setDefaultEffort: (...args) => publication.batch(() => actions.setDefaultEffort(...args)),
+      listModels: (...args) => publication.batch(() => actions.listModels(...args)),
+      listProviders: (...args) => publication.batch(() => actions.listProviders(...args)),
+      invalidateModelCompletion: (...args) => publication.batch(() => actions.invalidateModelCompletion(...args)),
+      describeCredential: (...args) => publication.batch(() => actions.describeCredential(...args)),
+      providerSetup: (...args) => publication.batch(() => actions.providerSetup(...args)),
+      oauthProviderStatuses: (...args) => publication.batch(() => actions.oauthProviderStatuses(...args)),
+      listSkills: (...args) => publication.batch(() => actions.listSkills(...args)),
+    }, publication),
+    composer: createComposerModule(launch, {
+      stageImage: (...args) => publication.batch(() => actions.stageImage(...args)),
+      stagedImageGeneration: (...args) => publication.batch(() => actions.stagedImageGeneration(...args)),
+      stageComposerImage: (...args) => publication.batch(() => actions.stageComposerImage(...args)),
+      hasStagedImage: (...args) => publication.batch(() => actions.hasStagedImage(...args)),
+      discardStagedImage: (...args) => publication.batch(() => actions.discardStagedImage(...args)),
+      stagedImage: (...args) => publication.batch(() => actions.stagedImage(...args)),
+      stagedImageLimits: (...args) => publication.batch(() => actions.stagedImageLimits(...args)),
+      submit: (...args) => publication.batch(() => actions.submit(...args)),
+      steer: (...args) => publication.batch(() => actions.steer(...args)),
+      removePending: (...args) => publication.batch(() => actions.removePending(...args)),
+      cancel: (...args) => publication.batch(() => actions.cancel(...args)),
+      interruptAndDeliver: (...args) => publication.batch(() => actions.interruptAndDeliver(...args)),
+      interruptAndDock: (...args) => publication.batch(() => actions.interruptAndDock(...args)),
+      deliverDocked: (...args) => publication.batch(() => actions.deliverDocked(...args)),
+      swapDockedForDraft: (...args) => publication.batch(() => actions.swapDockedForDraft(...args)),
+      commandCompletions: (...args) => publication.batch(() => actions.commandCompletions(...args)),
+      listFileCandidates: (...args) => publication.batch(() => actions.listFileCandidates(...args)),
+      listFiles: (...args) => publication.batch(() => actions.listFiles(...args)),
+    }, publication),
+    transcript: createTranscriptModule(launch, {
+      clear: (...args) => publication.batch(() => actions.clear(...args)),
+      loadOlder: (...args) => publication.batch(() => actions.loadOlder(...args)),
+      compact: (...args) => publication.batch(() => actions.compact(...args)),
+      cancelCompact: (...args) => publication.batch(() => actions.cancelCompact(...args)),
+      exportSession: (...args) => publication.batch(() => actions.exportSession(...args)),
+      pushLocal: (...args) => publication.batch(() => actions.pushLocal(...args)),
+    }, publication, rowIds),
+    activity: createActivityModule(launch, {
+      listSubagents: (...args) => publication.batch(() => actions.listSubagents(...args)),
+      jobControl: { kill: (...args) => actions.jobControl.kill(...args), watchOutput: (...args) => (actions.jobControl.watchOutput?.(...args) ?? (() => undefined)) },
+      subagentControl: { interrupt: (...args) => actions.subagentControl.interrupt(...args) },
+    }, publication),
+    workbench: createWorkbenchModule(launch, {
+      notify: (...args) => publication.batch(() => actions.notify(...args)),
+      runExternalCommand: (...args) => publication.batch(() => actions.runExternalCommand(...args)),
+      runExternalCommandOutcome: (...args) => publication.batch(() => actions.runExternalCommandOutcome(...args)),
+      mcpStatus: (...args) => publication.batch(() => actions.mcpStatus(...args)),
+      initWorkspace: (...args) => publication.batch(() => actions.initWorkspace(...args)),
+      doctorInfo: (...args) => publication.batch(() => actions.doctorInfo(...args)),
+    }, publication),
+    dispose() { owner.dispose() },
+  }
+  owner.own(() => {
+    publication.dispose()
+    state.sessions.dispose()
+    state.settings.dispose()
+    state.composer.dispose()
+    state.transcript.dispose()
+    state.activity.dispose()
+    state.workbench.dispose()
+  })
+
+  emitter = createChannelEmitter(state, () => services.flushDeferred?.() ?? false, {
     // Folding drops a row's full text on the promise that `loadOlder`
     // restores it; without a history slicer every row stays whole. A
     // session's durable transcript restores only rows with a stable anchor.
@@ -79,8 +185,14 @@ export function createCoreChannel(
   // The emitter exists before the complete state surface. Put it in the
   // construction rollback funnel immediately; normal release remains
   // idempotent through the same disposer.
-  owner.own(() => emitter.dispose())
-  const notify: ChannelState['notify'] = (...args) => {
+  owner.own(() => emitter?.dispose())
+  bindRuntimePublisher(state, mode => {
+    publication.batch(() => {
+      state.transcript.ingress.patch({ contextOccupancy: resolveContextOccupancy(options.contextPressure?.read(state.sessions.ingress.read().sessionId), state.transcript.ingress.read().lastUsage, state.settings.ingress.read().contextWindow) })
+      emitter?.emit(mode)
+    }, mode)
+  })
+  const notify: RuntimeCommands['notify'] = (...args) => {
     if (!owner.current()) return () => undefined
     return channelCommands(state).notify(...args)
   }
@@ -96,6 +208,7 @@ export function createCoreChannel(
     (text, notifyOptions) => notify(text, notifyOptions),
     percent => t('context-low-warning', { percent }),
     CONTEXT_WARNING_BUFFER_TOKENS,
+    () => resolveContextOccupancy(options.contextPressure?.read(state.sessions.ingress.read().sessionId), state.transcript.ingress.read().lastUsage, state.settings.ingress.read().contextWindow),
   )
   const { resetContextWarning, checkContextWarning, trackPending, untrackPending } = bookkeeping
 
@@ -118,8 +231,8 @@ export function createCoreChannel(
     // Live prompt-footer badge: the selection must reach the screen before
     // the user submits. emit() bumps `version` so the useSyncExternalStore
     // tree re-renders with the new badge immediately.
-    state.selection = currentSelection
-    state.emit()
+    state.composer.ingress.update(draft => { draft.selection = currentSelection })
+    publishRuntime(state)
   })
   /**
    * Re-target the IDE selection link when the session's working directory
@@ -132,9 +245,9 @@ export function createCoreChannel(
    */
   const resetIdeSelection = (): void => {
     currentSelection = undefined
-    state.selection = undefined
-    state.emit()
-    void ideChannel.rebind(state.cwd).catch(() => {})
+    state.composer.ingress.update(draft => { draft.selection = undefined })
+    publishRuntime(state)
+    void ideChannel.rebind(state.sessions.ingress.read().cwd).catch(() => {})
   }
   const selectionAttachments = createSelectionAttachments()
   // "Send to Chat": staged panel contexts are session-scoped like the
@@ -147,7 +260,7 @@ export function createCoreChannel(
    * held in memory by the core (local-images.ts), under the bound session's
    * limits; a DSH session keeps the attachments service.
    */
-  const composer = createComposerImages(ctx, owner, { generation: () => state.agentBindingGeneration })
+  const composer = createComposerImages(ctx, owner, { generation: () => state.sessions.ingress.read().agentBindingGeneration })
   const files = createCoreFiles(ctx, {
     owner,
     binding,
@@ -177,44 +290,15 @@ export function createCoreChannel(
 
   const contextPressure = options.contextPressure
 
-  const state: ChannelState = {
-    ...createInputActions(() => state, () => binding.session, owner, inputConvergence,
+  actions = {
+    ...createInputActions(() => ({ composer: state.composer, agentId: () => state.sessions.ingress.read().agentId, notify }), () => binding.session, owner, inputConvergence,
       composer,
       (text, placement, images) => dispatchUserText(text, placement, images),
       (command, includeInContext) => getReadyActions().runLocalCommand(command, includeInContext),
       sessionId => { services.touchSession?.(sessionId) }),
-    subscribe: emitter.subscribe,
-    emit: emitter.emit,
-    emitStream: emitter.emitStream,
     ...createSettingsHosts(ctx, owner.assertActive),
-    ...createInitialChannelView(options, {
-      agentId: initialSession.sessionId,
-      sessionId: initialSession.sessionId,
-      // The unmarked base mode: backend-native modes are a capability.
-      mode: DEFAULT_SESSION_MODES[0]!,
-      cwdDescription: options.cwd,
-    }),
-    /**
-     * Context occupancy is derived on read, not stored: the cached host
-     * projection value (a map lookup) combined with this channel's own
-     * fallback sample and capacity. An accessor avoids republishing it from
-     * every site that can move the window or the sample (replay, resume,
-     * model switch, reset).
-     */
-    get contextOccupancy() {
-      return resolveContextOccupancy(
-        contextPressure?.read(state.sessionId),
-        state.lastUsage,
-        state.contextWindow,
-      )
-    },
-    commandList: LOCAL_COMMANDS,
-    capabilities: () => services.agentCapabilities?.() ?? { compact: { route: 'none', reasonKey: 'capability-reason-no-compaction' }, plan: { route: 'none', reasonKey: 'capability-reason-no-plan-command' }, compaction: false, pruner: false, questionTool: false, skills: false },
-    costReport: undefined,
-    get olderHistory(): boolean {
-      return false
-    },
     ...actionMethods,
+    capabilities: () => services.agentCapabilities?.() ?? { compact: { route: 'none', reasonKey: 'capability-reason-no-compaction' }, plan: { route: 'none', reasonKey: 'capability-reason-no-plan-command' }, compaction: false, pruner: false, questionTool: false, skills: false },
     subagentControl: { interrupt: () => false },
     jobControl: { kill: () => false, watchOutput: () => () => undefined },
     stagedImageGeneration: composer.stagedImageGeneration,
@@ -224,21 +308,10 @@ export function createCoreChannel(
     discardStagedImage: composer.discardStagedImage,
     stagedImage: composer.stagedImage,
     stagedImageLimits: composer.stagedImageLimits,
-    notify: createChannelNotifications(() => state, owner),
+    notify: createChannelNotifications(state.workbench, owner),
     permissionPresets: () => unavailablePermissionPresetSnapshot(),
-    releaseContributions() {
-      // Owner cleanup is exhaustive, but it can report an external cleanup
-      // failure. The emitter and the IDE loopback link live outside the owner
-      // and must still stop whichever earlier step throws; a plain trailing
-      // ideChannel.stop() would be skipped when owner.dispose() throws and
-      // leak the socket.
-      try {
-        owner.dispose()
-      } finally {
-        try { emitter.dispose() } finally { ideChannel.stop() }
-      }
-    },
   }
+  state.workbench.ingress.patch({ commandList: LOCAL_COMMANDS })
 
   // Register the raw state before any services can synchronously publish a
   // callback. The renderer lease binds its external authority later, but this
@@ -253,7 +326,7 @@ export function createCoreChannel(
   // another session's value.
   if (contextPressure !== undefined) {
     owner.own(contextPressure.subscribe(() => {
-      if (owner.current()) state.emit()
+      if (owner.current()) publishRuntime(state)
     }))
   }
 
@@ -282,23 +355,23 @@ export function createCoreChannel(
    * backend made.
    */
   const resetConversation = (event: { readonly trigger: string }): void => {
-    state.rows.length = 0
-    markChannelReadDirty(state.rows)
+    state.transcript.ingress.update(draft => { draft.rows.length = 0 })
+    state.transcript.ingress.update(draft => { markChannelReadDirty(draft.rows) })
     rowIds.value = 0
     feed.resetProjection()
     services.dropRows?.()
-    state.todos = []
-    state.sessionTitle = ''
-    state.tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, peak: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, idle: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }
-    state.mainCost = {}
-    state.subagentCost = []
-    state.costReport = undefined
-    state.lastUsage = undefined
-    state.turnUsage = undefined
-    state.contextSegments = { system: 0, prompt: 0, assistant: 0, thinking: 0, tools: 0 }
-    state.activeToolCount = 0
-    state.responseChars = 0
-    state.compaction = undefined
+    state.transcript.ingress.update(draft => { draft.todos = [] })
+    state.sessions.ingress.update(draft => { draft.sessionTitle = '' })
+    state.transcript.ingress.update(draft => { draft.tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, peak: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, idle: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } } })
+    state.transcript.ingress.update(draft => { draft.mainCost = {} })
+    state.activity.ingress.update(draft => { draft.subagentCost = [] })
+    state.transcript.ingress.update(draft => { draft.costReport = undefined })
+    state.transcript.ingress.update(draft => { draft.lastUsage = undefined })
+    state.transcript.ingress.update(draft => { draft.turnUsage = undefined })
+    state.transcript.ingress.update(draft => { draft.contextSegments = { system: 0, prompt: 0, assistant: 0, thinking: 0, tools: 0 } })
+    state.transcript.ingress.update(draft => { draft.activeToolCount = 0 })
+    state.transcript.ingress.update(draft => { draft.responseChars = 0 })
+    state.sessions.ingress.update(draft => { draft.compaction = undefined })
     resetContextWarning()
     // The history before the reset is another conversation's: "load
     // earlier" never brings it back above this view.
@@ -306,8 +379,8 @@ export function createCoreChannel(
       : event.trigger === 'plan_mode_exit' ? 'conversation-reset-plan'
         : event.trigger === 'fresh_session' ? 'conversation-reset-fresh'
           : 'conversation-reset'
-    state.rows.push({ id: rowIds.value++, kind: 'notice', text: t(key) })
-    state.emit()
+    state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'notice', text: t(key) }) })
+    publishRuntime(state)
   }
 
   /** `!!` commands on their way to the session (`/new` waits them out). */
@@ -391,7 +464,7 @@ export function createCoreChannel(
       }
     },
     /** Install the actions, start the runtime, bind the session. */
-    start(): ChannelState {
+    start(): RuntimeModules {
       if (started) throw new Error('dsh-tui: Channel already started')
       started = true
       const core: Partial<ChannelActionDelegates> = {
@@ -429,10 +502,10 @@ export function createCoreChannel(
       effect?.call(ctx, () => () => {
         // The context owns the complete Channel lifetime. Keep emitter and
         // IDE-link teardown in the same finally funnel.
-        state.releaseContributions()
+        state.dispose()
       }, 'dsh-tui channel lifecycle')
       refreshGitBranch()
-      state.emit()
+      publishRuntime(state)
       return state
     },
   }

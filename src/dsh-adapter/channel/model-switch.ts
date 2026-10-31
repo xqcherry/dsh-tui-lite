@@ -1,3 +1,5 @@
+import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
@@ -15,11 +17,9 @@ import { composePreset, runningPresetOf } from '../presets.js'
 import { attachSessionToWorkspace } from '../workspace.js'
 import type { ChannelBinding } from './binding.js'
 import { childRecordsLineage } from './session-lineage.js'
-import type { ChannelState } from './types.js'
 
 type Binding = ChannelBinding
-type SwitchState = Parameters<typeof resetSessionProjection>[0] & Pick<ChannelState,
-  'cwd' | 'working' | 'status' | 'agentId' | 'sessionId' | 'agentPreset' | 'provider' | 'model' | 'contextWindow' | 'effortLevels' | 'reasoningEffort' | 'emit'>
+type SwitchState = Pick<ModuleOwners, 'sessions' | 'settings' | 'composer' | 'transcript' | 'activity' | 'publication'>
 
 /** Model-route adoption transaction. It settles compaction before its fork snapshot and owns the post-commit reset. */
 export function createModelSwitchAction(
@@ -41,12 +41,12 @@ export function createModelSwitchAction(
     refreshSkillCommands(): Promise<void>
     clearStagedImages(): void
     dropModelCompletion(): void
-    notify: ChannelState['notify']
+    notify: RuntimeCommands['notify']
   },
 ) {
   return async (provider: string, model: string): Promise<boolean> => {
     const adoption = deps.binding.capture()
-    if (state.working) { deps.notify(t('model-switch-while-working'), { color: 'warning' }); return false }
+    if (state.sessions.ingress.read().working) { deps.notify(t('model-switch-while-working'), { color: 'warning' }); return false }
     const agents = ctx.get('agents') as { create(options: CreateAgentOptions): Promise<AgentHandle> } | undefined
     if (agents === undefined) { deps.notify(t('model-switch-unavailable'), { color: 'error' }); return false }
     let seed: readonly SessionEvent[]
@@ -71,7 +71,7 @@ export function createModelSwitchAction(
         seed,
         runtimeSession: deps.binding.agent.session,
         inheritedCount: seed.length,
-        cwd: state.cwd,
+        cwd: state.sessions.ingress.read().cwd,
         // A session nobody has typed into has no conversation to relate, and
         // lineage would cost its first real prompt the generated title — the
         // child stands as its own root instead (session-lineage.ts).
@@ -81,7 +81,7 @@ export function createModelSwitchAction(
         setup: composed.setup,
       }))))
     } catch (error) { reservation.abandon(); deps.notify(t('model-switch-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 }); return false }
-    try { await attachSessionToWorkspace(ctx, state.cwd, childId) }
+    try { await attachSessionToWorkspace(ctx, state.sessions.ingress.read().cwd, childId) }
     catch (error) { deps.notify(t('model-switch-attach-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'warning', timeoutMs: 8000 }) }
     if (!deps.binding.isCurrent(adoption) || !deps.owner.current()) { await deps.binding.abandon(candidate); reservation.abandon(); return false }
     const handle = dshHandleOf(candidate)
@@ -89,19 +89,19 @@ export function createModelSwitchAction(
     try {
       const result = deps.binding.adopt<boolean>(candidate, adoption, (_previous, disposePrevious) => {
         resetSessionProjection(state, deps.rowIds, deps.resetProjector, deps.resetSubagents, deps.resetJobs)
-        state.status = handle.agent.status
-        state.agentId = handle.agent.id
-        state.sessionId = handle.agent.session.id
-        state.agentPreset = composed.agentPreset
-        state.provider = provider
-        state.model = model
-        state.contextWindow = undefined
-        state.effortLevels = undefined
-        state.reasoningEffort = undefined
+        state.sessions.ingress.update(draft => { draft.status = handle.agent.status })
+        state.sessions.ingress.update(draft => { draft.agentId = handle.agent.id })
+        state.sessions.ingress.update(draft => { draft.sessionId = handle.agent.session.id })
+        state.sessions.ingress.update(draft => { draft.agentPreset = composed.agentPreset })
+        state.settings.ingress.update(draft => { draft.provider = provider })
+        state.settings.ingress.update(draft => { draft.model = model })
+        state.settings.ingress.update(draft => { draft.contextWindow = undefined })
+        state.settings.ingress.update(draft => { draft.effortLevels = undefined })
+        state.settings.ingress.update(draft => { draft.reasoningEffort = undefined })
         deps.dropModelCompletion()
         deps.replay(seed)
         deps.settleReplay()
-        state.working = handle.agent.status === 'running'
+        state.sessions.ingress.update(draft => { draft.working = handle.agent.status === 'running' })
         // Reset the input FIFO and pending-decision indicators BEFORE the first
         // emit: a submit from a session-changed subscriber must not chain onto
         // the replaced session's parked promise (main's bind → clear → refresh
@@ -112,7 +112,7 @@ export function createModelSwitchAction(
         void deps.refreshLoadedContext()
         void deps.refreshSkillCommands()
         touchSession(childId)
-        state.emit()
+        publishRuntime(state)
         disposePrevious('dispose')
         if (!writeModelPref(provider, model)) deps.notify(t('model-pref-write-failed'), { color: 'warning' })
         return true

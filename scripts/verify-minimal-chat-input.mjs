@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
 import xtermHeadless from '@xterm/headless'
-import { createWorkbenchPorts } from '../src/dsh-adapter/runtime/ports.js'
+import { fixtureModules } from './lib/module-fixtures.mjs'
 import { Chat } from '../src/modules/workbench/ui/Chat.js'
 import { QuestionStore } from '../src/modules/decisions/model/questions.js'
 import { LOCAL_COMMANDS } from '../src/shared/commands.js'
@@ -83,7 +83,7 @@ async function fixture(options = {}) {
     decide(outcome) { decisions.push(outcome); approval = null; for (const listener of approvals) listener() },
   }
   const instance = await render(React.createElement(Chat, {
-    ports: createWorkbenchPorts(channel), questionStore, approvalStore,
+    ports: fixtureModules(channel), questionStore, approvalStore,
     initialPrompt: options.initialPrompt,
     modelConfigured: () => configurationProbe(),
     onExit() { exits++ },

@@ -1,3 +1,4 @@
+import type { ModuleOwners } from '../../module-runtime.js'
 /**
  * Reports every session gets: `/doctor` (the backend-neutral facts plus the
  * backend's own diagnostics lines) and `/export` (the projected transcript as
@@ -10,7 +11,7 @@ import { t } from '../../../shared/i18n.js'
 import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from '../../backend/session.js'
 import type { ChannelBinding } from '../binding.js'
-import type { ChannelState, ChatRow } from '../types.js'
+import type { ChatRow } from '../types.js'
 
 /** One transcript row as an export section; undefined = not exported. */
 function exportSection(row: ChatRow): string | undefined {
@@ -37,7 +38,7 @@ function exportSection(row: ChatRow): string | undefined {
 export function createCoreReports(deps: {
   owner: Pick<ChannelOwner, 'current'>
   binding: Pick<ChannelBinding, 'session' | 'capture' | 'isCurrent'>
-  state: () => Pick<ChannelState, 'rows' | 'model' | 'cwd' | 'contextWindow' | 'agentId'>
+  state: () => Pick<ModuleOwners, 'sessions' | 'settings' | 'transcript'>
 }) {
   /** `/doctor`: the backend-neutral facts plus the backend's own lines. */
   const doctorInfo = (): string[] => {
@@ -47,9 +48,9 @@ export function createCoreReports(deps: {
     return [
       `Node ${process.version} · ${process.platform} ${process.arch}`,
       t('doctor-backend', { label, id: 'dsh' }),
-      t('doctor-model', { model: state.model || t('doctor-unknown'), provider: label }),
-      t('doctor-cwd', { cwd: state.cwd }),
-      t('doctor-context-window', { window: state.contextWindow ?? t('doctor-unknown') }),
+      t('doctor-model', { model: state.settings.ingress.read().model || t('doctor-unknown'), provider: label }),
+      t('doctor-cwd', { cwd: state.sessions.ingress.read().cwd }),
+      t('doctor-context-window', { window: state.settings.ingress.read().contextWindow ?? t('doctor-unknown') }),
       t('doctor-session', { id: session.sessionId }),
     ]
   }
@@ -64,14 +65,14 @@ export function createCoreReports(deps: {
     const current = (): boolean => deps.owner.current() && deps.binding.isCurrent(capture)
     const state = deps.state()
     const parts = [t('export-title'), '', t('export-time', { time: new Date().toLocaleString() }),
-      t('export-model', { model: state.model }), t('export-session', { id: state.agentId }), t('export-dir', { cwd: state.cwd }), '']
-    for (const row of state.rows) {
+      t('export-model', { model: state.settings.ingress.read().model }), t('export-session', { id: state.sessions.ingress.read().agentId }), t('export-dir', { cwd: state.sessions.ingress.read().cwd }), '']
+    for (const row of state.transcript.ingress.read().rows) {
       const section = exportSection(row)
       if (section !== undefined) parts.push(section)
     }
     if (!current()) return null
     try {
-      const target = join(state.cwd, `dsh-tui-export-${Date.now()}.md`)
+      const target = join(state.sessions.ingress.read().cwd, `dsh-tui-export-${Date.now()}.md`)
       writeFileSync(target, parts.join('\n'), 'utf8')
       return current() ? target : null
     } catch {

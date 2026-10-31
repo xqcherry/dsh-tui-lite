@@ -1,17 +1,18 @@
+import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
+import type { ModuleOwners } from '../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { t } from '../../shared/i18n.js'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
 import { serviceForAgent } from '../presets.js'
-import type { ChannelState } from './types.js'
 
 interface ManualCompaction {
   controller: AbortController
   settled: Promise<void>
 }
 
-type CompactionState = Pick<ChannelState, 'agentId' | 'cwd' | 'working' | 'compaction' | 'emit'>
-type Notify = ChannelState['notify']
+type CompactionState = Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
+type Notify = RuntimeCommands['notify']
 
 /** Owns the one manual compaction transaction that must settle before a switch. */
 export function createManualCompaction(
@@ -57,7 +58,7 @@ export function createManualCompaction(
       deps.notify(t('compact-unavailable'), { color: 'warning' })
       return
     }
-    if (state.working) {
+    if (state.sessions.ingress.read().working) {
       deps.notify(t('compact-while-working'), { color: 'warning' })
       return
     }
@@ -70,7 +71,7 @@ export function createManualCompaction(
       cancelled.add(controller)
       controller.abort(new Error('channel lifetime ended'))
     })
-    const originAgentId = state.agentId
+    const originAgentId = state.sessions.ingress.read().agentId
     let finished = false
     const settled = (async () => {
       try {
@@ -81,7 +82,7 @@ export function createManualCompaction(
           deps.notify(t('ext-compact-stale'), { color: 'warning', timeoutMs: 4000 })
           return
         }
-        if (state.working) {
+        if (state.sessions.ingress.read().working) {
           deps.notify(t('compact-while-working'), { color: 'warning' })
           return
         }
@@ -94,8 +95,8 @@ export function createManualCompaction(
           outputChars: 0,
           cancellable: true,
         }
-        state.compaction = row
-        state.emit()
+        state.sessions.ingress.update(draft => { draft.compaction = row })
+        publishRuntime(state)
         try {
           // Compact the entry agent, never a later binding read after await.
           const result = await compactService.compactNow(originAgent, controller.signal)
@@ -130,9 +131,9 @@ export function createManualCompaction(
         // The durable `compaction/end` event already cleared the row on every
         // path that reached the host; this covers the ones that never did
         // (vetoed decision, unavailable service, a throw before the bracket).
-        if (state.compaction?.cancellable === true) {
-          state.compaction = undefined
-          state.emit()
+        if (state.sessions.ingress.read().compaction?.cancellable === true) {
+          state.sessions.ingress.update(draft => { draft.compaction = undefined })
+          publishRuntime(state)
         }
         const currentTransaction = active as ManualCompaction | undefined
         if (currentTransaction?.controller === controller) active = undefined

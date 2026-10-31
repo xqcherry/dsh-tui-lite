@@ -1,7 +1,8 @@
+import type { ModuleOwners } from '../module-runtime.js'
 import { t } from '../../shared/i18n.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { foldBack as FoldBack } from './transcript.js'
-import type { ChannelState, ToolViewPresenter } from './types.js'
+import type { ToolViewPresenter } from './types.js'
 
 /**
  * The DSH halves of the local actions (the backend-neutral ones live in
@@ -16,7 +17,7 @@ export function createLocalActions(deps: {
     isCurrent(capture: unknown): boolean
     readonly agent: { session: unknown }
   }
-  state: ChannelState
+  state: Pick<ModuleOwners, 'activity' | 'transcript'>
   presenters: ToolViewPresenter
   foldBack: typeof FoldBack
 }) {
@@ -26,7 +27,9 @@ export function createLocalActions(deps: {
     /** The history slicer behind "load earlier": restores folded rows from
      *  the durable DSH log (the core emits when anything came back). */
     loadOlder(): number {
-      return foldBack(state.rows, snapshotLiveSessionEvents(binding.agent.session), deps.presenters)
+      let restored = 0
+      state.transcript.ingress.update(draft => { restored = foldBack(draft.rows, snapshotLiveSessionEvents(binding.agent.session), deps.presenters) })
+      return restored
     },
     async listSubagents(): Promise<string[]> {
       const service = ctx.get('subagents') as {
@@ -43,7 +46,7 @@ export function createLocalActions(deps: {
           // The host's non-running activity is not proof that a child was
           // archived: continuable children can be idle or temporarily unknown.
           // Prefer the live projection when this process still owns the run.
-          const running = state.subagents.some(sub => sub.agentId === id && sub.status === 'running')
+          const running = state.activity.ingress.read().subagents.some(sub => sub.agentId === id && sub.status === 'running')
           const activity = running || child.activity === 'running' ? t('subagent-running') : t('subagent-unknown')
           return t('subagent-row', { mode: child.mode === 'continuable' ? t('subagent-resumable') : t('subagent-oneshot'), label: child.label ? `「${child.label}」` : '', activity, id: id.slice(0, 8) })
         })

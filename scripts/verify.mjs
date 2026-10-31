@@ -7,6 +7,8 @@ import { join } from 'node:path'
 export const checks = [
   'verify-boundaries.mjs',
   'verify-feature-modules.mjs',
+  'verify-module-store.ts',
+  'verify-activity-owners.ts',
   'verify-feature-ports.ts',
   'verify-upstream-contract.ts',
   'verify-runtime-boot.mjs',

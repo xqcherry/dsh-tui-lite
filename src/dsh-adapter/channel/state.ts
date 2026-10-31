@@ -1,9 +1,10 @@
 import type { SessionModeSpec } from '../../modules/sessions/contracts.js'
-import type { ClientLaunchOptions } from '../runtime/initial-state.js'
+import type { ModuleLaunch } from '../../shared/protocol/module-launch.js'
 import type { ContextPressureSource } from '../context-occupancy.js'
 
 /** Launch configuration belongs to channel construction, not the composition root. */
-export interface ChannelLaunchOptions extends ClientLaunchOptions {
+type LaunchOptions = ModuleLaunch['options']
+export interface ChannelLaunchOptions extends LaunchOptions {
   /** Read the activity projection's current value when a session binds. A
    *  projection value only arrives on change, so a resumed session needs this
    *  read to render its line before the next event lands. */

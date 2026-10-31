@@ -1,3 +1,4 @@
+import type { Publication } from '../../shared/state/module-store.js'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from '../backend/session.js'
@@ -23,7 +24,8 @@ const handleOf = (session: AgentSession): AgentHandle | undefined => session.dsh
 
 type PreviousDisposition = 'dispose' | 'park'
 
-export function createChannelBinding(initial: AgentSession, owner: ChannelOwner) {
+export function createChannelBinding(initial: AgentSession, owner: ChannelOwner, publication?: Pick<Publication, 'batch'>) {
+  const transaction = <T>(work: () => T): T => publication === undefined ? work() : publication.batch(work)
   let currentSession = initial
   let currentHandle = handleOf(initial)
   let generation = 0
@@ -157,7 +159,14 @@ export function createChannelBinding(initial: AgentSession, owner: ChannelOwner)
       currentSession = candidate
       currentHandle = handleOf(candidate)
       generation += 1
-      const result = tail(previous, decidePrevious)
+      const result = transaction(() => {
+        try { return tail(previous, decidePrevious) } catch (error) {
+          // Revoke before the publication's finally can commit a partial tail.
+          // Preserve the setup failure even if an external cleanup also fails.
+          try { owner.dispose() } catch { /* setup failure remains authoritative */ }
+          throw error
+        }
+      })
       // Tail callbacks include notifier/listener code and therefore remain a
       // synchronous reentrancy boundary even though they contain no await.
       if (handoff !== token || !owner.current() || currentSession !== candidate) {
@@ -208,7 +217,14 @@ export function createChannelBinding(initial: AgentSession, owner: ChannelOwner)
       currentSession = next
       currentHandle = nextHandle
       generation += 1
-      const result = tail(previous, decidePrevious)
+      const result = transaction(() => {
+        try { return tail(previous, decidePrevious) } catch (error) {
+          // Revoke before the publication's finally can commit a partial tail.
+          // Preserve the setup failure even if an external cleanup also fails.
+          try { owner.dispose() } catch { /* setup failure remains authoritative */ }
+          throw error
+        }
+      })
       if (handoff !== token || !owner.current() || currentSession !== next || currentHandle !== nextHandle) {
         throw new Error('dsh-tui: Channel binding changed during adoption')
       }

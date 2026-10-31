@@ -5,7 +5,7 @@ import type { DshSession as AgentSession } from './backend/session.js'
 import { createCoreChannel } from './channel/core/compose.js'
 import { configureDshServices } from './channel/services.js'
 import type { ChannelLaunchOptions } from './channel/state.js'
-import type { ChannelState } from './channel/types.js'
+import type { RuntimeModules } from './module-runtime.js'
 
 /**
  * Create the live channel state for one agent session: replay the durable
@@ -21,7 +21,7 @@ export function createChannel(
   ctx: Context,
   session: AgentSession,
   options: ChannelLaunchOptions,
-): ChannelState {
+): RuntimeModules {
   const owner = createChannelOwner()
   try {
     const core = createCoreChannel(ctx, session, options, owner)

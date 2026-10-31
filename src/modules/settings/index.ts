@@ -33,3 +33,5 @@ export { runOAuthLogin } from './model/providerWizard.js'
 export { runProviderWizard } from './model/providerWizard.js'
 
 export type * from './contracts.js'
+
+export { createSettingsModule } from './model/module.js'

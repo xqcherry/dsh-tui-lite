@@ -1,9 +1,9 @@
+import type { ModuleOwners } from '../module-runtime.js'
 import { completeTuiCommands, isCommandCompletionToken, type CommandCompletionNode } from '../../shared/commands.js'
-import type { ChannelState } from './types.js'
 
 /** Complete only supported chat controls and host commands. */
 export function createCommandCompletions(deps: {
-  state: () => ChannelState
+  state: () => Pick<ModuleOwners, 'sessions' | 'settings' | 'workbench'>
   commandTrees?: { children(path: readonly string[]): readonly CommandCompletionNode[] }
   model: {
     warmModelNodes(): void
@@ -13,17 +13,17 @@ export function createCommandCompletions(deps: {
 }) {
   return (input: string) => {
     const state = deps.state()
-    return completeTuiCommands(input, state.commandList, path => {
+    return completeTuiCommands(input, state.workbench.ingress.read().commandList, path => {
       if (path.length === 1 && path[0] === 'model') {
         deps.model.warmModelNodes()
         return deps.model.modelNodes()
       }
       if (path.length === 1 && path[0] === 'effort') {
         deps.model.warmEffortLevels()
-        return (state.effortLevels ?? []).map(id => ({ name: id, description: 'Reasoning effort', ...(state.reasoningEffort === id ? { tag: 'current' } : {}) }))
+        return (state.settings.ingress.read().effortLevels ?? []).map(id => ({ name: id, description: 'Reasoning effort', ...(state.settings.ingress.read().reasoningEffort === id ? { tag: 'current' } : {}) }))
       }
       if (path.length === 1 && path[0] === 'permission') {
-        const snapshot = state.permissionPresets()
+        const snapshot = state.sessions.commands.permissionPresets()
         if (snapshot.options.length > 0) {
           return snapshot.options.filter(option => isCommandCompletionToken(option.value)).map(option => ({
             name: option.value, description: option.description ?? option.name,

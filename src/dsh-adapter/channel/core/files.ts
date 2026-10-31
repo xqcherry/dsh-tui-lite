@@ -1,3 +1,5 @@
+import type { RuntimeCommands } from '../../module-runtime.js'
+import type { ModuleOwners } from '../../module-runtime.js'
 /**
  * Workspace files and slash completion for every session: the `fs` surface
  * `@` mentions and file completion read (the host fs service, else the local
@@ -14,7 +16,7 @@ import type { ChannelBinding } from '../binding.js'
 import { createCommandCompletions } from '../command-completions.js'
 import { createFileActions } from '../file-actions.js'
 import { mentionFs } from '../mentions.js'
-import type { ChannelState, MentionFs } from '../types.js'
+import type { MentionFs } from '../types.js'
 
 /** Argument catalogs the slash completion tree warms and reads. */
 export interface CompletionCatalog {
@@ -37,7 +39,7 @@ export const NO_COMPLETION_CATALOG: CompletionCatalog = {
 export function createCoreFiles(ctx: Context, deps: {
   owner: Pick<ChannelOwner, 'current' | 'signal'>
   binding: Pick<ChannelBinding, 'capture' | 'isCurrent'>
-  state: () => ChannelState
+  state: () => Pick<ModuleOwners, 'sessions' | 'settings' | 'workbench'>
   /** Whether the local disk stands in for a missing host fs service. */
   /** The bound backend's MCP server names (`/mcp` completion). */
   mcpServers?(): readonly string[] | undefined
@@ -49,14 +51,14 @@ export function createCoreFiles(ctx: Context, deps: {
     owner: deps.owner,
     capture: () => deps.binding.capture(),
     current: capture => deps.binding.isCurrent(capture as ReturnType<typeof deps.binding.capture>),
-    cwd: () => deps.state().cwd,
+    cwd: () => deps.state().sessions.ingress.read().cwd,
     fs,
   })
   return {
     listFileCandidates: fileActions.listFileCandidates,
     listFiles: fileActions.listFiles,
     /** The slash completion over the composition's argument catalogs. */
-    commandCompletions(catalog: CompletionCatalog): ChannelState['commandCompletions'] {
+    commandCompletions(catalog: CompletionCatalog): RuntimeCommands['commandCompletions'] {
       return createCommandCompletions({
         state: deps.state,
         model: catalog.model,

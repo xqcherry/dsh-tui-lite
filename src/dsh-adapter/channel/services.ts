@@ -1,3 +1,4 @@
+import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
 /** Host-backed transcript, tools, session, model and permission actions. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ModelSelectionRef } from '@deepseek-ai/dsh-agent'
@@ -89,8 +90,9 @@ export function configureDshServices(
   })
   // Subagent projection owns the child store, transcript row identity and
   // stream batching. Transport subscriptions below only route scoped events.
-  const subagentProjection = createSubagentProjection(() => state, {
-    rowIds,
+  const subagentProjection = createSubagentProjection(state.activity, state.transcript, {
+    emit: () => publishRuntime(state),
+    emitStream: () => publishRuntime(state, 'stream'),
     agent: () => binding.agent,
     // The continuation service is an optional host plugin: the projection's
     // message capability (direct prompt, catalog roster) exists only when the
@@ -103,8 +105,8 @@ export function configureDshServices(
   owner.own(() => subagentProjection.dispose())
   // Job projection owns registry callbacks and transcript rows. The optional
   // service attachment has no authority after its injected lifetime ends.
-  const jobProjection = createJobProjection(() => state, {
-    owner, notify: (...args) => notify(...args), rowIds, agent: () => binding.agent, steer: text => channelCommands(state).steer(text),
+  const jobProjection = createJobProjection(state.activity, state.transcript, {
+    owner, notify: (...args) => notify(...args), emit: () => publishRuntime(state), agent: () => binding.agent, steer: text => channelCommands(state).steer(text),
   })
 
   // The DSH slash-command registry (optional service): /plan, /goal and
@@ -138,9 +140,9 @@ export function configureDshServices(
 
   // ── the DSH session's view of the common state ─────────────────────────
   const initialSession: AgentSession = binding.session
-  state.agentId = binding.agent.id
-  state.sessionId = binding.agent.session.id
-  state.mode = sessionModes[0]!
+  state.sessions.ingress.update(draft => { draft.agentId = binding.agent.id })
+  state.sessions.ingress.update(draft => { draft.sessionId = binding.agent.session.id })
+  state.sessions.ingress.update(draft => { draft.mode = sessionModes[0]! })
   // A DSH session supports everything the TUI offers.
 
   // Capability facts for the bound agent (channel/capabilities.ts). Reads are
@@ -150,17 +152,17 @@ export function configureDshServices(
   // Annotated from the start: Help and `/` completion read `commandList`
   // before the first skill-catalog refresh publishes a new one, and a command
   // whose capability is missing must never look usable in that window.
-  state.commandList = annotateCommandCapabilities(LOCAL_COMMANDS, capabilitiesOf())
-  state.subagentControl = subagentProjection.control
-  state.jobControl = jobProjection.control
-  state.permissionPresets = () => {
+  state.workbench.ingress.update(draft => { draft.commandList = annotateCommandCapabilities(LOCAL_COMMANDS, capabilitiesOf()) })
+  state.activity.commands.subagentControl = subagentProjection.control
+  state.activity.commands.jobControl = jobProjection.control
+  state.sessions.commands.permissionPresets = () => {
     let service: unknown
     try {
       service = ctx.get('permissionPresets')
     } catch {
       return unavailablePermissionPresetSnapshot()
     }
-    if (service === undefined) return legacyPermissionPresetSnapshot(state.mode.sandbox)
+    if (service === undefined) return legacyPermissionPresetSnapshot(state.sessions.ingress.read().mode.sandbox)
     return permissionPresetSnapshotFromService(service, binding.agent.session)
   }
   // The DSH log restores folded rows; the projector prices by the DeepSeek
@@ -230,13 +232,13 @@ export function configureDshServices(
     owner,
     commandService,
     agent: () => binding.agent,
-    cwd: () => state.cwd,
+    cwd: () => state.sessions.ingress.read().cwd,
     setCommands(commands) {
       // Annotate before publishing: Help and `/` completion both read
       // `commandList`, so a command whose capability is missing says so
       // instead of looking usable and failing on use.
-      state.commandList = annotateCommandCapabilities(commands, capabilitiesOf())
-      state.emit()
+      state.workbench.ingress.update(draft => { draft.commandList = annotateCommandCapabilities(commands, capabilitiesOf()) })
+      publishRuntime(state)
     },
     // Attached-context pass-through: the skill catalog never loses the
     // FIFO/decision fence.
@@ -249,27 +251,27 @@ export function configureDshServices(
     owner,
     capture: () => binding.capture(),
     current: capture => binding.isCurrent(capture as ReturnType<typeof binding.capture>),
-    cwd: () => state.cwd,
-    model: () => state.model,
+    cwd: () => state.sessions.ingress.read().cwd,
+    model: () => state.settings.ingress.read().model,
   })
   const sessionMetadataActions = createSessionMetadataActions(ctx, {
     owner,
     binding,
-    provider: () => state.provider,
-    model: () => state.model,
-    emit: () => state.emit(),
-    sessionTitle: () => state.sessionTitle,
-    setSessionTitle: title => { state.sessionTitle = title },
+    provider: () => state.settings.ingress.read().provider,
+    model: () => state.settings.ingress.read().model,
+    emit: () => publishRuntime(state),
+    sessionTitle: () => state.sessions.ingress.read().sessionTitle,
+    setSessionTitle: title => { state.sessions.ingress.update(draft => { draft.sessionTitle = title }) },
     skillRegistryFor,
     skillViewOptions,
   })
   const loadedContext = createLoadedContextRefresher(ctx, {
     owner,
     agent: () => binding.agent,
-    cwd: () => state.cwd,
+    cwd: () => state.sessions.ingress.read().cwd,
     skillRegistryFor,
     skillViewOptions,
-    publish(context) { state.loadedContext = context; state.emit() },
+    publish(context) { state.transcript.ingress.update(draft => { draft.loadedContext = context }); publishRuntime(state) },
   })
   const refreshLoadedContext = loadedContext.refresh
 
@@ -288,10 +290,10 @@ export function configureDshServices(
   projector.settleStreaming()
   // Attached to an idle agent: any replayed turn/start belongs to a previous
   // session run, so the spinner must not come up on boot.
-  state.working = false
-  state.cancelPending = false
-  state.status = binding.agent.status
-  state.emit()
+  state.sessions.ingress.update(draft => { draft.working = false })
+  state.composer.ingress.update(draft => { draft.cancelPending = false })
+  state.sessions.ingress.update(draft => { draft.status = binding.agent.status })
+  publishRuntime(state)
 
   const modelActions = createModelActions(ctx, state, {
     owner,
@@ -455,8 +457,8 @@ export function configureDshServices(
     // selection pipeline. Capture the foreground route before awaiting so an
     // old child waterfall cannot borrow a later binding's model (A→B→A safe).
     const capture = binding.capture()
-    const provider = state.provider
-    const model = state.model
+    const provider = state.settings.ingress.read().provider
+    const model = state.settings.ingress.read().model
     const resolved = await next()
     if (!owner.current() || !binding.isCurrent(capture)) return resolved
     if (

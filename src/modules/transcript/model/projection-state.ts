@@ -1,42 +1,32 @@
-import type { SpinnerMode } from '../../../shared/protocol/display.js'
-import type { ChannelCostReport } from '../../../shared/protocol/session.js'
-import type { ChannelGoal } from '../../../shared/protocol/session.js'
+import type { MutableSnapshot } from '../../../shared/state/module-store.js'
+import type { TranscriptSnapshot } from '../state-contracts.js'
 import type { CompactionStatus } from '../../../shared/protocol/session.js'
-import type { SessionCostByModel } from '../../../shared/protocol/transcript.js'
-import type { TokenUsage } from '../../../shared/protocol/transcript.js'
-import type { TurnUsageSummary } from '../../../shared/protocol/transcript.js'
+import type { AgentEvent } from '../../../shared/protocol/events.js'
 
-/** Explicit ProjectionFacts capability; no access to unrelated client operations. */
-export interface ProjectionFacts {
-  thinkingFold: 'preview' | 'full'
-  activeToolCount: number
-  spinnerMode: SpinnerMode
-  goal: ChannelGoal | undefined
-  contextSegments: {
-    system: number
-    prompt: number
-    assistant: number
-    thinking: number
-    tools: number
+export type ProjectionState = MutableSnapshot<TranscriptSnapshot>
+
+type ProjectionPort<State extends object, Metadata extends AgentEvent = never> = {
+  ingress: {
+    read(): Readonly<State>
+    update(work: (draft: MutableSnapshot<State>) => void): void
+    metadata(event: Metadata): void
   }
-  tokens: TokenUsage
-  mainCost: SessionCostByModel
-  model: string
-  lastUsage:
-    | { input: number; output: number; cacheRead: number; cacheWrite: number; at: number }
-    | undefined
-  turnUsage: TurnUsageSummary | undefined
-  lastUserText: string
-  responseChars: number
-  tps: number | undefined
-  cancelPending: boolean
-  working: boolean
-  compaction: CompactionStatus | undefined
-  turnStart: number
-  contextWindow: number | undefined
-  reasoningEffort: string | undefined
-  sessionTitle: string
-  agentPreset: string | undefined
-  sessionColor: string
-  costReport: ChannelCostReport | undefined
+}
+
+/** Facts needed by normalized session events, independent of module commands. */
+export interface ProjectionHost {
+  readonly sessions: ProjectionPort<{
+    working: boolean
+    compaction: CompactionStatus | undefined
+    sessionTitle: string
+    agentPreset: string | undefined
+    sessionColor: string
+  }, Extract<AgentEvent, { type: 'session.title' | 'session.color' }>>
+  readonly settings: ProjectionPort<{
+    thinkingFold: 'preview' | 'full'
+    model: string
+    contextWindow: number | undefined
+    reasoningEffort: string | undefined
+  }, Extract<AgentEvent, { type: 'context.capacity' | 'session.ready' | 'model.changed' | 'effort.changed' | 'request.header' }>>
+  readonly composer: { ingress: { read(): Readonly<{ cancelPending: boolean }>; update(work: (draft: { cancelPending: boolean }) => void): void } }
 }
