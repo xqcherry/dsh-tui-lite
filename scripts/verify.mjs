@@ -68,6 +68,7 @@ async function worker() {
     if (!result.passed) { failures++; console.error(result.output || result.signal) }
   }
 }
-await Promise.all(Array.from({ length: 3 }, worker))
+// Render/image checks can saturate the desktop when several run together.
+await worker()
 console.log(`${checks.length - failures}/${checks.length} checks passed`)
 process.exitCode = failures ? 1 : 0
