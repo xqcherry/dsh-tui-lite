@@ -16,3 +16,13 @@ export interface WorkbenchModules {
 }
 
 export type { WorkbenchSnapshot, WorkbenchCommands, WorkbenchBinding } from './state-contracts.js'
+
+/** Host capabilities consumed by the workbench command owner. */
+export type WorkbenchCommandHost = import('./state-contracts.js').WorkbenchCommands
+
+/** Target identity and route supplied by host session adoption. */
+export interface SessionAdoptionFacts {
+  readonly identity: Parameters<import('../sessions/contracts.js').SessionEventIngress['adoptIdentity']>[0]
+  readonly route: Parameters<import('../settings/contracts.js').SettingsSessionIngress['adoptRoute']>[0]
+  readonly clearLoadedContext: boolean
+}
