@@ -1,3 +1,4 @@
+import { createWorkbenchProjection } from '../../src/modules/workbench/model/projection.js'
 /**
  * Projection golden pipeline shared by scripts/capture-projection-golden.ts
  * (writes) and scripts/verify-projection-golden.ts (compares).
@@ -132,7 +133,8 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
   }
   const runtime = createRuntimeModulesFixture({ model: 'fixture-model-a', agentPreset: 'ptc', thinkingFold: variant.thinkingFold })
   const rowIds = { value: 0 }
-  const inputConvergence = { cancelInFlight: true }
+  const inputConvergence = runtime.composer.ingress.convergence
+  inputConvergence.cancelInFlight = true
   const translator = createDshTranslator({
     tools: () => undefined,
     scope: () => {
@@ -148,7 +150,6 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
       onStarted: (id, command) => { recorder.calls.jobsOnStarted.push(toJson({ id, command })) },
       onOutputSeen: (id, text, at) => { recorder.calls.jobsOnOutputSeen.push(toJson({ id, text, at })) },
     },
-    inputConvergence,
     checkContextWarning: () => { recorder.calls.checkContextWarning += 1 },
     notify: (text, options) => {
       recorder.calls.notify.push(toJson({ text, options }))
@@ -168,11 +169,7 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
     selectionAttached: () => undefined,
     pricingWindow: dshPricingWindow,
   }
-  const projector = runtime.transcript.ingress.createProjection({
-    sessions: runtime.sessions,
-    settings: runtime.settings,
-    composer: runtime.composer,
-  }, deps)
+  const projector = createWorkbenchProjection(runtime, deps)
   // The transient view after each live input: spinner phase, open streaming
   // rows and live counters are behaviour the end snapshot cannot show (when a
   // thinking row folds, when the spinner leaves tool-use, …).
@@ -222,7 +219,7 @@ function project(variant: GoldenVariant, mode: 'replay' | 'live'): Projected {
     tpsSamples: state.tpsSamples,
     mainCost: state.mainCost,
     nextRowId: rowIds.value,
-    inputConvergence,
+    inputConvergence: { cancelInFlight: inputConvergence.cancelInFlight },
     calls: recorder.calls,
   })
   runtime.dispose()

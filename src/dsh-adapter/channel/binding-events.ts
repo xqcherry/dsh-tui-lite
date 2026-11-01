@@ -1,15 +1,16 @@
-import type { ModuleOwners } from '../module-runtime.js'
+import type { Notify } from '../../shared/protocol/notifications.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AssistantStreamFrame, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { carrierKeyOf } from '@deepseek-ai/dsh-scope'
 import { t } from '../../shared/i18n.js'
-import type { InputConvergence } from '../../modules/composer/contracts.js'
+import type { SettingsSnapshot } from '../../modules/settings/contracts.js'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
 import type { ChannelProjection } from '../../modules/transcript/contracts.js'
 import { runningPresetOf } from '../presets.js'
 import type { ChannelBinding } from './binding.js'
 import { agentCapabilityEvidence, resolveAgentCapabilities } from './capabilities.js'
-import { createSessionBatchRouter, createSessionBinder, type BindingFeedHooks, type BindingScope } from './core/binding-feed.js'
+import { createSessionBinder, type BindingFeedHooks, type BindingScope } from './core/binding-feed.js'
+import { createSessionBatchRouter } from '../../modules/workbench/index.js'
 
 /**
  * Foreground transcript listeners capture a binding generation: the bound
@@ -23,7 +24,11 @@ import { createSessionBatchRouter, createSessionBinder, type BindingFeedHooks, t
 export function createBindingEvents(ctx: Context, deps: {
   owner: ChannelOwner
   binding: ChannelBinding
-  state: Pick<ModuleOwners, 'settings' | 'sessions' | 'composer' | 'transcript' | 'workbench' | 'publication'>
+  settings(): Readonly<Pick<SettingsSnapshot, 'provider' | 'model'>>
+  notify: Notify
+  routing: Pick<Parameters<typeof createSessionBatchRouter>[0], 'sessions' | 'composer' | 'transcript' | 'publication' | 'publish'>
+  setBindingGeneration(generation: number): void
+  resetInputConvergence(): void
   /** Read the activity projection's current value for a freshly bound session.
    *  A projection value only arrives when it changes, so a resumed or
    *  reattached session needs this read to show its line before the next event.
@@ -36,7 +41,6 @@ export function createBindingEvents(ctx: Context, deps: {
    *  session needs one baseline read to show its occupancy before the next
    *  request reports usage. */
   seedContextOccupancy?(session: unknown): void
-  inputConvergence: InputConvergence
   selection: ModelSelectionRef
   modelActions: { applyPreferredEffort(): Promise<void>; selection: ModelSelectionRef }
   modeActions: { refreshMode(): void; onSessionEvent(session: unknown, event: unknown): void }
@@ -54,7 +58,6 @@ export function createBindingEvents(ctx: Context, deps: {
    *  channel.ts always wires it. */
   retireAttachment?(messageId: string): void
 }) {
-  const state = deps.state
   let subagentsInstalled = false
   /**
    * Preset of the last binding we announced a capability gap for. The gap is a
@@ -86,7 +89,7 @@ export function createBindingEvents(ctx: Context, deps: {
       : capabilities.pruner
         ? 'capability-gap-compaction'
         : 'capability-gap-compaction-pruner'
-    state.workbench.commands.notify(t(key), { color: 'warning', timeoutMs: 12000 })
+    deps.notify(t(key), { color: 'warning', timeoutMs: 12000 })
   }
   const installSubagents = (): void => {
     if (subagentsInstalled) return
@@ -132,8 +135,8 @@ export function createBindingEvents(ctx: Context, deps: {
       deps.seedContextOccupancy?.(deps.binding.agent.session)
       deps.modelActions.selection.current = undefined
       deps.modelActions.selection.assembled = undefined
-      if (deps.binding.agent.options?.model === undefined && state.settings.ingress.read().provider !== '' && state.settings.ingress.read().model !== '') {
-        deps.modelActions.selection.current = { provider: state.settings.ingress.read().provider, model: state.settings.ingress.read().model }
+      if (deps.binding.agent.options?.model === undefined && deps.settings().provider !== '' && deps.settings().model !== '') {
+        deps.modelActions.selection.current = { provider: deps.settings().provider, model: deps.settings().model }
       }
       void deps.modelActions.applyPreferredEffort()
       deps.modeActions.refreshMode()
@@ -190,21 +193,21 @@ export function createBindingEvents(ctx: Context, deps: {
   // Direct regressions drive this owner alone: the same binder the channel
   // feed runs, over the projector they hand in.
   const router = createSessionBatchRouter({
-    state: deps.state,
+    ...deps.routing,
     projector: deps.projector,
-    inputConvergence: deps.inputConvergence,
     retireAttachment: deps.retireAttachment,
     warn: message => ctx.logger.warn(message),
   })
   const binder = createSessionBinder({
     owner: deps.owner,
     binding: deps.binding,
-    state: deps.state,
-    inputConvergence: deps.inputConvergence,
+    batch: deps.routing.publication.batch,
+    setBindingGeneration: deps.setBindingGeneration,
+    resetInputConvergence: deps.resetInputConvergence,
     route: router.route,
     hooks: () => hooks,
   })
   return { bind: binder.bind, hooks }
 }
 
-export { createSessionBatchRouter } from './core/binding-feed.js'
+export { createSessionBatchRouter } from '../../modules/workbench/index.js'

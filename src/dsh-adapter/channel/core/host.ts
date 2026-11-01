@@ -1,5 +1,3 @@
-import { publishRuntime } from '../../module-runtime.js'
-import type { ModuleOwners } from '../../module-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
 import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
@@ -12,32 +10,33 @@ import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
  */
 export function createGitBranchRefresher(ctx: Context, deps: {
   owner: Pick<ChannelOwner, 'current'>
-  state: Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
+  cwd(): string
+  setGitBranch(branch: string | undefined): void
+  publish(): void
   /** Record the resolved branch against the bound session (the session
    *  browser's branch column); absent = nothing records it. */
   noteBranch?(branch: string): void
 }): () => void {
   return () => {
-    const { state } = deps
-    state.sessions.ingress.update(draft => { draft.gitBranch = undefined })
+    deps.setGitBranch(undefined)
     const shell = ctx.get('shell') as ForegroundShell | undefined
     if (!shell) return
     // Capture the requested cwd: a /resume landing while this query is in
     // flight refreshes the branch for the new cwd, so a late reply from the
     // old workspace must be dropped (stale statusline, issue #96).
-    const requestedCwd = state.sessions.ingress.read().cwd
+    const requestedCwd = deps.cwd()
     void runForegroundShell(shell, {
       command: 'git branch --show-current',
       workdir: requestedCwd,
       timeoutMs: 3000,
     })
       .then((result) => {
-        if (!deps.owner.current() || state.sessions.ingress.read().cwd !== requestedCwd) return
+        if (!deps.owner.current() || deps.cwd() !== requestedCwd) return
         const branch = result.stdout.text.trim()
         if (branch !== '') {
-          state.sessions.ingress.update(draft => { draft.gitBranch = branch })
+          deps.setGitBranch(branch)
           deps.noteBranch?.(branch)
-          publishRuntime(state)
+          deps.publish()
         }
       })
       .catch(() => {

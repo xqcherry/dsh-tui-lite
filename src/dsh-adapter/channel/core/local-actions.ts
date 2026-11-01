@@ -1,5 +1,5 @@
-import { publishRuntime, type RuntimeCommands } from '../../module-runtime.js'
-import type { ModuleOwners } from '../../module-runtime.js'
+import type { ChatRow } from '../../../shared/protocol/transcript.js'
+import type { Notify } from '../../../shared/protocol/notifications.js'
 /**
  * Local-only transcript actions every session gets: `/clear`, local report
  * rows, `!cmd` / `!!cmd` through the session's workspace shell,
@@ -11,7 +11,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import { t } from '../../../shared/i18n.js'
 import type { ChannelOwner } from '../../../shared/lifecycle/owner.js'
-import { markChannelReadDirty } from '../../../shared/state/read-view.js'
 import { runForegroundShell, type ForegroundShell } from '../../compat/shell.js'
 import type { ChannelBinding } from '../binding.js'
 import { LOCAL_OUTPUT_LIMIT, preview } from '../transcript.js'
@@ -19,10 +18,14 @@ import { LOCAL_OUTPUT_LIMIT, preview } from '../transcript.js'
 export function createCoreLocalActions(ctx: Context, deps: {
   owner: Pick<ChannelOwner, 'current'>
   binding: Pick<ChannelBinding, 'capture' | 'isCurrent'>
-  state: Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
+  cwd(): string
+  resetRows(): void
+  clearResponseActivity(): void
+  appendLocalRow(row: ChatRow): void
+  publish(): void
   rowIds: { value: number }
   resetProjection(): void
-  notify: RuntimeCommands['notify']
+  notify: Notify
   unavailable(name: string): void
   /** Extension projections whose rows `/clear` drops with the transcript. */
   dropRows(): void
@@ -32,33 +35,31 @@ export function createCoreLocalActions(ctx: Context, deps: {
   /** An input on its way to the session (`!!`): returns its end. */
   beginInput?(): () => void
 }) {
-  const { owner, binding, state, rowIds, notify } = deps
+  const { owner, binding, rowIds, notify } = deps
 
   return {
     loadOlder(): number {
       const restore = deps.loadOlder()
       if (restore === undefined) return 0
       const restored = restore()
-      if (restored > 0) publishRuntime(state)
+      if (restored > 0) deps.publish()
       return restored
     },
 
     clear(): void {
-      state.transcript.ingress.update(draft => { draft.rows.length = 0 })
-      state.transcript.ingress.update(draft => { markChannelReadDirty(draft.rows) })
+      deps.resetRows()
       rowIds.value = 0
       deps.resetProjection()
       deps.dropRows()
-      state.transcript.ingress.update(draft => { draft.activeToolCount = 0 })
-      state.transcript.ingress.update(draft => { draft.responseChars = 0 })
-      state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'notice', text: t('session-cleared') }) })
-      publishRuntime(state)
+      deps.clearResponseActivity()
+      deps.appendLocalRow({ id: rowIds.value++, kind: 'notice', text: t('session-cleared') })
+      deps.publish()
     },
 
     pushLocal(title: string, lines: readonly string[]): void {
-      state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local', text: title }) })
-      for (const line of lines) state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT) }) })
-      publishRuntime(state)
+      deps.appendLocalRow({ id: rowIds.value++, kind: 'local', text: title })
+      for (const line of lines) deps.appendLocalRow({ id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT) })
+      deps.publish()
     },
 
     /**
@@ -81,9 +82,9 @@ export function createCoreLocalActions(ctx: Context, deps: {
   async function runLocal(command: string, includeInContext: boolean): Promise<void> {
     const capture = binding.capture()
     const current = (): boolean => owner.current() && binding.isCurrent(capture)
-    const cwd = state.sessions.ingress.read().cwd
-    state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local', text: command, executionTarget: 'local' }) })
-    publishRuntime(state)
+    const cwd = deps.cwd()
+    deps.appendLocalRow({ id: rowIds.value++, kind: 'local', text: command, executionTarget: 'local' })
+    deps.publish()
     const executor = ctx.get('shell') as ForegroundShell | undefined
     if (!current()) return
     if (executor === undefined) {
@@ -98,8 +99,8 @@ export function createCoreLocalActions(ctx: Context, deps: {
       output = error instanceof Error ? error.message : String(error)
     }
     if (!current()) return
-    state.transcript.ingress.update(draft => { draft.rows.push({ id: rowIds.value++, kind: 'local-output', text: preview(output, LOCAL_OUTPUT_LIMIT) }) })
-    publishRuntime(state)
+    deps.appendLocalRow({ id: rowIds.value++, kind: 'local-output', text: preview(output, LOCAL_OUTPUT_LIMIT) })
+    deps.publish()
     if (includeInContext) {
       // This runs detached (`void runLocalCommand`): a session that closed
       // meanwhile (a backend process that exited) must not surface as an

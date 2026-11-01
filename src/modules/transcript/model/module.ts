@@ -1,15 +1,17 @@
 import { foldRows, MAX_ROWS } from './window.js'
+import { createCommandLifetime } from '../../../shared/lifecycle/module-commands.js'
+import type { TranscriptCommandHost } from '../contracts.js'
 import { createModuleStore, type Publication, type MutableSnapshot } from '../../../shared/state/module-store.js'
 import type { TranscriptSnapshot, TranscriptCommands } from '../state-contracts.js'
 import { createChannelProjection, type ChannelProjectionDeps } from './projection.js'
-import type { ProjectionHost } from './projection-state.js'
+import type { TranscriptProjectionContext, TranscriptProjectionEffects } from '../contracts.js'
 import type { ChatRow } from '../../../shared/protocol/transcript.js'
 import { markChannelReadDirty } from '../../../shared/state/read-view.js'
 import type { ModuleLaunch } from '../../../shared/protocol/module-launch.js'
 
 /** This module is the sole owner of these fields. Writers never reach the UI. */
-export function createTranscriptModule(launch: ModuleLaunch, commands: TranscriptCommands, publication: Publication, rowIds = { value: 0 }) {
-  const { options, input } = launch
+export function createTranscriptModule(launch: ModuleLaunch, publication: Publication, rowIds = { value: 0 }) {
+  const lifetime = createCommandLifetime<TranscriptCommandHost>(publication)
   const owned = createModuleStore<MutableSnapshot<TranscriptSnapshot>>({
     rows: [],
     costReport: undefined,
@@ -33,10 +35,21 @@ export function createTranscriptModule(launch: ModuleLaunch, commands: Transcrip
   }, publication, { trackedRows: true })
   const windowCursor = { rows: undefined as unknown, index: 0, head: undefined as unknown }
   const activityRows = new Map<string, ChatRow>()
+  const commands = Object.freeze<TranscriptCommands>({
+    clear: (...args) => lifetime.call(host => host.clear(...args)),
+    loadOlder: (...args) => lifetime.call(host => host.loadOlder(...args)),
+    compact: (...args) => lifetime.call(host => host.compact(...args)),
+    cancelCompact: (...args) => lifetime.call(host => host.cancelCompact(...args)),
+    exportSession: (...args) => lifetime.call(host => host.exportSession(...args)),
+    pushLocal: (...args) => lifetime.call(host => host.pushLocal(...args)),
+  })
   return {
+    connectHost: lifetime.connect,
+    startCommands: lifetime.start,
     store: owned.store,
     commands,
     ingress: {
+      read: owned.read,
       restoreSessionMetrics(metrics: Pick<TranscriptSnapshot, 'tokens' | 'responseChars' | 'activeToolCount' | 'lastUserText' | 'spinnerMode' | 'tps' | 'tpsSamples' | 'lastUsage' | 'contextSegments'>): void {
         owned.patch({ ...metrics, tpsSamples: [...metrics.tpsSamples] })
       },
@@ -80,6 +93,21 @@ export function createTranscriptModule(launch: ModuleLaunch, commands: Transcrip
           activeToolCount: 0, responseChars: 0,
         })
       },
+      createProjection(context: TranscriptProjectionContext, effects: TranscriptProjectionEffects, deps: ChannelProjectionDeps) {
+        let reducer!: ReturnType<typeof createChannelProjection>
+        owned.update(draft => { reducer = createChannelProjection(draft, context, effects, deps) })
+        const run = <Result>(work: () => Result): Result => {
+          let result!: Result
+          publication.batch(() => { owned.update(() => { result = work() }) })
+          return result
+        }
+        return {
+          apply: (...args: Parameters<typeof reducer.apply>) => run(() => reducer.apply(...args)),
+          reset: () => run(() => reducer.reset()),
+          settleStreaming: () => run(() => reducer.settleStreaming()),
+          updateSpinnerMode: () => run(() => reducer.updateSpinnerMode()),
+        }
+      },
       clearLoadedContext(): void { owned.patch({ loadedContext: undefined }) },
       releaseActiveTools(): void { owned.patch({ activeToolCount: 0 }) },
       resetRows(): void {
@@ -98,22 +126,6 @@ export function createTranscriptModule(launch: ModuleLaunch, commands: Transcrip
           contextSegments: { system: 0, prompt: 0, assistant: 0, thinking: 0, tools: 0 },
         })
       },
-      patch: owned.patch, update: owned.update, read: owned.read,
-      createProjection(host: ProjectionHost, deps: ChannelProjectionDeps) {
-        let reducer!: ReturnType<typeof createChannelProjection>
-        owned.update(draft => { reducer = createChannelProjection(draft, host, deps) })
-        const run = <Result>(work: () => Result): Result => {
-          let result!: Result
-          publication.batch(() => { owned.update(() => { result = work() }) })
-          return result
-        }
-        return {
-          apply: (...args: Parameters<typeof reducer.apply>) => run(() => reducer.apply(...args)),
-          reset: () => run(() => reducer.reset()),
-          settleStreaming: () => run(() => reducer.settleStreaming()),
-          updateSpinnerMode: () => run(() => reducer.updateSpinnerMode()),
-        }
-      },
       upsertActivityRow(key: string, value: Pick<ChatRow, 'kind' | 'text' | 'job' | 'subagent'>): void {
         owned.update(draft => {
           let row = activityRows.get(key)
@@ -130,6 +142,6 @@ export function createTranscriptModule(launch: ModuleLaunch, commands: Transcrip
         for (const key of activityRows.keys()) if (key.startsWith(`${kind}:`)) activityRows.delete(key)
       },
     },
-    dispose: owned.dispose,
+    dispose() { lifetime.dispose(); owned.dispose() },
   }
 }

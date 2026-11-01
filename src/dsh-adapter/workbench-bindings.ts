@@ -2,7 +2,6 @@ import type { WorkbenchModules } from '../modules/workbench/contracts.js'
 import type { RuntimeModules } from './module-runtime.js'
 import { channelOwnerCurrent } from '../shared/lifecycle/owner.js'
 import { createChannelReadView } from '../shared/state/read-view.js'
-import { bindChannelCommands } from './channel/commands.js'
 
 /** Hide adapter ingress and lifecycle capabilities at the renderer boundary. */
 export function createWorkbenchBindings(runtime: RuntimeModules): WorkbenchModules {
@@ -18,14 +17,6 @@ export function createWorkbenchBindings(runtime: RuntimeModules): WorkbenchModul
     settings: binding(runtime.settings),
     transcript: binding(runtime.transcript),
     workbench: binding(runtime.workbench),
-  })
-  bindChannelCommands(runtime, {
-    ...bindings.activity.commands,
-    ...bindings.composer.commands,
-    ...bindings.sessions.commands,
-    ...bindings.settings.commands,
-    ...bindings.transcript.commands,
-    ...bindings.workbench.commands,
   })
   return bindings
 }

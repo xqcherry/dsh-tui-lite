@@ -1,4 +1,5 @@
-import type { ModuleOwners } from '../../module-runtime.js'
+import type { SessionsSnapshot } from '../../../modules/sessions/contracts.js'
+import type { SettingsSnapshot } from '../../../modules/settings/contracts.js'
 /**
  * Reports every session gets: `/doctor` (the backend-neutral facts plus the
  * backend's own diagnostics lines) and `/export` (the projected transcript as
@@ -38,19 +39,20 @@ function exportSection(row: ChatRow): string | undefined {
 export function createCoreReports(deps: {
   owner: Pick<ChannelOwner, 'current'>
   binding: Pick<ChannelBinding, 'session' | 'capture' | 'isCurrent'>
-  state: () => Pick<ModuleOwners, 'sessions' | 'settings' | 'transcript'>
+  session(): Readonly<Pick<SessionsSnapshot, 'cwd' | 'agentId'>>
+  settings(): Readonly<Pick<SettingsSnapshot, 'model' | 'contextWindow'>>
+  rows(): readonly ChatRow[]
 }) {
   /** `/doctor`: the backend-neutral facts plus the backend's own lines. */
   const doctorInfo = (): string[] => {
     const session: AgentSession = deps.binding.session
-    const state = deps.state()
     const label = 'DSH'
     return [
       `Node ${process.version} · ${process.platform} ${process.arch}`,
       t('doctor-backend', { label, id: 'dsh' }),
-      t('doctor-model', { model: state.settings.ingress.read().model || t('doctor-unknown'), provider: label }),
-      t('doctor-cwd', { cwd: state.sessions.ingress.read().cwd }),
-      t('doctor-context-window', { window: state.settings.ingress.read().contextWindow ?? t('doctor-unknown') }),
+      t('doctor-model', { model: deps.settings().model || t('doctor-unknown'), provider: label }),
+      t('doctor-cwd', { cwd: deps.session().cwd }),
+      t('doctor-context-window', { window: deps.settings().contextWindow ?? t('doctor-unknown') }),
       t('doctor-session', { id: session.sessionId }),
     ]
   }
@@ -63,16 +65,15 @@ export function createCoreReports(deps: {
   const exportSession = (): string | null => {
     const capture = deps.binding.capture()
     const current = (): boolean => deps.owner.current() && deps.binding.isCurrent(capture)
-    const state = deps.state()
     const parts = [t('export-title'), '', t('export-time', { time: new Date().toLocaleString() }),
-      t('export-model', { model: state.settings.ingress.read().model }), t('export-session', { id: state.sessions.ingress.read().agentId }), t('export-dir', { cwd: state.sessions.ingress.read().cwd }), '']
-    for (const row of state.transcript.ingress.read().rows) {
+      t('export-model', { model: deps.settings().model }), t('export-session', { id: deps.session().agentId }), t('export-dir', { cwd: deps.session().cwd }), '']
+    for (const row of deps.rows()) {
       const section = exportSection(row)
       if (section !== undefined) parts.push(section)
     }
     if (!current()) return null
     try {
-      const target = join(state.sessions.ingress.read().cwd, `dsh-tui-export-${Date.now()}.md`)
+      const target = join(deps.session().cwd, `dsh-tui-export-${Date.now()}.md`)
       writeFileSync(target, parts.join('\n'), 'utf8')
       return current() ? target : null
     } catch {

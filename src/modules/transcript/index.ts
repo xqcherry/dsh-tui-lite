@@ -2,8 +2,6 @@
 
 export { isPeakHour } from './model/pricing.js'
 
-export { createChannelProjection } from './model/projection.js'
-
 export type { ChannelProjection } from './model/projection.js'
 
 export type { ChannelProjectionDeps } from './model/projection.js'

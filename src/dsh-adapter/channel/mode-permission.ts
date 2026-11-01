@@ -1,3 +1,4 @@
+import type { Notify } from '../../shared/protocol/notifications.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -7,7 +8,6 @@ import { modeDisplayName, type SessionModeSpec } from '../../modules/sessions/in
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { PermissionModeRoster } from './mode-roster.js'
 import { PERMISSION_PRESET_CUSTOM, permissionPresetRuntime } from './permissions.js'
-import type { RuntimeCommands } from '../module-runtime.js'
 
 /** Last durable permission preset identity (`permission/preset`), if any.
  *  Registered by the harness permission preset service, never manufactured
@@ -117,7 +117,7 @@ export function createPermissionIdentity(
     roster: PermissionModeRoster
     commandService?: { find(agent: Agent, name: string): unknown }
     executeRegistryCommand(name: string, input: string): Promise<string | undefined>
-    notify: RuntimeCommands['notify']
+    notify: Notify
   },
 ): PermissionIdentity {
   /** Durable preset identity captured when plan mode starts; an implicit plan

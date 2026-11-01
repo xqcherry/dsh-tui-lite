@@ -1,10 +1,10 @@
-import type { RuntimeCommands } from '../module-runtime.js'
+import type { SettingsCommands } from '../../modules/settings/contracts.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmConfigurableProvider, LlmDiscoveredModel } from '@deepseek-ai/dsh-llm'
 import type { OAuthProviderStatus, OAuthSetupHost, ProfilePathOp, ProviderSetupHost } from '../../modules/settings/contracts.js'
 import { settingsValue } from '../compat/settings.js'
 
-export function createSettingsHosts(ctx: Context, assertActive: () => void = () => undefined): Pick<RuntimeCommands, 'providerSetup' | 'oauthProviderStatuses'> {
+export function createSettingsHosts(ctx: Context, assertActive: () => void = () => undefined): Pick<SettingsCommands, 'providerSetup' | 'oauthProviderStatuses'> {
   return {
 
     providerSetup(): ProviderSetupHost | undefined {

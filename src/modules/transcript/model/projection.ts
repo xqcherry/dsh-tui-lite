@@ -14,7 +14,8 @@
  * contract (the goldens pin `startedAt`/`durationMs` with a stepping clock).
  */
 import { logForDebugging } from '../../../shared/platform/debug.js'
-import type { ProjectionHost, ProjectionState } from './projection-state.js'
+import type { ProjectionState } from './projection-state.js'
+import type { TranscriptProjectionContext, TranscriptProjectionEffects } from '../contracts.js'
 import type { Notify } from '../../../shared/protocol/notifications.js'
 import type { SelectionAttachment } from '../../../shared/protocol/composer.js'
 import type { TodoPanelItem } from '../../../shared/protocol/session.js'
@@ -47,7 +48,6 @@ export interface ChannelProjectionDeps {
   notify: Notify
   /** Background-job registry feed (DSH `jobs` service mirror). */
   jobs: { onOutputSeen(id: string, text: string, at?: number): void; onStarted(id: string, command: string): void }
-  inputConvergence: { cancelInFlight: boolean }
   renderer?: ProjectionRenderer
   /** What a submitted message's IDE selection attached (keyed by the message
    *  id the durable event carries), for the user row's indicator line. */
@@ -69,7 +69,7 @@ export function textOfBlocks(blocks: readonly ContentBlockView[] | undefined): s
 }
 
 /** Create the shared projector over one channel state. */
-export function createChannelProjection(state: ProjectionState, host: ProjectionHost, deps: ChannelProjectionDeps) {
+export function createChannelProjection(state: ProjectionState, context: TranscriptProjectionContext, effects: TranscriptProjectionEffects, deps: ChannelProjectionDeps) {
   /** The in-progress assistant text row; `undefined` when no step is streaming. */
   let streaming: ChatRow | undefined
   /** The in-progress reasoning row; `undefined` when no reasoning is streaming. */
@@ -315,7 +315,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
     const duration = Math.max(0, Date.now() - reasoningStart)
     reasoning.durationMs = duration
     reasoning.streaming = false
-    reasoning.thinkingOpen = host.settings.ingress.read().thinkingFold === 'full'
+    reasoning.thinkingOpen = context.settings().thinkingFold === 'full'
     touchRow(reasoning)
     sealedReasoning.push(reasoning)
     reasoning = undefined
@@ -571,7 +571,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
       // until turn settle; settleStreaming folds the sealed rows then.
       reasoning.durationMs = Math.max(0, Date.now() - reasoningStart)
       reasoning.streaming = false
-      reasoning.thinkingOpen = host.settings.ingress.read().thinkingFold === 'full'
+      reasoning.thinkingOpen = context.settings().thinkingFold === 'full'
       touchRow(reasoning)
       sealedReasoning.push(reasoning)
       logForDebugging(`thinking: step sealed (${reasoning.durationMs}ms), expanded until turn/end`)
@@ -597,7 +597,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
       // 归属。replay 用 request.header 还原历史请求模型，旧日志回退
       // channel 模型；换模型不会把历史 token 重估到新模型。
       if ((usage.input ?? 0) !== 0 || (usage.output ?? 0) !== 0 || (usage.cacheRead ?? 0) !== 0 || (usage.cacheWrite ?? 0) !== 0) {
-        const model = eventModel ?? host.settings.ingress.read().model
+        const model = eventModel ?? context.settings().model
         const cost = state.mainCost[model] ?? emptyCostBuckets()
         addUsageToBucket(peak ? cost.peak : cost.idle, usage)
         state.mainCost[model] = cost
@@ -887,10 +887,9 @@ export function createChannelProjection(state: ProjectionState, host: Projection
     if (event.cost !== undefined) state.costReport = event.cost
     if (activeAttempt !== undefined) discardAttempt(activeAttempt.turn, activeAttempt.step)
     openStep = undefined
-    deps.inputConvergence.cancelInFlight = false
-    host.composer.ingress.update(draft => { draft.cancelPending = false })
+    effects.clearCancellation()
     settleStreaming()
-    host.sessions.ingress.update(draft => { draft.working = false })
+    effects.setWorking(false)
     state.activeToolCount = 0
     if (tpsTurn !== undefined && tpsTurn === event.turn) {
       if (tpsTurnSampled && tpsTurnDecodeMs > 0) {
@@ -940,7 +939,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
         durationMs: Math.max(0, event.time - turnLedger.startedAt),
         ...(turnLedger.model === undefined ? {} : { model: turnLedger.model }),
         ...(turnLedger.model === undefined || turnLedger.model === lastNotedTurnModel ? {} : { noteModel: true }),
-        ...(host.settings.ingress.read().reasoningEffort === undefined ? {} : { effort: host.settings.ingress.read().reasoningEffort }),
+        ...(context.settings().reasoningEffort === undefined ? {} : { effort: context.settings().reasoningEffort }),
         outcome,
       }
       if (turnLedger.model !== undefined) lastNotedTurnModel = turnLedger.model
@@ -1113,9 +1112,8 @@ export function createChannelProjection(state: ProjectionState, host: Projection
 
         return
       case 'turn.start':
-        deps.inputConvergence.cancelInFlight = false
-        host.composer.ingress.update(draft => { draft.cancelPending = false })
-        host.sessions.ingress.update(draft => { draft.working = true })
+            effects.clearCancellation()
+        effects.setWorking(true)
         state.turnStart = Date.now()
         state.responseChars = 0
         state.spinnerMode = 'requesting'
@@ -1148,7 +1146,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
       case 'session.ready':
       case 'model.changed':
       case 'effort.changed':
-        host.settings.ingress.metadata(event)
+        effects.settingsMetadata(event)
         return
       case 'system.prompt':
         // The latest system prompt holds the active instructions (an empty
@@ -1157,7 +1155,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
         return
       case 'request.header':
         // Reasoning effort readout (status line) from the call config.
-        host.settings.ingress.metadata(event)
+        effects.settingsMetadata(event)
         // 该请求的 usage 按这里的 model 计价（replay 时逐请求还原；live 时
         // 与 state.model 同步更新）。header 缺/空 model 时也要清掉上一条
         // header 的值，否则后续 usage 会沿用旧模型进错桶；归属时再回退
@@ -1166,7 +1164,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
         return
       case 'session.title':
       case 'session.color':
-        host.sessions.ingress.metadata(event)
+        effects.sessionMetadata(event)
         return
       case 'todo.write':
         // The snapshot array is adopted as-is (the durable record owns it).
@@ -1176,7 +1174,7 @@ export function createChannelProjection(state: ProjectionState, host: Projection
         // A transcript marker so a replayed log shows which composition
         // produced the turns after it. A recording under an alias of the
         // current preset shows the current spelling.
-        const current = host.sessions.ingress.read().agentPreset
+        const current = context.session().agentPreset
         // `aliases` crosses a backend boundary: only a real array is trusted
         // (a translator bug must not turn a marker into a projector throw).
         const aliases: unknown = event.aliases
@@ -1197,29 +1195,29 @@ export function createChannelProjection(state: ProjectionState, host: Projection
         // history, and a process killed between start and end leaves an
         // unmatched start in the log: painting a row for it would show a
         // compaction that nothing will ever clear.
-        if (!replaying && host.sessions.ingress.read().compaction === undefined) {
-          host.sessions.ingress.update(draft => { draft.compaction = {
+        if (!replaying && context.session().compaction === undefined) {
+          effects.setCompaction({
             // oxlint-disable-next-line typescript/no-unnecessary-condition -- durable replay data may lack a time
             startedAt: typeof event.time === 'number' ? event.time : Date.now(),
             phase: 'prefill',
             outputChars: 0,
             cancellable: event.cancellable,
-          } })
+          })
         }
         return
       case 'compaction.progress': {
-        const compaction = host.sessions.ingress.read().compaction
+        const compaction = context.session().compaction
         if (compaction !== undefined) {
-          host.sessions.ingress.update(draft => { draft.compaction = {
+          effects.setCompaction({
             ...compaction,
             phase: 'summary',
             outputChars: compaction.outputChars + event.outputChars,
-          } })
+          })
         }
         return
       }
       case 'compaction.end':
-        host.sessions.ingress.update(draft => { draft.compaction = undefined })
+        effects.setCompaction(undefined)
         // A backend that measured the compacted window (Claude
         // `compact_boundary.post_tokens`) re-seeds the occupancy sample with
         // it: a compaction turn makes no request, so without this the

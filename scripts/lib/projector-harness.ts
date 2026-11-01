@@ -1,3 +1,4 @@
+import { createWorkbenchProjection } from '../../src/modules/workbench/model/projection.js'
 /**
  * Minimal shared-projector harness for translator gates: six real module owners plus recording projector deps, so a script can
  * fold translated `AgentEvent`s through the production reducer
@@ -30,11 +31,7 @@ export function createProjectorHarness(options: { agentPreset?: string; thinking
     notices.push(text)
     return () => undefined
   }
-  const projector = runtime.transcript.ingress.createProjection({
-    sessions: runtime.sessions,
-    settings: runtime.settings,
-    composer: runtime.composer,
-  }, {
+  const projector = createWorkbenchProjection(runtime, {
     rowIds,
     resetContextWarning: () => undefined,
     checkContextWarning: () => undefined,
@@ -43,7 +40,6 @@ export function createProjectorHarness(options: { agentPreset?: string; thinking
       return () => undefined
     },
     jobs: { onOutputSeen: () => undefined, onStarted: () => undefined },
-    inputConvergence: { cancelInFlight: false },
     selectionAttached: () => undefined,
   })
   return {

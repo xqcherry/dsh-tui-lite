@@ -20,8 +20,6 @@ export { touchSession } from './model/sessionHistory.js'
 
 export { reserveNewSession } from './model/sessionMounts.js'
 
-export { resetSessionProjection } from './model/session-reset.js'
-
 export { resolveSessionModes } from './model/modes.js'
 
 export { clearResumeTarget } from './model/sessionHistory.js'

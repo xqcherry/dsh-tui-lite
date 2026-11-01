@@ -1,5 +1,3 @@
-import { publishRuntime, type ModuleOwners } from '../module-runtime.js'
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
@@ -9,16 +7,16 @@ import type { SettingsModelCatalog, SettingsModelState } from '../../modules/set
 import type { ChannelBinding } from './binding.js'
 
 /** Official catalog and model-selection resources implement the settings host. */
-export function createModelActions(ctx: Context, state: Pick<ModuleOwners, 'settings' | 'sessions' | 'transcript' | 'publication'>, deps: {
+export function createModelActions(ctx: Context, settings: SettingsModelState, deps: {
   owner: { current(): boolean }
   binding: Pick<ChannelBinding, 'capture' | 'isCurrent'>
   selection: ModelSelectionRef
   initialEffort?: string
   notify: Notify
-  agent(): Agent
+  publish(): void
   checkContextWarning(): void
 }) {
-  const actions = createSettingsModelActions(state.settings.ingress, {
+  const actions = createSettingsModelActions(settings, {
     models: ctx.get('llm') as SettingsModelCatalog | undefined,
     current: deps.owner.current,
     capture: deps.binding.capture,
@@ -31,7 +29,7 @@ export function createModelActions(ctx: Context, state: Pick<ModuleOwners, 'sett
       }
     },
     notify: deps.notify,
-    publish: () => publishRuntime(state),
+    publish: deps.publish,
     checkContextWarning: deps.checkContextWarning,
   }, deps.initialEffort)
   return { ...actions, selection: deps.selection }

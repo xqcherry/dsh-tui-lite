@@ -1,4 +1,3 @@
-import type { ModuleOwners } from '../module-runtime.js'
 import type { SessionsSnapshot } from '../../modules/sessions/contracts.js'
 import type { Notify } from '../../shared/protocol/notifications.js'
 import { createInputQueue } from '../../modules/composer/index.js'
@@ -49,7 +48,7 @@ export interface UserTextOrigin {
 /** Input FIFO, staged attachments and decision notice timers share one lifetime. */
 export function createInputDelivery(
  ctx: Context, owner: ChannelOwner, binding: { readonly session: AgentSession },
- state: () => Pick<ModuleOwners, 'sessions'>,
+ session: () => Readonly<Pick<SessionsSnapshot, 'agentBindingGeneration' | 'agentId' | 'cwd'>>,
  notify: Notify,
  trackPending: (message: { id: string; text: string; images?: readonly ComposerImageRef[] }, placement: PendingMessage['placement']) => void,
  untrackPending: (id: string) => void,
@@ -63,7 +62,6 @@ export function createInputDelivery(
   *  `images` capability); absent / undefined = the DSH attachments service. */
 
 ) {
-  const session = () => state().sessions.ingress.read()
   /**
    * Attached-context registry (issue #842): `deliverUserText(..., attach)`
    * records the model-facing companion message under the DELIVERED user

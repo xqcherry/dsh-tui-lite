@@ -15,7 +15,7 @@ const runtime = createRuntimeModulesFixture({
     settings: { providerSetup: () => ({ writeCredential: () => { credentialWrites++ } }) as never },
   },
 })
-runtime.sessions.ingress.patch({ agentBindingGeneration: 7 })
+runtime.sessions.ingress.setBindingGeneration(7)
 const owner = createChannelOwner()
 registerChannelOwner(runtime, owner)
 const bindings = createWorkbenchBindings(runtime)
@@ -47,8 +47,8 @@ try {
   })
   const stopComposer = bindings.composer.store.subscribe(() => { composerUpdates++ })
   runtime.publication.batch(() => {
-    runtime.sessions.ingress.patch({ agentBindingGeneration: 8 })
-    runtime.settings.ingress.patch({ model: 'model-b' })
+    runtime.sessions.ingress.setBindingGeneration(8)
+    runtime.settings.ingress.adoptRoute({ model: 'model-b', provider: 'fixture' })
   })
   assert.equal(bindings.settings.store.getSnapshot().model, 'model-b')
   assert.equal(before.model, 'fixture-model', 'older snapshots keep their original values')

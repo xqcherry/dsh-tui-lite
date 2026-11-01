@@ -37,13 +37,24 @@ export function createRuntimeModulesFixture(options: {
   }
   const publication = createPublication()
   const commands = options.commands ?? {}
-  const sessions = createSessionsModule(launch, (commands.sessions ?? {}) as SessionsCommands, publication)
-  const settings = createSettingsModule(launch, (commands.settings ?? {}) as SettingsCommands, publication)
-  const composer = createComposerModule(launch, (commands.composer ?? {}) as ComposerCommands, publication)
-  const transcript = createTranscriptModule(launch, (commands.transcript ?? {}) as TranscriptCommands, publication)
-  const activity = createActivityModule(launch, (commands.activity ?? {}) as ActivityCommands, publication)
-  const workbench = createWorkbenchModule(launch, (commands.workbench ?? {}) as WorkbenchCommands, publication)
-  settings.ingress.patch({ thinkingFold: options.thinkingFold ?? 'preview' })
+  const sessions = createSessionsModule(launch, publication)
+  const settings = createSettingsModule(launch, publication)
+  const composer = createComposerModule(launch, publication)
+  const transcript = createTranscriptModule(launch, publication)
+  const activity = createActivityModule(launch, publication)
+  const workbench = createWorkbenchModule(launch, publication)
+  sessions.connectHost((commands.sessions ?? {}) as SessionsCommands)
+  settings.connectHost((commands.settings ?? {}) as SettingsCommands)
+  composer.connectHost((commands.composer ?? {}) as ComposerCommands)
+  transcript.connectHost((commands.transcript ?? {}) as TranscriptCommands)
+  activity.connectHost({
+    jobControl: { kill() { throw new Error('Fixture command not provided: activity.jobControl.kill') } },
+    subagentControl: { interrupt() { throw new Error('Fixture command not provided: activity.subagentControl.interrupt') } },
+    ...commands.activity,
+  } as ActivityCommands)
+  workbench.connectHost((commands.workbench ?? {}) as WorkbenchCommands)
+  for (const module of [sessions, settings, composer, transcript, activity, workbench]) module.startCommands()
+  settings.ingress.setThinkingFold(options.thinkingFold ?? 'preview')
   return {
     sessions, settings, composer, transcript, activity, workbench, publication,
     dispose() {

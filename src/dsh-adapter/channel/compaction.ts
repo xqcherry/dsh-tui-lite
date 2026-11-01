@@ -1,5 +1,5 @@
-import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
-import type { ModuleOwners } from '../module-runtime.js'
+import type { SessionsSnapshot } from '../../modules/sessions/contracts.js'
+import type { Notify } from '../../shared/protocol/notifications.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { t } from '../../shared/i18n.js'
@@ -11,13 +11,16 @@ interface ManualCompaction {
   settled: Promise<void>
 }
 
-type CompactionState = Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
-type Notify = RuntimeCommands['notify']
+export interface CompactionPorts {
+  session(): Readonly<Pick<SessionsSnapshot, 'working' | 'agentId' | 'compaction'>>
+  publish(): void
+  setCompaction: (value: SessionsSnapshot['compaction']) => void
+}
 
 /** Owns the one manual compaction transaction that must settle before a switch. */
 export function createManualCompaction(
   ctx: Context,
-  state: CompactionState,
+  ports: CompactionPorts,
   deps: {
     owner: Pick<ChannelOwner, 'current' | 'signal' | 'own'>
     agent(): Agent
@@ -58,7 +61,7 @@ export function createManualCompaction(
       deps.notify(t('compact-unavailable'), { color: 'warning' })
       return
     }
-    if (state.sessions.ingress.read().working) {
+    if (ports.session().working) {
       deps.notify(t('compact-while-working'), { color: 'warning' })
       return
     }
@@ -71,7 +74,7 @@ export function createManualCompaction(
       cancelled.add(controller)
       controller.abort(new Error('channel lifetime ended'))
     })
-    const originAgentId = state.sessions.ingress.read().agentId
+    const originAgentId = ports.session().agentId
     let finished = false
     const settled = (async () => {
       try {
@@ -82,7 +85,7 @@ export function createManualCompaction(
           deps.notify(t('ext-compact-stale'), { color: 'warning', timeoutMs: 4000 })
           return
         }
-        if (state.sessions.ingress.read().working) {
+        if (ports.session().working) {
           deps.notify(t('compact-while-working'), { color: 'warning' })
           return
         }
@@ -95,8 +98,8 @@ export function createManualCompaction(
           outputChars: 0,
           cancellable: true,
         }
-        state.sessions.ingress.update(draft => { draft.compaction = row })
-        publishRuntime(state)
+        ports.setCompaction(row)
+        ports.publish()
         try {
           // Compact the entry agent, never a later binding read after await.
           const result = await compactService.compactNow(originAgent, controller.signal)
@@ -131,9 +134,9 @@ export function createManualCompaction(
         // The durable `compaction/end` event already cleared the row on every
         // path that reached the host; this covers the ones that never did
         // (vetoed decision, unavailable service, a throw before the bracket).
-        if (state.sessions.ingress.read().compaction?.cancellable === true) {
-          state.sessions.ingress.update(draft => { draft.compaction = undefined })
-          publishRuntime(state)
+        if (ports.session().compaction?.cancellable === true) {
+          ports.setCompaction(undefined)
+          ports.publish()
         }
         const currentTransaction = active as ManualCompaction | undefined
         if (currentTransaction?.controller === controller) active = undefined

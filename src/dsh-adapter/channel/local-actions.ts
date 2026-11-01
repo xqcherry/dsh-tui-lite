@@ -1,4 +1,5 @@
-import type { ModuleOwners } from '../module-runtime.js'
+import type { ChatRow } from '../../shared/protocol/transcript.js'
+import type { SubagentState } from '../../shared/protocol/subagents.js'
 import { t } from '../../shared/i18n.js'
 import { snapshotLiveSessionEvents } from '../compat/liveSession.js'
 import type { foldBack as FoldBack } from './transcript.js'
@@ -17,18 +18,21 @@ export function createLocalActions(deps: {
     isCurrent(capture: unknown): boolean
     readonly agent: { session: unknown }
   }
-  state: Pick<ModuleOwners, 'activity' | 'transcript'>
+  rows(): readonly ChatRow[]
+  subagents(): readonly SubagentState[]
+  restoreHistoryRows(rows: readonly ChatRow[]): void
   presenters: ToolViewPresenter
   foldBack: typeof FoldBack
 }) {
-  const { ctx, owner, binding, state, foldBack } = deps
+  const { ctx, owner, binding, foldBack } = deps
   const current = (capture: unknown): boolean => owner.current() && binding.isCurrent(capture)
   return {
     /** The history slicer behind "load earlier": restores folded rows from
      *  the durable DSH log (the core emits when anything came back). */
     loadOlder(): number {
-      let restored = 0
-      state.transcript.ingress.update(draft => { restored = foldBack(draft.rows, snapshotLiveSessionEvents(binding.agent.session), deps.presenters) })
+      const rows = deps.rows().map(row => ({ ...row, ...(row.tool === undefined ? {} : { tool: { ...row.tool } }) }))
+      const restored = foldBack(rows, snapshotLiveSessionEvents(binding.agent.session), deps.presenters)
+      if (restored > 0) deps.restoreHistoryRows(rows)
       return restored
     },
     async listSubagents(): Promise<string[]> {
@@ -46,7 +50,7 @@ export function createLocalActions(deps: {
           // The host's non-running activity is not proof that a child was
           // archived: continuable children can be idle or temporarily unknown.
           // Prefer the live projection when this process still owns the run.
-          const running = state.activity.ingress.read().subagents.some(sub => sub.agentId === id && sub.status === 'running')
+          const running = deps.subagents().some(sub => sub.agentId === id && sub.status === 'running')
           const activity = running || child.activity === 'running' ? t('subagent-running') : t('subagent-unknown')
           return t('subagent-row', { mode: child.mode === 'continuable' ? t('subagent-resumable') : t('subagent-oneshot'), label: child.label ? `「${child.label}」` : '', activity, id: id.slice(0, 8) })
         })

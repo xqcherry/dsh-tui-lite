@@ -31,7 +31,9 @@ const publication = createPublication({ schedule(callback) {
 const activity = createActivityModule({
   options: { model: 'model', provider: 'provider', cwd: '/tmp' },
   input: { agentId: 'parent-a', sessionId: 'parent-a', mode: { id: 'agent', label: 'Agent' }, cwdDescription: '/tmp' },
-}, { listSubagents: async () => [], jobControl: { kill: () => false }, subagentControl: { interrupt: () => false } }, publication)
+}, publication)
+activity.connectHost({ listSubagents: async () => [], jobControl: { kill: () => false }, subagentControl: { interrupt: () => false } })
+activity.startCommands()
 
 type ActivityRowInput = Parameters<ActivityTranscriptTarget['ingress']['upsertActivityRow']>[1]
 const rows: (ActivityRowInput & { id: number })[] = []

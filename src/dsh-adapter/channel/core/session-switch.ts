@@ -1,9 +1,10 @@
+import type { PendingMessage } from '../../../shared/protocol/composer.js'
+import type { Notify } from '../../../shared/protocol/notifications.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { createSessionHandoff } from '../../../modules/sessions/index.js'
 import type { NewSessionOpener as SessionOpener, NewSessionPlan as SessionPlan } from '../../../modules/sessions/contracts.js'
 import type { DshSession } from '../../backend/session.js'
 import type { ChannelBinding } from '../binding.js'
-import type { ModuleOwners, RuntimeCommands } from '../../module-runtime.js'
 
 export type { NewSessionTarget } from '../../../modules/sessions/contracts.js'
 export type NewSessionOpener = SessionOpener<DshSession>
@@ -13,8 +14,9 @@ export type NewSessionPlan = SessionPlan<DshSession>
 export function createSessionSwitch(_ctx: Context, deps: {
   owner: { current(): boolean }
   binding: Pick<ChannelBinding, 'session' | 'capture' | 'isCurrent' | 'prepare' | 'abandon' | 'adopt'>
-  state(): Pick<ModuleOwners, 'sessions' | 'composer'>
-  notify: RuntimeCommands['notify']
+  read(): { readonly cwd: string; readonly working: boolean; readonly pending: readonly PendingMessage[] }
+  commitWorkspace(cwd: string, displayCwd: string): void
+  notify: Notify
   resetIdeSelection(): void
   clearStagedImages(): void
   opener(): NewSessionOpener | undefined
@@ -28,12 +30,8 @@ export function createSessionSwitch(_ctx: Context, deps: {
     prepare: deps.binding.prepare,
     abandon: deps.binding.abandon,
     adopt: (candidate, capture, tail) => deps.binding.adopt(candidate, capture, (_previous, disposePrevious) => tail(disposePrevious)),
-    read() {
-      const runtime = deps.state()
-      const session = runtime.sessions.ingress.read()
-      return { cwd: session.cwd, working: session.working, pending: runtime.composer.ingress.read().pending }
-    },
-    commitWorkspace: (cwd, displayCwd) => deps.state().sessions.ingress.patch({ cwd, displayCwd }),
+    read: deps.read,
+    commitWorkspace: deps.commitWorkspace,
     notify: deps.notify,
     resetIdeSelection: deps.resetIdeSelection,
     clearStagedImages: deps.clearStagedImages,

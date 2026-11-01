@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createChannelOwner } from '../shared/lifecycle/owner.js'
 import type { DshSession as AgentSession } from './backend/session.js'
 import { createCoreChannel } from './channel/core/compose.js'
-import { configureDshServices } from './channel/services.js'
+import { configureDshServices } from './channel/composition.js'
 import type { ChannelLaunchOptions } from './channel/state.js'
 import type { RuntimeModules } from './module-runtime.js'
 

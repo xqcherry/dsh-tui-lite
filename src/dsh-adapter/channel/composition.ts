@@ -1,4 +1,5 @@
-import { publishRuntime, type RuntimeCommands } from '../module-runtime.js'
+import { resetAdoptedSession } from '../../modules/workbench/index.js'
+import { publishRuntime } from '../module-runtime.js'
 /** Host-backed transcript, tools, session, model and permission actions. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ModelSelectionRef } from '@deepseek-ai/dsh-agent'
@@ -11,10 +12,8 @@ import type { DshSession as AgentSession, DshSessionService as DshNative } from 
 import { createDshTranslator, dshPricingWindow } from '../backend/translate.js'
 import type { JobsRuntime } from '../jobs.js'
 import { noteBranch } from '../sessions/index.js'
-import type { ChannelActionDelegates } from './action-readiness.js'
 import { createBindingEvents } from './binding-events.js'
 import { agentCapabilityEvidence, annotateCommandCapabilities, resolveAgentCapabilities } from './capabilities.js'
-import { channelCommands } from './commands.js'
 import { createManualCompaction } from './compaction.js'
 import type { CoreChannel } from './core/compose.js'
 import { createExternalCommandInvoker } from './external-commands.js'
@@ -106,7 +105,7 @@ export function configureDshServices(
   // Job projection owns registry callbacks and transcript rows. The optional
   // service attachment has no authority after its injected lifetime ends.
   const jobProjection = createJobProjection(state.activity, state.transcript, {
-    owner, notify: (...args) => notify(...args), emit: () => publishRuntime(state), agent: () => binding.agent, steer: text => channelCommands(state).steer(text),
+    owner, notify: (...args) => notify(...args), emit: () => publishRuntime(state), agent: () => binding.agent, steer: text => state.composer.commands.steer(text),
   })
 
   // The DSH slash-command registry (optional service): /plan, /goal and
@@ -140,9 +139,8 @@ export function configureDshServices(
 
   // ── the DSH session's view of the common state ─────────────────────────
   const initialSession: AgentSession = binding.session
-  state.sessions.ingress.update(draft => { draft.agentId = binding.agent.id })
-  state.sessions.ingress.update(draft => { draft.sessionId = binding.agent.session.id })
-  state.sessions.ingress.update(draft => { draft.mode = sessionModes[0]! })
+  state.sessions.ingress.setIdentity(binding.agent.id, binding.agent.session.id)
+  state.sessions.ingress.setMode(sessionModes[0]!)
   // A DSH session supports everything the TUI offers.
 
   // Capability facts for the bound agent (channel/capabilities.ts). Reads are
@@ -152,10 +150,8 @@ export function configureDshServices(
   // Annotated from the start: Help and `/` completion read `commandList`
   // before the first skill-catalog refresh publishes a new one, and a command
   // whose capability is missing must never look usable in that window.
-  state.workbench.ingress.update(draft => { draft.commandList = annotateCommandCapabilities(LOCAL_COMMANDS, capabilitiesOf()) })
-  state.activity.commands.subagentControl = subagentProjection.control
-  state.activity.commands.jobControl = jobProjection.control
-  state.sessions.commands.permissionPresets = () => {
+  state.workbench.ingress.setCommands(annotateCommandCapabilities(LOCAL_COMMANDS, capabilitiesOf()))
+  const permissionPresets = () => {
     let service: unknown
     try {
       service = ctx.get('permissionPresets')
@@ -171,7 +167,9 @@ export function configureDshServices(
     ctx,
     owner,
     binding,
-    state,
+    rows: () => state.transcript.ingress.read().rows,
+    subagents: () => state.activity.ingress.read().subagents,
+    restoreHistoryRows: state.transcript.ingress.restoreHistoryRows,
     // Fold restore re-derives views with the bound session's presenters.
     presenters: {
       call: (name, rawArgs) => dshNative().presentCallView(name, rawArgs),
@@ -237,7 +235,7 @@ export function configureDshServices(
       // Annotate before publishing: Help and `/` completion both read
       // `commandList`, so a command whose capability is missing says so
       // instead of looking usable and failing on use.
-      state.workbench.ingress.update(draft => { draft.commandList = annotateCommandCapabilities(commands, capabilitiesOf()) })
+      state.workbench.ingress.setCommands(annotateCommandCapabilities(commands, capabilitiesOf()))
       publishRuntime(state)
     },
     // Attached-context pass-through: the skill catalog never loses the
@@ -261,7 +259,7 @@ export function configureDshServices(
     model: () => state.settings.ingress.read().model,
     emit: () => publishRuntime(state),
     sessionTitle: () => state.sessions.ingress.read().sessionTitle,
-    setSessionTitle: title => { state.sessions.ingress.update(draft => { draft.sessionTitle = title }) },
+    setSessionTitle: title => { state.sessions.ingress.setTitle(title) },
     skillRegistryFor,
     skillViewOptions,
   })
@@ -271,7 +269,7 @@ export function configureDshServices(
     cwd: () => state.sessions.ingress.read().cwd,
     skillRegistryFor,
     skillViewOptions,
-    publish(context) { state.transcript.ingress.update(draft => { draft.loadedContext = context }); publishRuntime(state) },
+    publish(context) { state.transcript.ingress.setLoadedContext(context); publishRuntime(state) },
   })
   const refreshLoadedContext = loadedContext.refresh
 
@@ -290,19 +288,19 @@ export function configureDshServices(
   projector.settleStreaming()
   // Attached to an idle agent: any replayed turn/start belongs to a previous
   // session run, so the spinner must not come up on boot.
-  state.sessions.ingress.update(draft => { draft.working = false })
-  state.composer.ingress.update(draft => { draft.cancelPending = false })
-  state.sessions.ingress.update(draft => { draft.status = binding.agent.status })
+  state.sessions.ingress.setWorking(false)
+  state.composer.ingress.setCancelPending(false)
+  state.sessions.ingress.setStatus(binding.agent.status)
   publishRuntime(state)
 
-  const modelActions = createModelActions(ctx, state, {
+  const modelActions = createModelActions(ctx, state.settings.ingress, {
     owner,
     binding,
     selection,
     initialEffort: options.effort,
-    agent: () => binding.agent,
     notify,
     checkContextWarning: core.bookkeeping.checkContextWarning,
+    publish: () => publishRuntime(state),
   })
 
   // The first bind (start) and every adoption tail bind through the core
@@ -310,15 +308,21 @@ export function configureDshServices(
   const bindAgent = (): void => { core.feed.bind() }
   const clearStagedImages = core.input.clearStagedImages
 
-  const switchModelAction = createModelSwitchAction(ctx, state, {
+  const switchModelAction = createModelSwitchAction(ctx, {
+    session: state.sessions.ingress.read,
+    setWorking: state.sessions.ingress.setWorking,
+    resetSession: facts => resetAdoptedSession(state, facts, {
+      rowIds,
+      resetProjector: resetProjection,
+      resetSubagents: subagentProjection.reset,
+      resetJobs: jobProjection.reset,
+    }),
+    publish: () => publishRuntime(state),
+  }, {
     owner,
     binding,
-    rowIds,
     // Compaction is installed below before the channel binds or exposes input.
     settleCompaction: () => settleManualCompaction(),
-    resetProjector: resetProjection,
-    resetSubagents: subagentProjection.reset,
-    resetJobs: jobProjection.reset,
     replay: replaySessionSeed,
     settleReplay: projector.settleStreaming,
     bindAgent: () => bindAgent(),
@@ -333,7 +337,11 @@ export function configureDshServices(
   // This is the one necessary cyclic seam: mode actions need the completed
   // state, while the state exposes their command surface. It is assigned
   // before the channel starts binding/session observation.
-  const modeActions = createPermissionModeActions(ctx, state, {
+  const modeActions = createPermissionModeActions(ctx, {
+    session: state.sessions.ingress.read,
+    setMode: state.sessions.ingress.setMode,
+    publish: () => publishRuntime(state),
+  }, {
     owner,
     binding,
     sessionModes,
@@ -349,10 +357,19 @@ export function configureDshServices(
   const bindingEvents = createBindingEvents(ctx, {
     owner,
     binding,
-    state,
+    settings: state.settings.ingress.read,
+    notify,
+    routing: {
+      sessions: { projectionContext: state.sessions.ingress.projectionContext, setStatus: state.sessions.ingress.setStatus, setWorking: state.sessions.ingress.setWorking },
+      composer: { clearCancellation: state.composer.ingress.clearCancellation, retirePending: state.composer.ingress.retirePending },
+      transcript: { releaseActiveTools: state.transcript.ingress.releaseActiveTools },
+      publication: { batch: state.publication.batch },
+      publish: mode => publishRuntime(state, mode),
+    },
+    setBindingGeneration: state.sessions.ingress.setBindingGeneration,
+    resetInputConvergence: state.composer.ingress.resetBindingConvergence,
     seedActivity: options.seedActivity,
     seedContextOccupancy: options.seedContextOccupancy,
-    inputConvergence: core.inputConvergence,
     selection,
     modelActions,
     modeActions,
@@ -361,7 +378,18 @@ export function configureDshServices(
     retireAttachment: core.input.retireAttachment,
   })
 
-  const resumeActions = createSessionResumeActions(ctx, state, {
+  const resumeActions = createSessionResumeActions(ctx, {
+    session: state.sessions.ingress.read,
+    adoptWorkspace: state.sessions.ingress.adoptWorkspace,
+    setWorking: state.sessions.ingress.setWorking,
+    resetSession: facts => resetAdoptedSession(state, facts, {
+      rowIds,
+      resetProjector: resetProjection,
+      resetSubagents: subagentProjection.reset,
+      resetJobs: jobProjection.reset,
+    }),
+    publish: () => publishRuntime(state),
+  }, {
     configuredPreset: options.configuredPreset,
     configuredProvider: options.configuredProvider,
     configuredModel: options.configuredModel,
@@ -370,10 +398,6 @@ export function configureDshServices(
   }, {
     owner,
     binding,
-    rowIds,
-    resetProjector: resetProjection,
-    resetSubagents: subagentProjection.reset,
-    resetJobs: jobProjection.reset,
     replay: replaySessionSeed,
     settleReplay: projector.settleStreaming,
     refreshGitBranch: () => core.refreshGitBranch(),
@@ -386,41 +410,16 @@ export function configureDshServices(
     settleCompaction: () => settleManualCompaction(),
     notify,
   })
-  const manualCompaction = createManualCompaction(ctx, state, {
+  const manualCompaction = createManualCompaction(ctx, {
+    session: state.sessions.ingress.read,
+    setCompaction: state.sessions.ingress.setCompaction,
+    publish: () => publishRuntime(state),
+  }, {
     owner,
     agent: () => binding.agent,
     notify,
   })
   settleManualCompaction = manualCompaction.settle
-  // Every action a DSH session serves beyond the core's (the type keeps this
-  // table complete: a new public action must be placed on one side).
-  const delegates = {
-    runPermissionPreset: modeActions.runPermissionPreset,
-    resumeTo: resumeActions.resumeTo,
-    switchModel: switchModelAction,
-    listEfforts: modelActions.listEfforts,
-    setEffort: modelActions.setEffort,
-    setDefaultEffort: modelActions.setDefaultEffort,
-    cycleMode: modeActions.cycleMode,
-    listModels: modelActions.listModels,
-    listProviders: modelActions.listProviders,
-    invalidateModelCompletion: modelActions.dropModelNodeCache,
-    listSkills: sessionMetadataActions.listSkills,
-    describeCredential: sessionMetadataActions.describeCredential,
-    cachedSessions: sessionMetadataActions.cachedSessions,
-    listSessions: sessionMetadataActions.listSessions,
-    previewSession: sessionMetadataActions.previewSession,
-    setResumeTarget: sessionMetadataActions.setResumeTarget,
-    renameSession: sessionMetadataActions.renameSession,
-    deleteSession: sessionMetadataActions.deleteSession,
-    renameSessionTo: sessionMetadataActions.renameSessionTo,
-    compact: manualCompaction.compact,
-    cancelCompact: manualCompaction.cancel,
-    runExternalCommand: externalCommands.invokeText,
-    runExternalCommandOutcome: externalCommands.invoke,
-    exportSession: reportActions.exportSession,
-    listSubagents: dshLocal.listSubagents,
-  } satisfies Partial<ChannelActionDelegates>
 
   core.configure({
     completions: { model: modelActions },
@@ -433,7 +432,33 @@ export function configureDshServices(
       resetTranslation: () => { binding.session.dsh?.resetTranslation() },
     },
     newSession: resumeActions.newSessionOpener,
-    delegates,
+    sessions: {
+      runPermissionPreset: modeActions.runPermissionPreset,
+      resumeTo: resumeActions.resumeTo,
+      cycleMode: modeActions.cycleMode,
+      permissionPresets,
+      cachedSessions: sessionMetadataActions.cachedSessions,
+      listSessions: sessionMetadataActions.listSessions,
+      previewSession: sessionMetadataActions.previewSession,
+      setResumeTarget: sessionMetadataActions.setResumeTarget,
+      renameSession: sessionMetadataActions.renameSession,
+      deleteSession: sessionMetadataActions.deleteSession,
+      renameSessionTo: sessionMetadataActions.renameSessionTo,
+    },
+    settings: {
+      switchModel: switchModelAction,
+      listEfforts: modelActions.listEfforts,
+      setEffort: modelActions.setEffort,
+      setDefaultEffort: modelActions.setDefaultEffort,
+      listModels: modelActions.listModels,
+      listProviders: modelActions.listProviders,
+      invalidateModelCompletion: modelActions.dropModelNodeCache,
+      listSkills: sessionMetadataActions.listSkills,
+      describeCredential: sessionMetadataActions.describeCredential,
+    },
+    transcript: { compact: manualCompaction.compact, cancelCompact: manualCompaction.cancel, exportSession: reportActions.exportSession },
+    workbench: { runExternalCommand: externalCommands.invokeText, runExternalCommandOutcome: externalCommands.invoke },
+    activity: { listSubagents: dshLocal.listSubagents, jobControl: jobProjection.control, subagentControl: subagentProjection.control },
     start: {
       before() {
         owner.own(ctx.on('commands/change', () => { if (owner.current()) modeActions.refreshMode() }))

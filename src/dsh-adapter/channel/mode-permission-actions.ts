@@ -1,5 +1,4 @@
-import { publishRuntime } from '../module-runtime.js'
-import type { ModuleOwners } from '../module-runtime.js'
+import type { ModePorts } from './mode-actions.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -12,7 +11,7 @@ import { createPermissionIdentity, foldPermissionPreset, type PermissionIdentity
 import type { PermissionModeRoster } from './mode-roster.js'
 
 type Binding = ChannelBinding
-type ModeState = Pick<ModuleOwners, 'sessions' | 'transcript' | 'publication'>
+
 type ModeCapture = ReturnType<Binding['capture']>
 /** The composition seam `createModeActions` owns; this factory forwards every
  *  member verbatim so both stay in lockstep. */
@@ -95,7 +94,7 @@ function derivePermissionModeIndex(
  */
 export function createPermissionModeActions(
   ctx: Context,
-  state: ModeState,
+  ports: ModePorts,
   deps: Pick<
     BaseModeActionDeps,
     'owner' | 'binding' | 'sessionModes' | 'executeRegistryCommand' | 'notify'
@@ -115,7 +114,7 @@ export function createPermissionModeActions(
   permission: PermissionIdentity
 } {
   const { owner, binding, sessionModes, roster, commandService, executeRegistryCommand, notify } = deps
-  const base = createModeActions(ctx, state, {
+  const base = createModeActions(ctx, ports, {
     owner,
     binding,
     sessionModes,
@@ -137,8 +136,7 @@ export function createPermissionModeActions(
   const refreshMode = (): void => {
     roster.rebuild(binding.agent)
     const index = derivePermissionModeIndex(sessionModes, snapshotLiveSessionEvents(binding.agent.session))
-    state.sessions.ingress.update(draft => { draft.modeIndex = index })
-    state.sessions.ingress.update(draft => { draft.mode = sessionModes[index]! })
+    ports.setMode(sessionModes[index]!, index)
   }
 
   /** Apply the configured atoms; an explicit exit owns its target mode.
@@ -189,9 +187,9 @@ export function createPermissionModeActions(
     if (!owner.current() || !binding.isCurrent(capture) || session !== agent.session) return
     await base.applyMode(spec, capture)
     if (!owner.current() || !binding.isCurrent(capture)) return
-    const before = state.sessions.ingress.read().modeIndex
+    const before = ports.session().modeIndex
     refreshMode()
-    if (state.sessions.ingress.read().modeIndex !== before) publishRuntime(state)
+    if (ports.session().modeIndex !== before) ports.publish()
   }
 
   /** Shift+Tab: advance from the mode DERIVED from the session log (never a
@@ -228,8 +226,8 @@ export function createPermissionModeActions(
       void permission.applyPermissionIdentity(remembered).then((ok) => {
         if (!ok || subject !== binding.agent.session) return
         refreshMode()
-        notify(t('mode-switched', { name: modeDisplayName(state.sessions.ingress.read().mode) }))
-        publishRuntime(state)
+        notify(t('mode-switched', { name: modeDisplayName(ports.session().mode) }))
+        ports.publish()
       }).catch(() => {
         // Best-effort; failures already surfaced through applyPermissionIdentity.
       })
