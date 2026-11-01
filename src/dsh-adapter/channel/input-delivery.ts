@@ -1,5 +1,7 @@
-import type { RuntimeCommands } from '../module-runtime.js'
 import type { ModuleOwners } from '../module-runtime.js'
+import type { SessionsSnapshot } from '../../modules/sessions/contracts.js'
+import type { Notify } from '../../shared/protocol/notifications.js'
+import { createInputQueue } from '../../modules/composer/index.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type { ChannelSelection, SelectionAttachment } from '../../shared/protocol/composer.js'
@@ -48,7 +50,7 @@ export interface UserTextOrigin {
 export function createInputDelivery(
  ctx: Context, owner: ChannelOwner, binding: { readonly session: AgentSession },
  state: () => Pick<ModuleOwners, 'sessions'>,
- notify: RuntimeCommands['notify'],
+ notify: Notify,
  trackPending: (message: { id: string; text: string; images?: readonly ComposerImageRef[] }, placement: PendingMessage['placement']) => void,
  untrackPending: (id: string) => void,
  composer: ComposerImages,
@@ -61,19 +63,7 @@ export function createInputDelivery(
   *  `images` capability); absent / undefined = the DSH attachments service. */
 
 ) {
-  /**
-   * `@` file mentions (issue #15): expansion reads files asynchronously, so
-   * every user-text delivery (submit / steer / interrupt-requeue) funnels
-   * through this chain to keep the send order FIFO.
-   */
-  let inputChain: Promise<void> = Promise.resolve()
-  /** Monotonic: inputs that entered the FIFO, and how many of them have
-   *  left it (delivered, dropped or failed). `/new` compares them. */
-  let dispatched = 0
-  let settled = 0
-  /** The texts still in the FIFO, oldest first (a switch names the parked one). */
-  const inFlight: string[] = []
-
+  const session = () => state().sessions.ingress.read()
   /**
    * Attached-context registry (issue #842): `deliverUserText(..., attach)`
    * records the model-facing companion message under the DELIVERED user
@@ -130,7 +120,7 @@ export function createInputDelivery(
    *  bound session object plus the binding generation every adoption
    *  advances; works for any backend, no DSH agent needed). */
   const current = (origin: UserTextOrigin): boolean =>
-    owner.current() && binding.session === origin.session && state().sessions.ingress.read().agentBindingGeneration === origin.generation
+    owner.current() && binding.session === origin.session && session().agentBindingGeneration === origin.generation
 
   /** D-6: bind the submission to the session it was typed in AT ENQUEUE
    *  TIME. The FIFO chain may park this task behind a slow predecessor
@@ -140,9 +130,9 @@ export function createInputDelivery(
   const captureOrigin = (): UserTextOrigin => {
     return {
     session: binding.session,
-    agentId: state().sessions.ingress.read().agentId,
-    generation: state().sessions.ingress.read().agentBindingGeneration,
-    cwd: state().sessions.ingress.read().cwd,
+    agentId: session().agentId,
+    generation: session().agentBindingGeneration,
+    cwd: session().cwd,
     fs: mentionFs(ctx) ?? fallbackFs?.(),
     attachments: mentionAttachments(ctx),
     stagedImages: composer.snapshot(),
@@ -224,57 +214,20 @@ export function createInputDelivery(
       })
     }
   }
-  /** Deliver in submission order and reject work from a replaced binding. */
-  const deliverQueuedUserText = async (
-    text: string,
-    placement: PendingMessage['placement'],
-    images: readonly ComposerImageRef[],
-    origin: UserTextOrigin,
-    attach?: UserMessage,
-  ): Promise<void> => {
-    // Stale detection compares the SESSION REFERENCE, not the id: session ids
-    // are reusable (A → /new → /resume A lands back on the same id with a
-    // fresh session), so an id check has an ABA hole. Both origin values are
-    // ENQUEUE-time captures (see dispatchUserText): a decision parked behind
-    // a slow predecessor must still be judged against the session its text
-    // was typed in, not whichever session is live when it finally runs.
-    const dropIfStale = (): boolean => {
-      if (current(origin)) return false
-      notify(t('ext-stale-dropped'), { color: 'warning', timeoutMs: 4000 })
-      return true
-    }
-    // A follower can wait behind an older slow decision while /new replaces
-    // the session. Do not even expose that stale text to plugins.
-    if (dropIfStale()) return
-    try {
-      await deliverUserText(text, placement, images, origin, attach)
-    } catch (error: unknown) {
-      // The FIFO must survive a failed expansion/send: surface it, then let
-      // the next input proceed through the settled inputChain.
+  const queue = createInputQueue<UserTextOrigin, UserMessage>({
+    capture: captureOrigin,
+    current,
+    captureImages: (text, images) => composer.captureDraftImages(text, images),
+    deliver: deliverUserText,
+    stale: () => { notify(t('ext-stale-dropped'), { color: 'warning', timeoutMs: 4000 }) },
+    failed(error) {
       const message = error instanceof Error ? error.message : String(error)
       logForDebugging(`submit: delivery failed (${message})`)
       notify(t('send-failed', { err: message }), { color: 'error' })
-    }
-  }
-  const dispatchUserText = (
-    text: string,
-    placement: PendingMessage['placement'],
-    images: readonly ComposerImageRef[] = [],
-    attach?: UserMessage,
-  ): void => {
-    const origin = captureOrigin()
-    const capturedImages = composer.captureDraftImages(text, images)
-    dispatched += 1
-    inFlight.push(text)
-    inputChain = inputChain.then(() => deliverQueuedUserText(text, placement, capturedImages, origin, attach)).catch((error: unknown) => {
-      // The chain must survive a failed decision: log, then continue with
-      // the next queued submission.
-      ctx.logger.warn('dsh-tui: tui/input dispatch failed: %o', error)
-    }).finally(() => {
-      settled += 1
-      inFlight.shift()
-    })
-  }
+    },
+    warn: error => { ctx.logger.warn('dsh-tui: tui/input dispatch failed: %o', error) },
+  })
+  const { dispatchUserText } = queue
   /** Public companion for callers that own a line but not a draft (skill
    *  registrations): same FIFO as a typed submit. The
    *  optional `attach` is registered by `deliverUserText` only once its user
@@ -289,18 +242,14 @@ export function createInputDelivery(
    *  a task parked on the replaced session cannot wedge the new one. */
   const clearStagedImages = (): void => {
     composer.clearStagedImages()
-    inputChain = Promise.resolve()
+    queue.reset()
   }
 
   return {
     dispatchUserText,
     /** Inputs dispatched so far, and whether any is still in the FIFO (a
      *  parked decision, an `@` read, an IDE-selection read). */
-    activity: (): { readonly dispatched: number; readonly unsettled: boolean; readonly parked?: string } => ({
-      dispatched,
-      unsettled: settled < dispatched,
-      ...(inFlight[0] === undefined ? {} : { parked: inFlight[0] }),
-    }),
+    activity: queue.activity,
     deliverUserText: deliverUserTextNow,
     claimAttachments,
     retireAttachment,
