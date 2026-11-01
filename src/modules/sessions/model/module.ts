@@ -1,3 +1,4 @@
+import type { SessionEventIngress } from '../contracts.js'
 import { createModuleStore, type Publication, type MutableSnapshot } from '../../../shared/state/module-store.js'
 import type { SessionsSnapshot, SessionsCommands } from '../state-contracts.js'
 import type { ModuleLaunch } from '../../../shared/protocol/module-launch.js'
@@ -26,6 +27,20 @@ export function createSessionsModule(launch: ModuleLaunch, commands: SessionsCom
     store: owned.store,
     commands,
     ingress: {
+      setIdentity(agentId: string, sessionId: string): void { owned.patch({ agentId, sessionId }) },
+      setBindingGeneration(agentBindingGeneration: number): void { owned.patch({ agentBindingGeneration }) },
+      setMode(mode: SessionsSnapshot['mode'], modeIndex = owned.read().modeIndex): void { owned.patch({ mode, modeIndex }) },
+      setTitle(sessionTitle: string): void { owned.patch({ sessionTitle }) },
+      setGitBranch(gitBranch: string | undefined): void { owned.patch({ gitBranch }) },
+      projectionContext: owned.read,
+      adoptIdentity(identity: Parameters<SessionEventIngress['adoptIdentity']>[0]): void { owned.patch(identity) },
+      adoptWorkspace(cwd: string, displayCwd = cwd): void { owned.patch({ cwd, displayCwd }) },
+      setStatus(status: 'idle' | 'running' | 'disposed'): void { owned.patch({ status }) },
+      setWorking(working: boolean): void { owned.patch({ working }) },
+      setCompaction(compaction: SessionsSnapshot['compaction']): void { owned.patch({ compaction }) },
+      resetSessionState(): void {
+        owned.patch({ sessionTitle: '', sessionColor: '', working: false, compaction: undefined })
+      },
       patch: owned.patch, update: owned.update, read: owned.read,
       metadata(event: Extract<AgentEvent, { type: 'session.title' | 'session.color' }>): void {
         switch (event.type) {

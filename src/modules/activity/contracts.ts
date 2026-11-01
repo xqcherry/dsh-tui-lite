@@ -9,3 +9,20 @@ export type { ActivityView, ActivityPhase, ProjectionRegistryLike } from './mode
 export type { SubagentCostSnapshot } from './model/subagents.js'
 export type { BackgroundJobSnapshot, KernelJobOutputEvent, KernelJobLifecycleEvent, KernelJobEvent, KernelJobChunk, KernelJobOutputRead, BackgroundJobEvents } from './model/jobs.js'
 export type { SubagentProjectionDependencies, SubagentsServiceView, SubagentCatalogEntryView } from './model/subagent-projection.js'
+
+export interface ActivitySessionIngress {
+  resetSessionCost(): void
+}
+
+/** Host capabilities consumed by the activity command owner. */
+export type ActivityCommandHost = import('./state-contracts.js').ActivityCommands
+
+/** Job presentation consumes only its own reducer and snapshot publication. */
+export interface ActivityJobTarget {
+  readonly ingress: Pick<import('./model/module.js').ActivityRuntime['ingress'], 'batch' | 'createJobs' | 'setBackgroundJobs'>
+}
+
+/** Child projection owns scoped reducers and the child snapshot only. */
+export interface ActivitySubagentTarget {
+  readonly ingress: Pick<import('./model/module.js').ActivityRuntime['ingress'], 'batch' | 'createSubagents' | 'releaseSubagents' | 'setSubagentSnapshot'>
+}

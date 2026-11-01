@@ -19,6 +19,9 @@ export function createActivityModule(launch: ModuleLaunch, commands: ActivityCom
     store: owned.store,
     commands,
     ingress: {
+      setBackgroundJobs(backgroundJobs: ActivitySnapshot['backgroundJobs']): void { owned.patch({ backgroundJobs: [...backgroundJobs] }) },
+      setSubagentSnapshot(subagents: ActivitySnapshot['subagents'], subagentCost: ActivitySnapshot['subagentCost']): void { owned.patch({ subagents: [...subagents], subagentCost: [...subagentCost] }) },
+      resetSessionCost(): void { owned.patch({ subagentCost: [] }) },
       patch: owned.patch,
       update: owned.update,
       read: owned.read,

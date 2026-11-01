@@ -12,7 +12,10 @@ export function createWorkbenchModule(launch: ModuleLaunch, commands: WorkbenchC
   return {
     store: owned.store,
     commands,
-    ingress: { read: owned.read, patch: owned.patch, update: owned.update },
+    ingress: {
+      setCommands(commandList: WorkbenchSnapshot['commandList']): void { owned.patch({ commandList: [...commandList] }) },
+      addNotification(item: WorkbenchSnapshot['notifications'][number]): void { owned.update(draft => { draft.notifications.push(item) }) },
+      removeNotification(id: number): void { owned.update(draft => { draft.notifications = draft.notifications.filter(item => item.id !== id) }) }, read: owned.read, patch: owned.patch, update: owned.update },
     dispose: owned.dispose,
   }
 }

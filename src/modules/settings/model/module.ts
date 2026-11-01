@@ -1,3 +1,4 @@
+import type { ModelRoute } from './modelRoute.js'
 import { createModuleStore, type Publication, type MutableSnapshot } from '../../../shared/state/module-store.js'
 import type { SettingsSnapshot, SettingsCommands } from '../state-contracts.js'
 import type { ModuleLaunch } from '../../../shared/protocol/module-launch.js'
@@ -26,6 +27,10 @@ export function createSettingsModule(launch: ModuleLaunch, commands: SettingsCom
     store: owned.store,
     commands,
     ingress: {
+      setThinkingFold(thinkingFold: SettingsSnapshot['thinkingFold']): void { owned.patch({ thinkingFold }) },
+      projectionContext: owned.read,
+      adoptRoute(route: ModelRoute | undefined): void { if (route !== undefined) owned.patch(route) },
+      resetSessionCapabilities(): void { owned.patch({ contextWindow: undefined, effortLevels: undefined, reasoningEffort: undefined }) },
       setReasoningEffort(reasoningEffort: string | undefined): void { owned.patch({ reasoningEffort }) },
       setEffortLevels(effortLevels: readonly string[] | undefined): void { owned.patch({ effortLevels }) },
       setContextWindow(contextWindow: number | undefined): void { owned.patch({ contextWindow }) },
