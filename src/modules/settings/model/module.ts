@@ -26,6 +26,9 @@ export function createSettingsModule(launch: ModuleLaunch, commands: SettingsCom
     store: owned.store,
     commands,
     ingress: {
+      setReasoningEffort(reasoningEffort: string | undefined): void { owned.patch({ reasoningEffort }) },
+      setEffortLevels(effortLevels: readonly string[] | undefined): void { owned.patch({ effortLevels }) },
+      setContextWindow(contextWindow: number | undefined): void { owned.patch({ contextWindow }) },
       read: owned.read, patch: owned.patch, update: owned.update,
       metadata(event: Extract<AgentEvent, { type: 'context.capacity' | 'session.ready' | 'model.changed' | 'effort.changed' | 'request.header' }>): void {
         switch (event.type) {

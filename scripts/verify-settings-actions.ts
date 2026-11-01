@@ -1,0 +1,65 @@
+/** Route metadata, effort preference and caches are settings-owned policies. */
+import assert from 'node:assert/strict'
+import { createSettingsModelActions, type SettingsModelInfo } from '../src/modules/settings/model/model-actions.js'
+import { createRuntimeModulesFixture } from './lib/runtime-modules-fixture.js'
+
+const runtime = createRuntimeModulesFixture()
+let generation = 0
+let alive = true
+let pin: { provider: string; model: string; effort?: string } | undefined
+const notices: string[] = []
+const pending: ((info: SettingsModelInfo) => void)[] = []
+let catalogReads = 0
+const model = createSettingsModelActions(runtime.settings.ingress, {
+  current: () => alive,
+  capture: () => generation,
+  bindingCurrent: capture => capture === generation,
+  models: {
+    resolveModelInfo: () => new Promise<SettingsModelInfo>(resolve => pending.push(resolve)),
+    listProviders: () => [{ id: 'fixture', name: 'Fixture' }],
+    listModels: async () => { catalogReads++; return [{ provider: 'fixture', id: 'fixture-model', name: 'Fixture' }] },
+  },
+  pinnedEffort: () => pin?.effort,
+  pin: value => { pin = value },
+  notify: text => { notices.push(text); return () => undefined },
+  publish: () => undefined,
+  checkContextWarning: () => undefined,
+}, 'high')
+try {
+  const first = model.setEffort('high')
+  generation++
+  pending.shift()!({ context: { contextWindow: 100 }, reasoning: { efforts: [{ id: 'high', name: 'High' }] } })
+  assert.equal(await first, false)
+  assert.equal(pin, undefined)
+  assert.equal(runtime.settings.store.getSnapshot().contextWindow, 100, 'same route metadata survives binding change')
+  const fallback = model.applyPreferredEffort()
+  pending.shift()!({ reasoning: { efforts: [{ id: 'low', name: 'Low' }], defaultEffort: 'low' } })
+  await fallback
+  assert.deepEqual(pin, { provider: 'fixture', model: 'fixture-model', effort: 'low' })
+  const noticeCount = notices.length
+  const again = model.applyPreferredEffort()
+  pending.shift()!({ reasoning: { efforts: [{ id: 'low', name: 'Low' }] } })
+  await again
+  assert.equal(notices.length, noticeCount, 'fallback toast is deduplicated but pin reapplied')
+  model.warmModelNodes()
+  await new Promise(resolve => setImmediate(resolve))
+  model.warmModelNodes()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(catalogReads, 1)
+  assert.equal(model.modelNodes().length, 1)
+  model.dropModelNodeCache()
+  model.warmModelNodes()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(catalogReads, 2)
+  model.setDefaultEffort('max')
+  pending.shift()!({ reasoning: { efforts: [{ id: 'custom', name: 'Custom' }], defaultEffort: 'custom' } })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(runtime.settings.store.getSnapshot().reasoningEffort, 'custom')
+  assert.deepEqual(pin, { provider: 'fixture', model: 'fixture-model' }, 'unsupported preference clears only the effort pin')
+  const late = model.setEffort('low')
+  alive = false
+  pending.shift()!({ context: { contextWindow: 200 }, reasoning: { efforts: [{ id: 'low', name: 'Low' }] } })
+  assert.equal(await late, false)
+  assert.equal(runtime.settings.store.getSnapshot().contextWindow, 100)
+} finally { runtime.dispose() }
+console.log('Settings actions passed: binding fences, route metadata, fallback, cache and disposal')

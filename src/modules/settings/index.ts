@@ -35,3 +35,7 @@ export { runProviderWizard } from './model/providerWizard.js'
 export type * from './contracts.js'
 
 export { createSettingsModule } from './model/module.js'
+
+export { createConfigurationCheck } from './model/configuration-check.js'
+
+export { createSettingsModelActions } from './model/model-actions.js'
