@@ -3,7 +3,7 @@ import type { AgentIdentity, AgentMessageControl, AgentMessageSubmitInput, Agent
 import type { SubagentTranscriptPage, SubagentTranscriptWindow } from '../../../shared/protocol/session-capabilities.js'
 import { agentMessageFailureOf, agentMessageTextOf, agentRelaySourceOf, foldAgentMessage } from '../../../shared/protocol/messages.js'
 import type { SubagentState, SubagentControl, SubagentRow } from '../../../shared/protocol/subagents.js'
-import type { ActivityRuntime } from './module.js'
+import type { ActivitySubagentTarget } from '../contracts.js'
 import type { ActivityAssistantStreamFrame, ActivityProjectionHost, ActivityTranscriptTarget, SubagentCostPolicy } from '../model-contracts.js'
 const SUBAGENT_TOOL_NAMES = new Set(['task', 'subagent', 'subagent_fork', 'subagent_claude_code', 'subagent_codex', 'spawn_task'])
 const isSubagentToolName = (name: string): boolean => SUBAGENT_TOOL_NAMES.has(name.toLowerCase())
@@ -67,7 +67,7 @@ export interface SubagentProjectionDependencies {
  * stream attempt/settlement cursor. A display snapshot cannot resume either
  * a run epoch or an in-flight assistant attempt faithfully.
  */
-export function createActivitySubagentProjection(activity: ActivityRuntime, transcript: ActivityTranscriptTarget, deps: SubagentProjectionDependencies) {
+export function createActivitySubagentProjection(activity: ActivitySubagentTarget, transcript: ActivityTranscriptTarget, deps: SubagentProjectionDependencies) {
   type Projection = ReturnType<typeof createSessionSubagentProjection>
   const parked = new Map<ActivityProjectionHost, Projection>()
   const make = (): Projection => {
@@ -222,7 +222,7 @@ export function createActivitySubagentProjection(activity: ActivityRuntime, tran
       active = make()
       activeParent = deps.agent()
       restored = false
-      activity.ingress.patch({ subagents: [], subagentCost: [] })
+      activity.ingress.setSubagentSnapshot([], [])
     },
   }
 }
@@ -247,7 +247,7 @@ export function createActivitySubagentProjection(activity: ActivityRuntime, tran
  * session's historical children appear in the dashboard without flooding the
  * replayed transcript with cards that the durable log never contained. */
 function createSessionSubagentProjection(
-  activity: ActivityRuntime,
+  activity: ActivitySubagentTarget,
   transcript: ActivityTranscriptTarget,
   deps: SubagentProjectionDependencies & { visible(): boolean },
 ) {
@@ -282,7 +282,7 @@ function createSessionSubagentProjection(
     streamDirty = false
     if (!deps.visible()) return
     const snapshot = store.snapshot()
-    activity.ingress.patch({ subagents: [...snapshot], subagentCost: store.costSnapshot().entries })
+    activity.ingress.setSubagentSnapshot(snapshot, store.costSnapshot().entries)
     // 费用快照随 dashboard 一起镜像：StatusLine/BalanceReportRow 从这里读
     // 子代理按 (provider, model) 的 durable 用量桶。与 subagents 同在 visible
     // 守卫之后——停靠父级的费用留在自己的 store 里，restore 时重新镜像。
@@ -587,7 +587,7 @@ function createSessionSubagentProjection(
     },
   }
   const dropRows = (): void => { streamDirty = false; transcript.ingress.resetActivityRows('subagent') }
-  const reset = (): void => { dropRows(); cardedIds.clear(); workflowMembers.clear(); pendingTaskDescriptions.length = 0; agentMessages.length = 0; store.reset(); activity.ingress.patch({ subagents: [], subagentCost: [] }) }
+  const reset = (): void => { dropRows(); cardedIds.clear(); workflowMembers.clear(); pendingTaskDescriptions.length = 0; agentMessages.length = 0; store.reset(); activity.ingress.setSubagentSnapshot([], []) }
   const dispose = (): void => {
     streamDirty = false
     pendingTaskDescriptions.length = 0

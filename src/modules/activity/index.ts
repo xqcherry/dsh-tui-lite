@@ -14,3 +14,5 @@ export { BackgroundJobStore, JOBS_MAX_TRACKED, JOBS_MAX_OUTPUT_LINES, JOBS_MAX_T
 export { SubagentActivityStore } from './model/subagents.js'
 export { ActivityStore, ACTIVITY_PROJECTION_KEY, asActivityView, createActivityFeed, seedActivity } from './model/working-activity.js'
 export { createActivitySubagentProjection } from './model/subagent-projection.js'
+
+export { createJobPresentation } from './model/job-presentation.js'

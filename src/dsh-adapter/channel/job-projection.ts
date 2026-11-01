@@ -1,7 +1,8 @@
 import { t } from '../../shared/i18n.js'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
-import { formatJobDuration, type JobsRuntime } from '../jobs.js'
-import type { ActivityRuntime, ActivityProjectionHost, ActivityTranscriptTarget } from '../../modules/activity/index.js'
+import type { JobsRuntime } from '../jobs.js'
+import { createJobPresentation } from '../../modules/activity/index.js'
+import type { ActivityJobTarget, ActivityProjectionHost, ActivityTranscriptTarget } from '../../modules/activity/index.js'
 import type { JobControl } from '../../shared/protocol/jobs.js'
 
 /**
@@ -10,7 +11,7 @@ import type { JobControl } from '../../shared/protocol/jobs.js'
  * are still current before they read a service or mutate projected rows.
  */
 export function createJobProjection(
-  activity: ActivityRuntime,
+  activity: ActivityJobTarget,
   transcript: ActivityTranscriptTarget,
   deps: {
     owner: Pick<ChannelOwner, 'current' | 'own'>
@@ -27,43 +28,10 @@ export function createJobProjection(
   let attachmentToken: symbol | undefined
   let attachmentCurrent = (): boolean => false
 
-  const syncRows = (): void => activity.ingress.batch(() => {
-    if (!attachmentCurrent()) return
-    const snapshot = store.snapshot()
-    activity.ingress.patch({ backgroundJobs: [...snapshot] })
-    for (const job of snapshot) {
-      const view = {
-        id: job.id,
-        kind: job.kind,
-        label: job.label,
-        status: job.status,
-        ...(job.detail === undefined ? {} : { detail: job.detail }),
-        ...(job.progress === undefined ? {} : { progress: job.progress }),
-        startedAt: job.startedAt,
-        ...(job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt }),
-        outputLines: job.outputLines,
-      }
-      transcript.ingress.upsertActivityRow(`job:${job.id}`, { kind: 'job', text: job.label, job: view })
-    }
-  })
-
-  const store = activity.ingress.createJobs({
-    onSettled(job) {
-      deps.notify(
-        t(job.status === 'completed' ? 'jobs-toast-completed' : job.status === 'failed' ? 'jobs-toast-failed' : 'jobs-toast-killed', {
-          id: job.id,
-          label: job.label,
-          duration: formatJobDuration(job),
-          detail: job.detail ?? '',
-        }),
-        { color: job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : 'warning', timeoutMs: 6000 },
-      )
-    },
-    onChanged() {
-      if (!attachmentCurrent()) return
-      syncRows()
-      if (attachmentCurrent()) deps.emit()
-    },
+  const { store, dropRows, reset } = createJobPresentation(activity, transcript, {
+    current: () => attachmentCurrent(),
+    notify: deps.notify,
+    emit: deps.emit,
   })
 
   const control: JobControl = {
@@ -208,9 +176,6 @@ export function createJobProjection(
       throw error
     }
   }
-
-  const dropRows = (): void => { transcript.ingress.resetActivityRows('job') }
-  const reset = (): void => { dropRows(); store.reset() }
 
   /**
    * Re-anchor after the live agent changed. `reset()` runs while the OLD
