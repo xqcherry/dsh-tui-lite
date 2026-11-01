@@ -1,9 +1,8 @@
-import { parseCommandName, resolveLocalCommandPath } from '../../../../shared/commands.js'
+import { parseCommandName } from '../../../../shared/commands.js'
 import type { ComposerSubmission } from '../../../../shared/protocol/composer.js'
 
 
 import type { DraftImageLease } from '../../model/image-tokens.js'
-import type { CommandCompletion } from '../../../../shared/protocol/commands.js'
 
 import type { DraftUndoEntry, UndoMode } from '../../model/editing.js'
 
@@ -23,7 +22,6 @@ interface Context {
   readonly syncImageGeneration: () => number
   readonly detachDraftImages: () => void
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
-  readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
   readonly composer: ComposerBinding
   readonly context: ComposerContext
@@ -44,9 +42,6 @@ interface Context {
   readonly dockSelectedRef: React.RefObject<number | null>
   readonly dockCount: number
   readonly editDocked: (index: number) => void
-  readonly overlayOpen: boolean
-  readonly suggestions: readonly CommandCompletion[]
-  readonly selectedCommand: number
   readonly fileOverlayOpen: boolean
   readonly fileMatches: readonly FileCandidate[]
   readonly fileSelected: number
@@ -55,7 +50,7 @@ interface Context {
 
 export function createSubmission(getContext: () => Context) {
 const clearDeliveredDraft = (): void => {
-    const { syncImageGeneration, detachDraftImages, setInput, setSelectedCommand, setFileSelected } = getContext()
+    const { syncImageGeneration, detachDraftImages, setInput, setFileSelected } = getContext()
 
 
     syncImageGeneration()
@@ -64,7 +59,6 @@ const clearDeliveredDraft = (): void => {
     // history: a submitted message must not come back with Ctrl+Z.
     detachDraftImages()
     setInput('', 0, 'reset')
-    setSelectedCommand(0)
     setFileSelected(0)
   }
 
@@ -254,17 +248,8 @@ const tryRunCommand = (text: string): boolean => {
     return handled !== false
   }
 
-const chooseCommand = (text: string): void => {
-    const { composer, context } = getContext()
-
-
-    if (tryRunCommand(text)) return
-    if (context.sessions.getSnapshot().working) steerSend(text)
-    else submitText(text)
-  }
-
 const handleEnter = () => {
-    const { lastEnterAtRef, valueRef, dockSelectedRef, dockCount, editDocked, overlayOpen, suggestions, selectedCommand, fileOverlayOpen, fileMatches, fileSelected, acceptFile, composer, context } = getContext()
+    const { lastEnterAtRef, valueRef, dockSelectedRef, dockCount, editDocked, fileOverlayOpen, fileMatches, fileSelected, acceptFile, composer, context } = getContext()
 
 
     // A single Enter can arrive as two events in cmd pipelines (`\r`
@@ -280,15 +265,7 @@ const handleEnter = () => {
       editDocked(dockSelectedRef.current)
       return
     }
-    if (overlayOpen) {
-      const command = suggestions[selectedCommand]
-      if (command) {
-        chooseCommand(command.commandLine)
-        return
-      }
-    }
-    // File-completion overlay open → Enter accepts the selection (same
-    // contract as the command menu: the overlay owns Enter while open).
+    // File completion owns Enter while its overlay is open.
     if (fileOverlayOpen) {
       const file = fileMatches[fileSelected]
       if (file) {
@@ -305,21 +282,14 @@ const handleEnter = () => {
       sendDocked()
       return
     }
+    // Explicit commands keep their command route during both idle and
+    // working turns. Only unhandled input falls through to model delivery.
+    if (tryRunCommand(value)) return
     if (context.sessions.getSnapshot().working && value.trim() !== '') {
-      // Host skill commands may run during a turn. Other model input steers
-      // the active turn, while unsupported local commands are refused.
-      const parsed = value.startsWith('/') ? parseCommandName(value) : undefined
-      if (parsed !== undefined && (
-        context.workbench.getSnapshot().commandList.some(command => command.name === parsed.name && (parsed.name === 'skills' || command.skill === true))
-        || 'usage' in resolveLocalCommandPath(parsed.name, parsed.rawInput)
-
-      )) {
-        if (tryRunCommand(value)) return
-      }
       steerSend(value)
       return
     }
-    if (!tryRunCommand(value)) submitText(value)
+    submitText(value)
   }
-  return { clearDeliveredDraft, sameImageRefs, shellImagesUnsupported, submitText, steerSend, queueSend, sendDocked, interruptSend, tryRunCommand, chooseCommand, handleEnter }
+  return { clearDeliveredDraft, sameImageRefs, shellImagesUnsupported, submitText, steerSend, queueSend, sendDocked, interruptSend, tryRunCommand, handleEnter }
 }

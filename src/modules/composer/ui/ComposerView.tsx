@@ -1,6 +1,5 @@
 import type { ImageTokenSpan } from '../model/image-tokens.js'
 import type { PendingMessage } from '../../../shared/protocol/composer.js'
-import type { CommandCompletion } from '../../../shared/protocol/commands.js'
 import { HOME_BUTTON_TEXT, HOME_BUTTON_COLS, isBigInput, MAX_VISIBLE_LINES, DOUBLE_CLICK_MS, wrapToWidth, caretInText, clickToCursorOffset, visualLineRanges, wordSelectionAt } from '../model/geometry.js'
 
 
@@ -31,7 +30,6 @@ import { stringWidth } from '../../../shared/platform/stringWidth.js'
 import { Box, Text, type ScrollBoxHandle } from '../../../ui/primitives.js'
 import { sessionColorHex } from '../../../ui/text/sessionColors.js'
 
-import { CommandSuggestions } from './CommandSuggestions.js'
 import { EffortChargeGlyph } from './EffortChargeGlyph.js'
 import { EffortInputBorder, type InputBorderLabel } from './EffortInputBorder.js'
 import { EffortTierBadge } from './EffortTierBadge.js'
@@ -78,7 +76,6 @@ interface Context {
   readonly dockedPending: PendingMessage[]
   readonly helpOpen: boolean
   readonly fileOverlayOpen: boolean
-  readonly overlayOpen: boolean
   readonly terminalRows: number
   readonly helpViewportHeight: number
   readonly helpScrollRef: React.RefObject<ScrollBoxHandle | null>
@@ -91,17 +88,13 @@ interface Context {
   readonly mention: { start: number; end: number; query: string; pathEnd?: number; } | undefined
   readonly acceptFile: (candidate: FileCandidate) => void
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
-  readonly suggestions: readonly CommandCompletion[]
-  readonly selectedCommand: number
-  readonly chooseCommand: (text: string) => void
-  readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setHovered: React.Dispatch<React.SetStateAction<boolean>>
   readonly setHomeHovered: React.Dispatch<React.SetStateAction<boolean>>
   readonly homeHovered: boolean
 }
 
 export function useComposerView(view: Context): React.ReactNode {
-const { onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, overlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, suggestions, selectedCommand, chooseCommand, setSelectedCommand, setHovered, setHomeHovered, homeHovered } = view
+const { onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
 const promptAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
@@ -462,7 +455,7 @@ const { start: dockStart, end: dockEnd } = listWindow(
   )
 const floatersOpen =
     !suspended &&
-    (helpOpen || composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || overlayOpen || peekOpen)
+    (helpOpen || composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || peekOpen)
 const sessionTitle = context.sessions.getSnapshot().sessionTitle ?? ''
 const topRightLabel: InputBorderLabel | undefined =
     context.settings.getSnapshot().promptSessionLabel === true && sessionTitle !== ''
@@ -576,24 +569,6 @@ return (
             // 滚轮 = 移动选中行（与 ↑/↓ 同路径，窗口跟随）
             onWheelStep={(step) => {
               setFileSelected(i => Math.max(0, Math.min(fileMatches.length - 1, i + step)))
-            }}
-          />
-        )}
-        {overlayOpen && (
-          <CommandSuggestions
-            commands={suggestions}
-            selectedIndex={selectedCommand}
-            columns={columns}
-            query={value}
-            accent={promptAccent}
-            // 点击行 = 运行该命令（与 Enter 同路径）
-            onPick={(index) => {
-              const command = suggestions[index]
-              if (command) chooseCommand(command.commandLine)
-            }}
-            // 滚轮 = 移动选中行（与 ↑/↓ 同路径，窗口跟随）
-            onWheelStep={(step) => {
-              setSelectedCommand(i => Math.max(0, Math.min(suggestions.length - 1, i + step)))
             }}
           />
         )}

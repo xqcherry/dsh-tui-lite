@@ -11,7 +11,7 @@ import { SuggestionCard, cardContentWidth, splitQueryMatch } from '../../../ui/S
 
 /**
  * The `@` file-completion overlay, wrapped in the
- * shared rounded `SuggestionCard` (与 `/` 命令菜单同一视觉语言):
+ * shared rounded `SuggestionCard`:
  *
  *   ╭─ 文件 · 共 12 项 ──────────────────────╮
  *   │ ❯ ▸ src/components/     directory     │

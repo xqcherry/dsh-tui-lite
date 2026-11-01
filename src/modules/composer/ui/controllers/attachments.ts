@@ -30,7 +30,6 @@ interface Context {
   readonly selectionRef: React.RefObject<{ start: number; end: number; } | null>
   readonly cursorRef: React.RefObject<number>
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
-  readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
   readonly draftImageLeaseIsCurrent: (lease: DraftImageLease) => boolean
   readonly composer: ComposerBinding
@@ -42,7 +41,7 @@ interface Context {
 
 export function createAttachments(getContext: () => Context) {
 const insertClipboardAtCaret = (text: string): { next: string; at: number } => {
-    const { valueRef, selectionRef, cursorRef, setInput, setSelectedCommand, setFileSelected } = getContext()
+    const { valueRef, selectionRef, cursorRef, setInput, setFileSelected } = getContext()
 
 
     text = sanitizeEditableText(text)
@@ -54,7 +53,6 @@ const insertClipboardAtCaret = (text: string): { next: string; at: number } => {
       : current.slice(0, position) + text + current.slice(position)
     // A paste is ONE undo step however many characters it carries.
     setInput(next, position + text.length, 'step')
-    setSelectedCommand(0)
     setFileSelected(0)
     return { next, at: position }
   }

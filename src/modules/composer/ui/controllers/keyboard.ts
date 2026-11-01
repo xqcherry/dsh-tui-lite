@@ -1,6 +1,5 @@
 import type { DraftImageLease } from '../../model/image-tokens.js'
 import type { StagedImageHandle } from '../../../../shared/protocol/composer.js'
-import type { CommandCompletion } from '../../../../shared/protocol/commands.js'
 import type { InputEvent, Key } from '../../../../ink/events/input-event.js'
 import { isBigInput } from '../../model/geometry.js'
 
@@ -38,7 +37,6 @@ interface Context {
   readonly selectionRef: React.RefObject<{ start: number; end: number; } | null>
   readonly consumeEditingEscape: () => boolean
   readonly deleteInputRange: (start: number, end: number, undo?: UndoMode) => void
-  readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
   readonly foldBlockRef: React.RefObject<{ start: number; end: number; } | null>
   readonly updateFoldBlock: (block: { start: number; end: number; } | null) => void
@@ -60,17 +58,13 @@ interface Context {
   readonly syncImageGeneration: () => number
   readonly advanceDraftRevision: () => void
   readonly handleEnter: () => void
-  readonly chooseCommand: (text: string) => void
   readonly tryRunCommand: (text: string) => boolean
   readonly submitText: (text: string, notice?: string) => void
   readonly interruptSend: () => void
   readonly fileOverlayOpen: boolean
-  readonly overlayOpen: boolean
   readonly fileMatches: readonly FileCandidate[]
   readonly fileSelected: number
   readonly acceptFile: (candidate: FileCandidate) => void
-  readonly suggestions: readonly CommandCompletion[]
-  readonly selectedCommand: number
   readonly queueSend: (text: string) => void
   readonly helpViewportHeight: number
   readonly helpScrollRef: React.RefObject<ScrollBoxHandle | null>
@@ -98,7 +92,7 @@ interface Context {
 
 export function createComposerKeyboard(getContext: () => Context) {
   return (input: string, key: Key, event: InputEvent) => {
-const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setSelectedCommand, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, chooseCommand, tryRunCommand, submitText, interruptSend, fileOverlayOpen, overlayOpen, fileMatches, fileSelected, acceptFile, suggestions, selectedCommand, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
+const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
 
     if (selectionActive) return
     // The editor round-trip ends by resuming stdin one microtask before the
@@ -126,7 +120,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       // Removing a selection is atomic: it must undo in one step, not fold
       // into whatever the caret-continuity rule would otherwise see.
       deleteInputRange(selection.start, selection.end, 'step')
-      setSelectedCommand(0)
       setFileSelected(0)
       return
     }
@@ -154,7 +147,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
         const next = value.slice(0, block.start) + value.slice(block.end)
         updateFoldBlock(null)
         setInput(next, block.start, 'step', block)
-        setSelectedCommand(0)
         setFileSelected(0)
         return
       }
@@ -186,7 +178,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       // Replacing a selection is atomic (like deleting one): the replaced span
       // must not fold into the surrounding typed run.
       setInput(next, at + text.length, sel ? 'step' : undo)
-      setSelectedCommand(0)
       setFileSelected(0)
       return at
     }
@@ -205,7 +196,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       if (droppedPath !== null) {
         const lease = captureDraftImageLease()
         if (helpOpen) onToggleHelp()
-        setSelectedCommand(0)
         setFileSelected(0)
         void enqueueImageWork(async () => {
           const handle = await stageImagePath(droppedPath, lease)
@@ -243,7 +233,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       // async continuation below only sets value/cursor, so a paste landing
       // while the help overlay is open would otherwise insert behind it.
       if (helpOpen) onToggleHelp()
-      setSelectedCommand(0)
       setFileSelected(0)
       clipboardBusyRef.current = true
       void readClipboard()
@@ -412,7 +401,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
             const beforeBlock = foldBlockRef.current
             updateFoldBlock(null)
             setInput(outcome.text, outcome.text.length, 'step', beforeBlock)
-            setSelectedCommand(0)
             setFileSelected(0)
           } else if (outcome.kind === 'unavailable') {
             context.notify(t('input-editor-unavailable'), { color: 'warning' })
@@ -454,13 +442,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       }
       const line = (value + input).trim()
       setInput(line, line.length)
-      if (line.startsWith('/')) {
-        const matches = composer.commands.commandCompletions(line)
-        if (matches.length === 1) {
-          chooseCommand(matches[0]!.commandLine)
-          return
-        }
-      }
       if (!tryRunCommand(line)) submitText(line)
       return
     }
@@ -490,9 +471,9 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       event.stopImmediatePropagation()
       return
     }
-    // Completion menus own Backtab just like plain Tab; do not mutate the
+    // File completion owns Backtab just like plain Tab; do not mutate the
     // background session mode while the user is choosing a candidate.
-    if (key.tab && key.shift && (fileOverlayOpen || overlayOpen)) {
+    if (key.tab && key.shift && fileOverlayOpen) {
       event.stopImmediatePropagation()
       return
     }
@@ -517,14 +498,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
     if (key.tab && fileOverlayOpen) {
       const file = fileMatches[fileSelected]
       if (file) acceptFile(file)
-      return
-    }
-    if (key.tab && overlayOpen) {
-      const command = suggestions[selectedCommand]
-      if (command) {
-        updateFoldBlock(null)
-        setInput(command.replacement, command.replacement.length, 'step')
-      }
       return
     }
     // Tab while the model is working = queue for AFTER the turn (followup),
@@ -586,8 +559,8 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
         return
       }
       // A history walk owns the arrows until it returns to the draft: a
-      // recalled entry can itself open the @ menu or the slash menu (e.g.
-      // `/model`), and letting the overlay navigate here strands the stashed
+      // recalled entry can itself open the @ menu, and letting the overlay
+      // navigate here strands the stashed
       // draft — Down would cycle menu rows instead of walking back.
       if (fileOverlayOpen && historyIndex.current < 0) {
         setFileSelected(index =>
@@ -625,18 +598,12 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
         setInput(value, prevLineStart + Math.min(cursorColumn(value, cursor), prevLine.length))
         return
       }
-      if (overlayOpen && historyIndex.current < 0) {
-        setSelectedCommand(index =>
-          index <= 0 ? suggestions.length - 1 : index - 1,
-        )
-        return
-      }
       // An EMPTY draft while idle with a docked queue takes ↑ into the dock
       // selector, ahead of the history walk (Claude Code parity). Any draft
       // keeps ↑ as cursor movement; the menus above keep their priority.
       if (
         value === '' && !context.sessions.getSnapshot().working
-        && !overlayOpen && !fileOverlayOpen && dockCount > 0
+        && !fileOverlayOpen && dockCount > 0
       ) {
         setDockSelected(dockCount - 1)
         return
@@ -733,12 +700,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
           nextLineEnd === -1 ? value.length : nextLineEnd,
         )
         setInput(value, nextLineStart + Math.min(cursorColumn(value, cursor), nextLine.length))
-        return
-      }
-      if (overlayOpen && historyIndex.current < 0) {
-        setSelectedCommand(index =>
-          index >= suggestions.length - 1 ? 0 : index + 1,
-        )
         return
       }
       // A walk cut short by a workspace switch has no position in the new
@@ -859,13 +820,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
         onToggleHelp()
         return
       }
-      // A single Esc closes the open command menu first;
-      // the double-tap-clear semantics only apply to ordinary input.
-      if (overlayOpen) {
-        event.stopImmediatePropagation()
-        clearDraftUndoably()
-        return
-      }
       // File overlay: Esc dismisses the menu for THIS token only — clearing
       // the input would nuke a mid-message `@` mention's surrounding text.
       if (fileOverlayOpen) {
@@ -900,7 +854,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       if (value.length > 0) {
         if (isBigInput(value)) {
           updateFoldBlock({ start: 0, end: value.length })
-          setSelectedCommand(0)
           setFileSelected(0)
           return
         }
@@ -930,7 +883,6 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       // Replacing a selection is atomic, exactly like `insertAtCaret`: the
       // replaced span must not fold into the surrounding typed run.
       setInput(next, at + input.length, sel ? 'step' : 'group')
-      setSelectedCommand(0)
       setFileSelected(0)
     }
   }

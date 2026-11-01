@@ -56,7 +56,6 @@ export function HelpMenu({
       <Text dimColor>{t('help-history-nav')}</Text>
       <Text dimColor>{t('help-move-cursor')}</Text>
       <Text dimColor>ctrl+←/→ word jump</Text>
-      <Text dimColor>{t('help-complete-command')}</Text>
       <Text dimColor>shift+enter newline</Text>
       <Text dimColor>shift+tab permission mode</Text>
       <Text dimColor>tab queue while working</Text>

@@ -119,7 +119,7 @@ export { sanitizeEditableText, sanitizePastedText } from '../../../shared/platfo
 /**
  * dsh-TUI prompt input: rounded border box (top+bottom borders
  * only), `❯ ` prompt char (dimmed while a turn is working), the text with a
- * block cursor at the cursor position, and above it the slash-command /
+ * block cursor at the cursor position, and above it the
  * file-completion suggestion card (SuggestionCard: rounded panel with the
  * selected row behind a `❯` pointer in the theme's `suggestion` color).
  *
@@ -338,7 +338,7 @@ export function PromptInput({
 
 
 
-  const { clearDraftUndo, pushDraftUndo, recordDraftEdit, clearDraftUndoably, undoDraft } = createDraftUndo(() => ({ draftUndoRef, discardUnretainedImages, now, imageRefsFor, syncImageGeneration, valueRef, cursorRef, foldBlockRef, discardDraftImages, setInput, setSelectedCommand, setFileSelected, advanceDraftRevision, replaceDraftImages, updateFoldBlock }))
+  const { clearDraftUndo, pushDraftUndo, recordDraftEdit, clearDraftUndoably, undoDraft } = createDraftUndo(() => ({ draftUndoRef, discardUnretainedImages, now, imageRefsFor, syncImageGeneration, valueRef, cursorRef, foldBlockRef, discardDraftImages, setInput, setFileSelected, advanceDraftRevision, replaceDraftImages, updateFoldBlock }))
 
 
   /** Push one step and enforce the depth/character guards. */
@@ -432,7 +432,6 @@ export function PromptInput({
       controllerRef.current = null
     }
   })
-  const [selectedCommand, setSelectedCommand] = React.useState(0)
   // ctrl+r history fill: replace the input when a new fill arrives, then
   // tell the caller to clear it.
   const lastFill = React.useRef<string | null>(null)
@@ -526,13 +525,6 @@ export function PromptInput({
   // loses nothing functional. (PR #446; restored after the picker
   // snapshot's cherry-pick resurrected the old formula.)
   const helpViewportHeight = Math.max(3, Math.min(terminalRows - 7, 15))
-
-  const suggestions = value.startsWith('/') ? composer.commands.commandCompletions(value) : []
-  const overlayOpen =
-    suggestions.length > 0 &&
-    !helpOpen &&
-    !selectionActive &&
-    !value.includes('\n')
 
   // `@` file completion (issue #15): the trigger is the mention token at the
   // CARET, so `@` works mid-message (`看看 @src/a.ts 这个`), not only when it
@@ -663,7 +655,7 @@ export function PromptInput({
    * then shows a recalled entry of the previous project while the draft that
    * walk started from is still held in `historyDraft`.
    */
-  const { seedHistory, restoreHistoryDraft, rememberHistory, pullBackLast, retractRecalledCopy, editDocked } = createHistoryNavigation(() => ({ composer, context, historySeededProject, historyIndex, history, updateFoldBlock, restoreDraftImages, historyDraft, setInput, setDockSelected, setSelectedCommand, setFileSelected, dockedPending, valueRef, imageRefsFor, foldBlockRef, replaceDraftImages }))
+  const { seedHistory, restoreHistoryDraft, rememberHistory, pullBackLast, retractRecalledCopy, editDocked } = createHistoryNavigation(() => ({ composer, context, historySeededProject, historyIndex, history, updateFoldBlock, restoreDraftImages, historyDraft, setInput, setDockSelected, setFileSelected, dockedPending, valueRef, imageRefsFor, foldBlockRef, replaceDraftImages }))
 
 
   /** End the walk and put back the draft it started from. */
@@ -671,7 +663,7 @@ export function PromptInput({
 
 
 
-  const { clearDeliveredDraft, sameImageRefs, shellImagesUnsupported, submitText, steerSend, queueSend, sendDocked, interruptSend, tryRunCommand, chooseCommand, handleEnter } = createSubmission(() => ({ syncImageGeneration, detachDraftImages, setInput, setSelectedCommand, setFileSelected, composer, context, beforeSubmit, imageRefsFor, rememberHistory, setDockSelected, value, draftRevisionRef, inputEditSequenceRef, pendingCommandRef, captureDraftImageLease, valueRef, onRunCommand, warnStaleImageTokens, draftImageLeaseIsCurrent, lastEnterAtRef, dockSelectedRef, dockCount, editDocked, overlayOpen, suggestions, selectedCommand, fileOverlayOpen, fileMatches, fileSelected, acceptFile }))
+  const { clearDeliveredDraft, sameImageRefs, shellImagesUnsupported, submitText, steerSend, queueSend, sendDocked, interruptSend, tryRunCommand, handleEnter } = createSubmission(() => ({ syncImageGeneration, detachDraftImages, setInput, setFileSelected, composer, context, beforeSubmit, imageRefsFor, rememberHistory, setDockSelected, value, draftRevisionRef, inputEditSequenceRef, pendingCommandRef, captureDraftImageLease, valueRef, onRunCommand, warnStaleImageTokens, draftImageLeaseIsCurrent, lastEnterAtRef, dockSelectedRef, dockCount, editDocked, fileOverlayOpen, fileMatches, fileSelected, acceptFile }))
 
 
 
@@ -778,10 +770,9 @@ export function PromptInput({
 
   /**
    * The Enter path for prompt submission:
-   * - command menu open → run the SELECTED command (never send `/mo`);
    * - model working → STEER into the running turn (next step boundary,
    *   agent continues — the "immediate" send; Codex/pi semantics);
-   * - otherwise → submit directly (or run a unique command).
+   * - otherwise → run a complete command or submit directly.
    * Reads valueRef so a key batch (typing + Enter in one stdin read)
    * operates on the text the preceding keys produced.
    */
@@ -796,7 +787,7 @@ export function PromptInput({
       setDockSelected(null)
       return true
     }
-    if (selectionRef.current && !helpOpen && !overlayOpen && !fileOverlayOpen) {
+    if (selectionRef.current && !helpOpen && !fileOverlayOpen) {
       clearSelection()
       return true
     }
@@ -807,7 +798,7 @@ export function PromptInput({
    * typing while PowerShell owns the clipboard never gets overwritten.
    * An active selection is replaced by the insert. Returns the resulting
    * value and the insertion offset so callers can apply the paste fold. */
-  const { insertClipboardAtCaret, stageImagePath, enqueueImageWork, stagedImageNotice, discardStagedHandles, bindStagedImage } = createAttachments(() => ({ valueRef, selectionRef, cursorRef, setInput, setSelectedCommand, setFileSelected, draftImageLeaseIsCurrent, composer, context, draftImagesRef, imageStageChainRef, nextImageNumberRef }))
+  const { insertClipboardAtCaret, stageImagePath, enqueueImageWork, stagedImageNotice, discardStagedHandles, bindStagedImage } = createAttachments(() => ({ valueRef, selectionRef, cursorRef, setInput, setFileSelected, draftImageLeaseIsCurrent, composer, context, draftImagesRef, imageStageChainRef, nextImageNumberRef }))
 
 
   /** Read one local image file and stage it through the composer, returning
@@ -852,7 +843,7 @@ export function PromptInput({
   const head = foldBlock ? value.slice(0, foldBlock.start) : ''
   const tail = foldBlock ? value.slice(foldBlock.end) : ''
 
-  useInput(createComposerKeyboard(() => ({ selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setSelectedCommand, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, chooseCommand, tryRunCommand, submitText, interruptSend, fileOverlayOpen, overlayOpen, fileMatches, fileSelected, acceptFile, suggestions, selectedCommand, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
+  useInput(createComposerKeyboard(() => ({ selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
 
   // === Render: hard-wrap every logical line at the input width, then show
   // the window of visual lines with the caret row always visible.
@@ -863,7 +854,7 @@ export function PromptInput({
   // （既有调用方的可用列数逐列不变）。用实测常量而不是 stringWidth：该字符
   // 是 U+1F3E0+VS15，stringWidth 按码点算 2（含 VS15 仍是 2），终端只给 1，
   // 见 HOME_BUTTON_COLS 的说明。
-  return useComposerView({ onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, overlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, suggestions, selectedCommand, chooseCommand, setSelectedCommand, setHovered, setHomeHovered, homeHovered })
+  return useComposerView({ onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
 }
 
 /**

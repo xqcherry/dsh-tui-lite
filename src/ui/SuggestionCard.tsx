@@ -6,7 +6,7 @@ import { Box, Text } from './primitives.js'
 import type { Theme } from './theme.js'
 
 /**
- * `/` 命令菜单与 `@` 文件菜单共用的圆角卡片外壳（与输入框 EffortInputBorder
+ * `@` 文件菜单与折叠预览共用的圆角卡片外壳（与输入框 EffortInputBorder
  * 同款 ╭╮╰╯ 视觉语言）：
  *
  *   ╭─ 标题 ─────────────────────╮
@@ -44,7 +44,7 @@ export function SuggestionCard({
   /** 已渲染的行内容（每行一个节点），本组件为各行补上左右边框。 */
   rows: readonly React.ReactNode[]
   /**
-   * 鼠标点击行（fullscreen）：上报行索引——命令/文件补全用它接受该项
+   * 鼠标点击行（fullscreen）：上报行索引——文件补全用它接受该项
    * （与 Tab/Enter 同路径）。未提供时行为不变。
    */
   onRowPick?: (index: number) => void
@@ -113,21 +113,16 @@ export function SuggestionCard({
 
 /**
  * 卡片内一行内容的可用显示宽度：总宽减去两侧 │ + 各 1 空格的内边距。
- * CommandSuggestions / FileSuggestions 的截断数学共用这一口径。
+ * FileSuggestions 的截断数学使用这一口径。
  */
 export function cardContentWidth(columns: number): number {
   return Math.max(0, columns - 4)
 }
 
 /**
- * 把补全名按「命中的查询前缀」拆成三段（用于前缀高亮）。三级尝试，
- * 均大小写不敏感，与 completeCommands / 文件候选的过滤语义对齐：
- *   1. 整名前缀（文件查询是路径前缀，`src/re` 命中 `src/render`）；
- *   2. 最后一个空格 token 的前缀（嵌套命令 `model deepseek/…` 的
- *      `deepseek/` 查询——补全名带 `model ` 路径前缀）；
- *   3. 最后一个 `/` 段的前缀（`/model deepseek-v` 命中段
- *      `deepseek-v4-flash` 的开头）。
- * 查询为空、或都不命中（别名命中、过期候选）返回 null——渲染方整体 dim。
+ * 把文件名按「命中的查询前缀」拆成三段，用于大小写不敏感的前缀高亮。
+ * 依次尝试整名前缀、最后一个空格之后的前缀和最后一个路径段的前缀。
+ * 查询为空或没有命中时返回 null，渲染方整体 dim。
  */
 export function splitQueryMatch(
   name: string,

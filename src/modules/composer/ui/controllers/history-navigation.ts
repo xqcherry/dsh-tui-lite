@@ -27,7 +27,6 @@ interface Context {
   readonly historyDraft: React.RefObject<PromptHistoryEntry>
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
   readonly setDockSelected: (index: number | null) => void
-  readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
   readonly dockedPending: PendingMessage[]
   readonly valueRef: React.RefObject<string>
@@ -81,7 +80,7 @@ const rememberHistory = (text: string, images: readonly ComposerImageRef[]): voi
   }
 
 const pullBackLast = () => {
-    const { setDockSelected, composer, context, restoreDraftImages, setInput, updateFoldBlock, setSelectedCommand, setFileSelected } = getContext()
+    const { setDockSelected, composer, context, restoreDraftImages, setInput, updateFoldBlock, setFileSelected } = getContext()
 
 
     // Alt+↑ keeps its direct last-item meaning even while the dock selector
@@ -99,7 +98,6 @@ const pullBackLast = () => {
     })
     setInput(item.text, item.text.length, 'silent')
     updateFoldBlock(null)
-    setSelectedCommand(0)
     setFileSelected(0)
     context.notify(t('input-retracted'), { timeoutMs: 2000 })
   }
@@ -121,7 +119,7 @@ const retractRecalledCopy = (text: string): void => {
   }
 
 const editDocked = (index: number): void => {
-    const { dockedPending, setDockSelected, valueRef, composer, context, imageRefsFor, foldBlockRef, updateFoldBlock, setInput, replaceDraftImages, setSelectedCommand, setFileSelected, restoreDraftImages } = getContext()
+    const { dockedPending, setDockSelected, valueRef, composer, context, imageRefsFor, foldBlockRef, updateFoldBlock, setInput, replaceDraftImages, setFileSelected, restoreDraftImages } = getContext()
 
 
     const item = dockedPending[index]
@@ -149,7 +147,6 @@ const editDocked = (index: number): void => {
       updateFoldBlock(null)
       setInput(item.text, item.text.length, 'step', beforeBlock)
       replaceDraftImages(item.images ?? [])
-      setSelectedCommand(0)
       setFileSelected(0)
       context.notify(t('input-dock-swapped'), { timeoutMs: 2000 })
       return
@@ -164,7 +161,6 @@ const editDocked = (index: number): void => {
     })
     setInput(item.text, item.text.length, 'silent')
     updateFoldBlock(null)
-    setSelectedCommand(0)
     setFileSelected(0)
     context.notify(t('input-retracted'), { timeoutMs: 2000 })
   }

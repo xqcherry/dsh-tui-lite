@@ -137,8 +137,7 @@ check(
 )
 
 // A command and Enter can arrive as win32-input-mode records in one stdin
-// read. React has not repainted the completion overlay yet, so PromptInput
-// must use the synchronous value mirror to keep safe live commands local.
+// read. PromptInput must use the synchronous value mirror for command dispatch.
 const win32Record = (virtualKey, scanCode, codePoint) =>
   `\x1b[${virtualKey};${scanCode};${codePoint};1;0;1_`
 const batchedCommand = (letters) => [
@@ -161,7 +160,7 @@ stdin.write(batchedCommand([
 ]))
 
 check(
-  'batched /skills while streaming executes locally before the overlay repaints',
+  'batched /skills while streaming executes locally',
   await settled(() => commands.length === 1 && commands[0] === 'skills' && steered.length === 1),
   `commands=${JSON.stringify(commands)} steered=${JSON.stringify(steered)}`,
 )
@@ -176,8 +175,8 @@ stdin.write(batchedCommand([
 ]))
 
 check(
-  'batched idle-only commands keep the existing steer behavior while streaming',
-  await settled(() => commands.length === 1 && steered.length === 2 && steered[1] === '/model'),
+  'batched complete commands execute locally while streaming',
+  await settled(() => commands.length === 2 && commands[1] === 'model' && steered.length === 1),
   `commands=${JSON.stringify(commands)} steered=${JSON.stringify(steered)}`,
 )
 
@@ -196,8 +195,8 @@ stdin.write(batchedCommand([
 
 check(
   'declined /skills falls back to steer while streaming',
-  await settled(() => commands.length === 2 && commands[1] === 'skills'
-    && steered.length === 3 && steered[2] === '/skills'),
+  await settled(() => commands.length === 3 && commands[2] === 'skills'
+    && steered.length === 2 && steered[1] === '/skills'),
   `commands=${JSON.stringify(commands)} steered=${JSON.stringify(steered)}`,
 )
 

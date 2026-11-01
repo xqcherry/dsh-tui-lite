@@ -25,7 +25,6 @@ interface Context {
   readonly foldBlockRef: React.RefObject<{ start: number; end: number; } | null>
   readonly discardDraftImages: (options?: { keepUndo?: boolean; }) => void
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
-  readonly setSelectedCommand: React.Dispatch<React.SetStateAction<number>>
   readonly setFileSelected: React.Dispatch<React.SetStateAction<number>>
   readonly advanceDraftRevision: () => void
   readonly replaceDraftImages: (images: readonly ComposerImageRef[]) => void
@@ -125,7 +124,7 @@ const recordDraftEdit = (
   }
 
 const clearDraftUndoably = (): void => {
-    const { syncImageGeneration, valueRef, cursorRef, imageRefsFor, foldBlockRef, discardDraftImages, setInput, setSelectedCommand, setFileSelected } = getContext()
+    const { syncImageGeneration, valueRef, cursorRef, imageRefsFor, foldBlockRef, discardDraftImages, setInput, setFileSelected } = getContext()
 
 
     syncImageGeneration()
@@ -145,12 +144,11 @@ const clearDraftUndoably = (): void => {
     }
     discardDraftImages({ keepUndo: true })
     setInput('', 0, 'silent')
-    setSelectedCommand(0)
     setFileSelected(0)
   }
 
 const undoDraft = (): void => {
-    const { syncImageGeneration, draftUndoRef, advanceDraftRevision, replaceDraftImages, updateFoldBlock, setInput, setSelectedCommand, setFileSelected } = getContext()
+    const { syncImageGeneration, draftUndoRef, advanceDraftRevision, replaceDraftImages, updateFoldBlock, setInput, setFileSelected } = getContext()
 
 
     // A session replacement invalidates the whole stack. Check that BEFORE
@@ -172,7 +170,6 @@ const undoDraft = (): void => {
         ? entry.block
         : null
     updateFoldBlock(block)
-    setSelectedCommand(0)
     setFileSelected(0)
   }
   return { clearDraftUndo, pushDraftUndo, recordDraftEdit, clearDraftUndoably, undoDraft }
