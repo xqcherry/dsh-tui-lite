@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 export const checks = [
+  'verify-composer-delivery.ts',
   'verify-boundaries.mjs',
   'verify-feature-modules.mjs',
   'verify-module-store.ts',
