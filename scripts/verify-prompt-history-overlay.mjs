@@ -2,14 +2,9 @@
 /**
  * Regression: a history walk must own ↑/↓ until it returns to the draft.
  *
- * A recalled entry can itself satisfy an overlay grammar — recalling
- * `/model` opens the slash-command menu the moment it lands in the input
- * (`suggestions.length > 0`). Before the fix, ↑/↓ on such an entry
- * navigated the MENU instead of the history: the stashed draft became
- * unreachable via ↓, and Esc (menu open → clear input) destroyed the
- * recalled entry without restoring the draft either — recovery required
- * Ctrl+R. The fix gates both overlay branches on `historyIndex < 0` so the
- * walk keeps walking until the draft comes back.
+ * Slash input has no candidate menu and must keep ordinary editing and
+ * submission behavior. History walks through commands must restore drafts.
+ * Runs in a narrow TTY to catch leftover menu rows and layout artifacts.
  *
  * Run after build: `node scripts/verify-prompt-history-overlay.mjs`.
  */
@@ -18,7 +13,7 @@ import './lib/fake-home.mjs'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
 import xtermHeadless from '@xterm/headless'
-import { render } from '../lib/types/ui/primitives.js'
+import { Box, Text, render } from '../lib/types/ui/primitives.js'
 import { PromptInput } from '../lib/types/modules/composer/ui/PromptInput.js'
 import { settled, sleep, viewportLines } from './lib/term-test.mjs'
 
@@ -42,8 +37,8 @@ function makeStreams(term) {
       }
     },
   })
-  stdout.columns = 100
-  stdout.rows = 30
+  stdout.columns = 40
+  stdout.rows = 16
   stdout.isTTY = true
   const stderr = new Writable({ write(_chunk, _encoding, callback) { callback() } })
   stderr.isTTY = true
@@ -58,6 +53,7 @@ function makeStreams(term) {
 
 const submitted = []
 const commands = []
+const controllerRef = React.createRef()
 const channel = {
   mode: { id: 'default', plan: false },
   modeIndex: 0,
@@ -67,9 +63,9 @@ const channel = {
     { name: 'model', description: 'Show the active model' },
   ],
   commandCompletions(input) {
-    if (input !== '/skills' && input !== '/model') return []
-    const name = input.slice(1)
-    return [{ name, description: name, commandLine: input, replacement: `${input} ` }]
+    if (!['/', '/mo', '/skills', '/model'].includes(input)) return []
+    const name = input === '/' || input === '/mo' ? 'model' : input.slice(1)
+    return [{ name, description: 'MENUPROBE', commandLine: `/${name}`, replacement: `/${name} ` }]
   },
   notifications: [],
   pending: [],
@@ -81,18 +77,25 @@ const channel = {
   removePending() { return false },
   stageImage() {},
   listFiles: async () => [],
+  listFileCandidates: async () => [{
+    id: 'demo.ts', path: 'demo.ts', displayPath: 'demo.ts',
+    name: 'demo.ts', kind: 'file', score: 1,
+  }],
 }
 
-const term = new XTerm({ cols: 100, rows: 30, scrollback: 100, allowProposedApi: true })
+const term = new XTerm({ cols: 40, rows: 16, scrollback: 100, allowProposedApi: true })
 const { stdout, stderr, stdin } = makeStreams(term)
 await render(
-  React.createElement(PromptInput, {
+  React.createElement(Box, { flexDirection: 'column' },
+    React.createElement(Text, null, 'TRANSCRIPT_ANCHOR\n' + 'history row\n'.repeat(6)),
+    React.createElement(PromptInput, {
     ...composerFixture(channel),
+    controllerRef,
     helpOpen: false,
     onToggleHelp() {},
     onRunCommand(name) { commands.push(name); return true },
     selectionActive: false,
-  }),
+  })),
   { stdout, stderr, stdin, exitOnCtrlC: false, patchConsole: false },
 )
 
@@ -104,8 +107,34 @@ const shows = (text) => viewportLines(term).some(line => line.includes(text))
 // 首帧挂载 pacing：等 React 树完成首次渲染与输入监听挂接，无单一可观测条件。
 await sleep(500)
 
-// Seed the history: one plain message, then a slash command — the command
-// entry is the one that reopens the menu when recalled.
+// Candidate data remains available to future UIs, but typing a prefix must
+// neither render it nor let Tab/Enter accept an invisible candidate.
+stdin.write('/')
+await settled(() => controllerRef.current.text() === '/')
+await sleep(200) // 固定窗:探针 — bare slash must not render a candidate menu.
+check('bare slash does not display candidates', !shows('MENUPROBE'))
+stdin.write('mo')
+await settled(() => shows('/mo'))
+await sleep(200) // 固定窗:探针 — candidate rows must remain absent after rendering.
+check('slash prefix does not display candidates', !shows('MENUPROBE'))
+stdin.write('\x1b')
+check('Esc clears slash input like ordinary input',
+  await settled(() => controllerRef.current.text() === ''))
+stdin.write('\x1a')
+check('undo restores the slash draft after Esc',
+  await settled(() => controllerRef.current.text() === '/mo'))
+stdin.write('\t')
+await sleep(200) // 固定窗:探针 — Tab must not complete the prefix invisibly.
+check('Tab leaves the typed prefix unchanged', controllerRef.current.text() === '/mo')
+stdin.write('\r')
+check('Enter submits the prefix without running a candidate',
+  await settled(() => submitted[0] === '/mo') && commands.length === 0,
+  JSON.stringify({ submitted, commands }))
+submitted.length = 0
+commands.length = 0
+await sleep(150) // 固定窗:墙钟 — wait for the Enter deduplication window.
+
+// Seed the history: one plain message, then a complete slash command.
 stdin.write('plain one')
 await sleep(150)
 stdin.write('\r')
@@ -122,24 +151,24 @@ stdin.write('draft 草稿')
 await sleep(200)
 check('draft typed into the input', await settled(() => shows('draft 草稿')))
 
-// ↑ recalls `/model` — the slash menu opens over it (this is the trap).
+// ↑ recalls `/model` without opening a candidate menu.
 stdin.write(UP)
 check('up recalls the /model history entry', await settled(() => shows('/model')))
 
-// ↓ must return to the draft even though the menu is open over `/model`.
+// ↓ must return to the draft after recalling `/model`.
 stdin.write(DOWN)
 check(
-  'down past the newest entry restores the draft despite the open menu',
+  'down past the newest entry restores the draft after recalling a slash command',
   await settled(() => shows('draft 草稿')),
 )
 
-// The walk also continues UP through menu-opening entries: ↑↑ from the
+// The walk also continues UP through slash commands: ↑↑ from the
 // draft reaches `plain one` past `/model`.
 stdin.write(UP)
 await settled(() => shows('/model'))
 stdin.write(UP)
 check(
-  'up continues through the menu-opening entry to the older one',
+  'up continues through the slash-command entry to the older one',
   await settled(() => shows('plain one')),
 )
 
@@ -156,6 +185,27 @@ check(
   await settled(() => submitted.length === 2 && submitted[1] === 'draft 草稿'),
   JSON.stringify({ submitted, commands }),
 )
+
+// Complete commands keep their explicit command route during a running turn.
+await sleep(100) // 固定窗:墙钟 — cross the physical-Enter deduplication window.
+channel.working = true
+stdin.write('/model')
+await settled(() => controllerRef.current.text() === '/model')
+stdin.write('\r')
+check('complete command executes while a turn is running',
+  await settled(() => commands.length === 2 && commands[1] === 'model'),
+  JSON.stringify({ submitted, commands }))
+
+// The shared card and file-completion keyboard path remain functional.
+channel.working = false
+stdin.write('@de')
+check('file candidates still display above the input',
+  await settled(() => shows('demo.ts')))
+stdin.write('\t')
+check('Tab still accepts file completion',
+  await settled(() => controllerRef.current.text() === '@demo.ts '))
+check('transcript anchor remains visible without duplicate rows',
+  viewportLines(term).filter(line => line.includes('TRANSCRIPT_ANCHOR')).length === 1)
 
 console.log(failed === 0 ? '\nAll prompt-history-overlay checks passed' : `\n${failed} check(s) FAILED`)
 process.exit(failed === 0 ? 0 : 1)
