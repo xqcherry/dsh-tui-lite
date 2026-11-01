@@ -53,6 +53,9 @@ export function createPersistedSessionResume<Session, Capture, Entry, Plan>(host
   const resume = async (sessionId: string, capture: Capture, entry: Entry, reservation: SessionReservation): Promise<ResumeResult> => {
     let committed = false
     try {
+      await host.settleCompaction()
+      if (!host.bindingCurrent(capture) || !host.sameEntry(entry)) return { ok: false, reason: 'cancelled' }
+      if (host.liveMounted(sessionId) || host.working()) return { ok: false, reason: 'cancelled' }
       if (!host.available()) {
         host.notify(t('resume-unavailable'), { color: 'error' })
         return { ok: false, reason: 'unavailable' }
@@ -121,15 +124,6 @@ export function createPersistedSessionResume<Session, Capture, Entry, Plan>(host
     if (host.liveMounted(sessionId)) return { ok: false, reason: 'occupied', pid: host.localPid }
     const reserved = await host.reserve(sessionId)
     if (!reserved.ok) return reserved.result
-    await host.settleCompaction()
-    if (!host.bindingCurrent(capture) || !host.sameEntry(entry.identity)) {
-      reserved.reservation.abandon()
-      return { ok: false, reason: 'cancelled' }
-    }
-    if (host.liveMounted(sessionId) || host.working()) {
-      reserved.reservation.abandon()
-      return { ok: false, reason: 'cancelled' }
-    }
     return resume(sessionId, capture, entry.identity, reserved.reservation)
   }
 }
@@ -159,16 +153,22 @@ export function createModelFork<Session, Capture, Seed, Resource, Preset>(host: 
       seed = host.snapshot()
     } catch (error) { host.notify(t('model-switch-fork-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'error' }); return false }
     const { resource, reservation } = await host.reserve()
-    const preset = await host.preset()
-    const route = { provider, model }
-    let candidate: Session
-    try { candidate = await host.prepare(capture, resource, seed, preset, route) }
-    catch (error) { reservation.abandon(); host.notify(t('model-switch-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 }); return false }
-    try { await host.attach(resource) }
-    catch (error) { host.notify(t('model-switch-attach-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'warning', timeoutMs: 8000 }) }
-    if (!host.bindingCurrent(capture) || !host.current()) { await host.abandon(candidate); reservation.abandon(); return false }
     let committed = false
+    let released = false
+    const releaseReservation = (): void => {
+      if (released) return
+      released = true
+      reservation.abandon()
+    }
     try {
+      const preset = await host.preset()
+      const route = { provider, model }
+      let candidate: Session
+      try { candidate = await host.prepare(capture, resource, seed, preset, route) }
+      catch (error) { releaseReservation(); host.notify(t('model-switch-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'error', timeoutMs: 8000 }); return false }
+      try { await host.attach(resource) }
+      catch (error) { host.notify(t('model-switch-attach-failed', { err: error instanceof Error ? error.message : String(error) }), { color: 'warning', timeoutMs: 8000 }) }
+      if (!host.bindingCurrent(capture) || !host.current()) { await host.abandon(candidate); return false }
       const result = host.adopt<boolean>(candidate, capture, disposePrevious => {
         host.reset(candidate, preset, route)
         host.dropModelCompletion()
@@ -190,7 +190,7 @@ export function createModelFork<Session, Capture, Seed, Resource, Preset>(host: 
       return result
     } finally {
       if (committed) reservation.settle()
-      else reservation.abandon()
+      else releaseReservation()
     }
   }
 }

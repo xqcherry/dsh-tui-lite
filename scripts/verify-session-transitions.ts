@@ -191,4 +191,70 @@ for (const phase of ['adopt', 'reset', 'replay', 'bind']) {
   assert.equal(await createModelFork(f.fork)('p', 'm'), true)
   assert.deepEqual(f.calls.slice(-3), ['dispose', 'notify', 'settle'], 'preference failure is a post-publication warning')
 }
+// Each case reports independently so a missing release cannot hide another exit path.
+const failures: Error[] = []
+const cases: readonly [string, () => Promise<void>][] = [
+  ['resume compaction rejection', async () => {
+    const f = fixture()
+    f.fail('compaction')
+    await assert.rejects(createPersistedSessionResume(f.resume)('disk'), /compaction/)
+    assert.deepEqual(f.calls, ['wait', 'reserve', 'compaction', 'release'])
+  }],
+  ['fork preset rejection', async () => {
+    const f = fixture()
+    f.fail('preset')
+    await assert.rejects(createModelFork(f.fork)('p', 'm'), /preset/)
+    assert.deepEqual(f.calls, ['compaction', 'snapshot', 'reserve', 'preset', 'release'])
+  }],
+]
+for (const [name, run] of cases) {
+  try { await run() }
+  catch (error) { failures.push(new Error(name, { cause: error })) }
+}
+for (const kind of ['resume', 'fork'] as const) {
+  try {
+    const f = fixture()
+    const host = f[kind]
+    const attach = host.attach
+    host.attach = async (...args: Parameters<typeof attach>) => {
+      await attach(...args)
+      if (kind === 'resume') f.changeEntry()
+      else f.cancel()
+    }
+    let started!: () => void
+    let finish!: () => void
+    const cleaning = new Promise<void>(resolve => { started = resolve })
+    const blocked = new Promise<void>(resolve => { finish = resolve })
+    const cleanupError = new Error('candidate cleanup failed')
+    host.abandon = async () => {
+      f.calls.push('abandon')
+      started()
+      await blocked
+      throw cleanupError
+    }
+    const switching = kind === 'resume'
+      ? createPersistedSessionResume(f.resume)('disk')
+      : createModelFork(f.fork)('p', 'm')
+    const rejected = assert.rejects(switching, error => error === cleanupError)
+    await cleaning
+    assert.equal(f.calls.includes('release'), false, `${kind}: keep reservation while cleanup is pending`)
+    finish()
+    await rejected
+    assert.deepEqual(f.calls.slice(-2), ['abandon', 'release'])
+    assert.equal(f.calls.filter(call => call === 'release').length, 1)
+    assert.equal(f.calls.includes('adopt'), false)
+    assert.equal(f.calls.includes('settle'), false)
+  } catch (error) { failures.push(new Error(`${kind} candidate cleanup rejection`, { cause: error })) }
+}
+for (const kind of ['resume', 'fork'] as const) {
+  const f = fixture()
+  f.fail('reserve')
+  const switching = kind === 'resume'
+    ? createPersistedSessionResume(f.resume)('disk')
+    : createModelFork(f.fork)('p', 'm')
+  await assert.rejects(switching, /reserve/)
+  assert.equal(f.calls.includes('release'), false, `${kind}: no reservation acquired`)
+  assert.equal(f.calls.includes('settle'), false)
+}
+if (failures.length > 0) throw new AggregateError(failures, 'Reservation exit paths failed')
 console.log('verify:session-transitions OK (resume and model fork order, cancellation, failed adoption, reservations)')
