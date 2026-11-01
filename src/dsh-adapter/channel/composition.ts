@@ -300,7 +300,10 @@ export function configureDshServices(
     initialEffort: options.effort,
     notify,
     checkContextWarning: core.bookkeeping.checkContextWarning,
-    publish: () => publishRuntime(state),
+    publish: () => {
+      state.composer.ingress.invalidateCommandCompletions()
+      publishRuntime(state)
+    },
   })
 
   // The first bind (start) and every adoption tail bind through the core

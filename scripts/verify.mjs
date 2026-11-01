@@ -32,6 +32,7 @@ export const checks = [
   'verify-prompt-history-draft.mjs',
   'verify-prompt-history-persist.mjs',
   'verify-prompt-history-overlay.mjs',
+  'verify-command-suggestions.mjs',
   'verify-prompt-history-queue-retract.mjs',
   'verify-binding-transaction.ts',
   'verify-session-reset.ts',

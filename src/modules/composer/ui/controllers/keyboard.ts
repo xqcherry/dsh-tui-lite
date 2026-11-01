@@ -30,6 +30,7 @@ import { type ScrollBoxHandle } from '../../../../terminal/index.js'
 
 
 interface Context {
+  readonly handleCommandSuggestionKey: (key: Key, event: InputEvent) => boolean
   readonly selectionActive: boolean
   readonly editorBusyRef: React.RefObject<boolean>
   readonly valueRef: React.RefObject<string>
@@ -92,7 +93,7 @@ interface Context {
 
 export function createComposerKeyboard(getContext: () => Context) {
   return (input: string, key: Key, event: InputEvent) => {
-const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
+const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
 
     if (selectionActive) return
     // The editor round-trip ends by resuming stdin one microtask before the
@@ -369,6 +370,8 @@ const { selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consu
       event.stopImmediatePropagation()
       return
     }
+
+    if (handleCommandSuggestionKey(key, event)) return
 
     // Ctrl+G (remappable via /settings): edit the current draft in
     // $VISUAL/$EDITOR (issue #123, readline's edit-and-execute-command). The

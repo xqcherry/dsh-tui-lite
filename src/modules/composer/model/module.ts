@@ -10,6 +10,7 @@ export function createComposerModule(launch: ModuleLaunch, publication: Publicat
   const convergence: InputConvergence = { interruptSeq: 0, cancelInFlight: false, cancelCause: undefined }
   const lifetime = createCommandLifetime<ComposerCommandHost>(publication)
   const owned = createModuleStore<MutableSnapshot<ComposerSnapshot>>({
+    commandCompletionRevision: 0,
     selection: undefined,
     cancelPending: false,
     pending: [],
@@ -40,6 +41,7 @@ export function createComposerModule(launch: ModuleLaunch, publication: Publicat
     store: owned.store,
     commands,
     ingress: {
+      invalidateCommandCompletions(): void { owned.update(draft => { draft.commandCompletionRevision += 1 }) },
       setSelection(selection: ComposerSnapshot['selection']): void { owned.patch({ selection }) },
       setCancelPending(cancelPending: boolean): void { owned.patch({ cancelPending }) },
       setPending(pending: ComposerSnapshot['pending']): void { owned.patch({ pending: [...pending] }) },

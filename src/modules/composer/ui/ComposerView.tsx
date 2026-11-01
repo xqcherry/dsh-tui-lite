@@ -1,3 +1,5 @@
+import type { CommandSuggestionsSnapshot } from '../model/command-suggestions.js'
+import { CommandSuggestions } from './CommandSuggestions.js'
 import type { ImageTokenSpan } from '../model/image-tokens.js'
 import type { PendingMessage } from '../../../shared/protocol/composer.js'
 import { HOME_BUTTON_TEXT, HOME_BUTTON_COLS, isBigInput, MAX_VISIBLE_LINES, DOUBLE_CLICK_MS, wrapToWidth, caretInText, clickToCursorOffset, visualLineRanges, wordSelectionAt } from '../model/geometry.js'
@@ -41,6 +43,10 @@ import { listWindow } from '../../../ui/listWindow.js'
 
 
 interface Context {
+  readonly commandMaxRows: number
+  readonly commandSnapshot: CommandSuggestionsSnapshot
+  readonly acceptCommandSuggestion: (index: number) => boolean
+  readonly moveCommandSuggestion: (delta: number, wrap?: boolean) => void
   readonly onOpenSessions: (() => void) | undefined
   readonly composer: ComposerBinding
   readonly context: ComposerContext
@@ -94,7 +100,7 @@ interface Context {
 }
 
 export function useComposerView(view: Context): React.ReactNode {
-const { onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
+const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
 const promptAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
@@ -702,6 +708,13 @@ return (
           </Box>
         </Box>
       </EffortInputBorder>
+      <CommandSuggestions
+        snapshot={commandSnapshot}
+        columns={columns}
+        maxRows={commandMaxRows}
+        onPick={acceptCommandSuggestion}
+        onWheelStep={step => moveCommandSuggestion(step, false)}
+      />
     </Box>
   )
 }

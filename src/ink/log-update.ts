@@ -321,7 +321,10 @@ export class LogUpdate {
       // frame from the viewport top — duplicating every pre-shrink row the
       // user scrolls up to (the whale-logo / duplicated-transcript
       // reports).
+      // A prior shrink may already have stranded MORE rows than the height
+      // formula sees. Keep that seam across successive menu contractions.
       const scrollbackRows = Math.max(
+        this.state.anchoredPad,
         0,
         Math.max(prev.screen.height, next.screen.height) -
           next.viewport.height +
@@ -393,6 +396,7 @@ export class LogUpdate {
         // reprinted the whole frame, duplicating the scrollback rows
         // (whale-logo / duplicated-transcript reports).
         const scrollbackRows = Math.max(
+          this.state.anchoredPad,
           0,
           prev.screen.height - prev.viewport.height + cursorRestoreScroll,
         )

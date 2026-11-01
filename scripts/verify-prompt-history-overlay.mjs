@@ -2,8 +2,7 @@
 /**
  * Regression: a history walk must own ↑/↓ until it returns to the draft.
  *
- * Slash input has no candidate menu and must keep ordinary editing and
- * submission behavior. History walks through commands must restore drafts.
+ * Slash candidates live below the input; history walks retain keyboard ownership. History walks through commands must restore drafts.
  * Runs in a narrow TTY to catch leftover menu rows and layout artifacts.
  *
  * Run after build: `node scripts/verify-prompt-history-overlay.mjs`.
@@ -107,28 +106,25 @@ const shows = (text) => viewportLines(term).some(line => line.includes(text))
 // 首帧挂载 pacing：等 React 树完成首次渲染与输入监听挂接，无单一可观测条件。
 await sleep(500)
 
-// Candidate data remains available to future UIs, but typing a prefix must
-// neither render it nor let Tab/Enter accept an invisible candidate.
+// Candidates appear below the input and Escape dismisses without clearing it.
 stdin.write('/')
-await settled(() => controllerRef.current.text() === '/')
-await sleep(200) // 固定窗:探针 — bare slash must not render a candidate menu.
-check('bare slash does not display candidates', !shows('MENUPROBE'))
+check('bare slash displays a candidate below the input',
+  await settled(() => shows('→ model')))
 stdin.write('mo')
-await settled(() => shows('/mo'))
-await sleep(200) // 固定窗:探针 — candidate rows must remain absent after rendering.
-check('slash prefix does not display candidates', !shows('MENUPROBE'))
+check('slash prefix displays the selected candidate',
+  await settled(() => shows('/mo') && shows('→ model')))
 stdin.write('\x1b')
-check('Esc clears slash input like ordinary input',
-  await settled(() => controllerRef.current.text() === ''))
-stdin.write('\x1a')
-check('undo restores the slash draft after Esc',
-  await settled(() => controllerRef.current.text() === '/mo'))
+check('Esc dismisses candidates and retains the slash draft',
+  await settled(() => controllerRef.current.text() === '/mo' && !shows('→ model')))
 stdin.write('\t')
-await sleep(200) // 固定窗:探针 — Tab must not complete the prefix invisibly.
-check('Tab leaves the typed prefix unchanged', controllerRef.current.text() === '/mo')
+check('explicit Tab reopens and accepts completion after Esc',
+  await settled(() => controllerRef.current.text() === '/model '))
+stdin.write('\x1a')
+check('completion is one undo step',
+  await settled(() => controllerRef.current.text() === '/mo'))
 stdin.write('\r')
-check('Enter submits the prefix without running a candidate',
-  await settled(() => submitted[0] === '/mo') && commands.length === 0,
+check('Enter accepts a root candidate and runs the existing command route',
+  await settled(() => commands[0] === 'model') && submitted.length === 0,
   JSON.stringify({ submitted, commands }))
 submitted.length = 0
 commands.length = 0

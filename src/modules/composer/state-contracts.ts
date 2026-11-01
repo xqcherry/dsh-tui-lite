@@ -10,6 +10,8 @@ import type { TranscriptImage } from '../../shared/protocol/composer.js'
 import type { ReadableStore } from '../../shared/state/module-store.js'
 
 export interface ComposerSnapshot {
+  /** Wakes completion consumers when an adapter's lazy catalog changes. */
+  readonly commandCompletionRevision: number
   readonly selection: ChannelSelection | undefined
   readonly cancelPending: boolean
   readonly pending: readonly PendingMessage[]

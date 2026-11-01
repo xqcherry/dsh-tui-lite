@@ -1,6 +1,9 @@
 import type { PromptController, PromptInputProps } from './types.js'
 export type { PromptController, PromptInputProps } from './types.js'
 
+import { commandSuggestionRows, createCommandSuggestions } from '../model/command-suggestions.js'
+import { HOME_BUTTON_COLS } from '../model/geometry.js'
+import type { InputEvent, Key } from '../../../ink/events/input-event.js'
 import { createComposerKeyboard } from './controllers/keyboard.js'
 import { useComposerView } from './ComposerView.js'
 import { createDraftUndo } from './controllers/draft-undo.js'
@@ -778,9 +781,59 @@ export function PromptInput({
    */
 
 
+  const commandSuggestions = React.useMemo(
+    () => createCommandSuggestions(input => composer.commands.commandCompletions(input)),
+    [composer],
+  )
+  const [, refreshCommandSuggestions] = React.useReducer((version: number) => version + 1, 0)
+  const commandMaxRows = () => commandSuggestionRows(valueRef.current, columns, terminalRows, onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS)
+  const readCommandSuggestions = () => commandSuggestions.read(
+    valueRef.current,
+    cursorRef.current,
+    !suspended && !helpOpen && !selectionActive && selectionRef.current === null
+      && historyIndex.current < 0 && dockSelectedRef.current === null
+      && foldBlockRef.current === null && !editorBusyRef.current && commandMaxRows() > 0,
+  )
+  const acceptCommandSuggestion = (index: number): boolean => {
+    const snapshot = readCommandSuggestions()
+    const item = snapshot.items[index]
+    if (!item) return false
+    updateFoldBlock(null)
+    setInput(item.replacement, item.replacement.length, 'step')
+    // A Tab/click accepts one step; a later edit or explicit Tab may reopen.
+    commandSuggestions.read(valueRef.current, cursorRef.current, true)
+    commandSuggestions.dismiss(valueRef.current)
+    refreshCommandSuggestions()
+    return true
+  }
+  const moveCommandSuggestion = (delta: number, wrap = true): void => {
+    commandSuggestions.move(readCommandSuggestions(), delta, wrap)
+    refreshCommandSuggestions()
+  }
+  const handleCommandSuggestionKey = (key: Key, event: InputEvent): boolean => {
+    if (event.isPasted || key.ctrl || key.meta || key.super) return false
+    if (key.tab && !key.shift) commandSuggestions.reopen()
+    const snapshot = readCommandSuggestions()
+    if (snapshot.items.length === 0) return false
+    if (key.tab) {
+      if (!key.shift) acceptCommandSuggestion(snapshot.selectedIndex)
+    } else if ((key.upArrow || key.downArrow) && !key.shift) {
+      moveCommandSuggestion(key.upArrow ? -1 : 1)
+    } else if (key.return && !key.shift) {
+      if (acceptCommandSuggestion(snapshot.selectedIndex) && snapshot.root) handleEnter()
+    } else return false
+    event.stopImmediatePropagation()
+    return true
+  }
+
   /** Local Esc layers, shared by the prompt listener and Chat's delegation.
    * Refs preserve this order even when expansion and Esc share a stdin batch. */
   const consumeEditingEscape = (): boolean => {
+    if (readCommandSuggestions().items.length > 0) {
+      commandSuggestions.dismiss(valueRef.current)
+      refreshCommandSuggestions()
+      return true
+    }
     // The docked-queue selector folds first: Esc leaves the selector and the
     // dock itself stays put (⏎/↑ keep working afterwards).
     if (dockSelectedRef.current !== null) {
@@ -843,7 +896,7 @@ export function PromptInput({
   const head = foldBlock ? value.slice(0, foldBlock.start) : ''
   const tail = foldBlock ? value.slice(foldBlock.end) : ''
 
-  useInput(createComposerKeyboard(() => ({ selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
+  useInput(createComposerKeyboard(() => ({ handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
 
   // === Render: hard-wrap every logical line at the input width, then show
   // the window of visual lines with the caret row always visible.
@@ -854,7 +907,7 @@ export function PromptInput({
   // （既有调用方的可用列数逐列不变）。用实测常量而不是 stringWidth：该字符
   // 是 U+1F3E0+VS15，stringWidth 按码点算 2（含 VS15 仍是 2），终端只给 1，
   // 见 HOME_BUTTON_COLS 的说明。
-  return useComposerView({ onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
+  return useComposerView({ commandMaxRows: commandMaxRows(), commandSnapshot: readCommandSuggestions(), acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
 }
 
 /**
