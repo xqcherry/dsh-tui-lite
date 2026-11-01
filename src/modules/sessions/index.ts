@@ -53,3 +53,7 @@ export type * from './contracts.js'
 export { createSessionsModule } from './model/module.js'
 
 export { createSessionHandoff } from './model/session-switch.js'
+
+export { createPersistedSessionResume, createModelFork } from './model/session-transitions.js'
+
+export { createNewSessionPlanner } from './model/new-session-planner.js'

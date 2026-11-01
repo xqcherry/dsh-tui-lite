@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 export const checks = [
+  'verify-new-session-planner.ts',
+  'verify-session-transitions.ts',
   'verify-settings-actions.ts',
   'verify-composer-delivery.ts',
   'verify-boundaries.mjs',
