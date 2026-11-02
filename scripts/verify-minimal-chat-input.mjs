@@ -294,11 +294,12 @@ for (const columns of [100, 40, 20]) {
       const lines = status.screen().split('\n')
       const prompt = lines.findIndex(line => line.includes('footer anchor'))
       const footer = lines[prompt + 2] ?? ''
-      return prompt >= 0 && footer.trimEnd().endsWith('plan') && stringWidth(footer) === columns - 1
+      const suffix = columns === 100 ? 'plan (shift+tab to cycle)' : 'plan'
+      return prompt >= 0 && footer.trimEnd().endsWith(suffix) && stringWidth(footer) === columns - 1
     }), `status must appear immediately below the input border at ${columns} columns`)
     assert(!/Ready|Working|ctx /.test(status.screen()), 'old combined status row must be removed')
     if (columns === 100) {
-      assert(status.screen().split('\n').some(line => /deepseek-flash · \/项目\/long-workspace-directory +plan$/.test(line)))
+      assert(status.screen().split('\n').some(line => /deepseek-flash · \/项目\/long-workspace-directory +plan \(shift\+tab to cycle\)$/.test(line)))
     }
     if (columns >= 40) {
       status.channel.sessionTitle = '首次对话'
@@ -307,12 +308,14 @@ for (const columns of [100, 40, 20]) {
         const lines = status.screen().split('\n')
         const prompt = lines.findIndex(line => line.includes('footer anchor'))
         const footer = lines[prompt + 2] ?? ''
-        return /deepseek-flash · .+ · 首次(?:对话|…) +plan$/.test(footer)
+        const suffix = columns === 100 ? 'plan (shift+tab to cycle)' : 'plan'
+        return /deepseek-flash · .+ · 首次(?:对话|…) +/.test(footer) && footer.trimEnd().endsWith(suffix)
           && stringWidth(footer) === columns - 1
       }), 'real session title must follow the directory once published')
       status.channel.sessionTitle = '已重命名'
       status.channel.emit()
-      assert(await settled(() => / · 已重(?:命名|…) +plan/.test(status.screen())), 'renames must update the footer')
+      const suffix = columns === 100 ? '(shift+tab to cycle)' : 'plan'
+      assert(await settled(() => status.screen().split('\n').some(line => line.includes(' · 已重') && line.trimEnd().endsWith(suffix))), 'renames must update the footer')
       status.channel.sessionTitle = ''
       status.channel.emit()
       assert(await settled(() => !status.screen().includes('已重命名') && !status.screen().includes('已重…')), 'a new session must clear the previous title')
