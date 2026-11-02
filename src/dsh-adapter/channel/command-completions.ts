@@ -30,7 +30,6 @@ export function createCommandCompletions(deps: {
         if (snapshot.options.length > 0) {
           return snapshot.options.filter(option => isCommandCompletionToken(option.value)).map(option => ({
             name: option.value, description: option.description ?? option.name,
-            ...(option.value === 'read-only' ? { descriptionKey: 'permission-preset-readonly-desc' } : option.value === 'workspace-write' ? { descriptionKey: 'permission-preset-workspace-write-desc' } : option.value === 'danger-full-access' ? { descriptionKey: 'permission-preset-full-access-desc' } : {}),
             ...(snapshot.current?.kind === 'preset' && snapshot.current.value === option.value ? { tag: 'current' } : {}),
           }))
         }
