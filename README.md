@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green?style=flat)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](tsconfig.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%7C%20%3E%3D24-339933?style=flat&logo=node.js&logoColor=white)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-F69220?style=flat&logo=pnpm&logoColor=white)](pnpm-lock.yaml)
@@ -148,7 +148,7 @@ Read the [contribution guide](CONTRIBUTING.md) (currently in Chinese) before sub
 
 ## License
 
-Licensed under [Apache License 2.0](LICENSE). The upstream dsh-TUI MIT copyright and license notice, along with other third-party notices, are preserved in [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
+Licensed under [MIT License](LICENSE). The upstream dsh-TUI MIT copyright and license notice, along with other third-party notices, are preserved in [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
 
 ## Acknowledgments
 

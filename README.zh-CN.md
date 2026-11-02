@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green?style=flat)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](tsconfig.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%7C%20%3E%3D24-339933?style=flat&logo=node.js&logoColor=white)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-F69220?style=flat&logo=pnpm&logoColor=white)](pnpm-lock.yaml)
@@ -148,7 +148,7 @@ pnpm verify
 
 ## 许可证
 
-本项目采用 [Apache License 2.0](LICENSE)。上游 dsh-TUI 的 MIT 版权与许可声明，以及其他第三方许可，保留在 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) 中。
+本项目采用 [MIT License](LICENSE)。上游 dsh-TUI 的 MIT 版权与许可声明，以及其他第三方许可，保留在 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) 中。
 
 ## 致谢
 
