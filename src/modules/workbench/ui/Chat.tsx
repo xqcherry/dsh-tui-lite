@@ -233,7 +233,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
         return false
       }}
     />
-    <ComposerStatusBar model={setting.model} cwd={displayCwd} sessionTitle={session.sessionTitle} mode={session.mode} />
+    <ComposerStatusBar model={setting.model} cwd={displayCwd} sessionTitle={session.sessionTitle} sessionColor={session.sessionColor} mode={session.mode} />
     {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} /> : null}
   </Box>
 }
