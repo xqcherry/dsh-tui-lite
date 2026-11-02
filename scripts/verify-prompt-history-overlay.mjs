@@ -90,8 +90,7 @@ await render(
     React.createElement(PromptInput, {
     ...composerFixture(channel),
     controllerRef,
-    helpOpen: false,
-    onToggleHelp() {},
+    onOpenHelp() {},
     onRunCommand(name) { commands.push(name); return true },
     selectionActive: false,
   })),

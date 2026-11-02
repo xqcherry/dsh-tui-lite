@@ -29,14 +29,12 @@ import { type FileCandidate } from '../../../shared/platform/file-suggestions.js
 
 
 import { stringWidth } from '../../../shared/platform/stringWidth.js'
-import { Box, Text, type ScrollBoxHandle } from '../../../ui/primitives.js'
+import { Box, Text } from '../../../ui/primitives.js'
 import { sessionColorHex } from '../../../ui/text/sessionColors.js'
 
 import { EffortChargeGlyph } from './EffortChargeGlyph.js'
 import { EffortInputBorder, type InputBorderLabel } from './EffortInputBorder.js'
 import { FileSuggestions } from './FileSuggestions.js'
-import { HelpMenu } from '../../../ui/HelpMenu.js'
-import { SelectionPanel } from '../../../ui/SelectionPanel.js'
 import { OverlayAbove, useOverlayListRows } from '../../../ui/OverlayAbove.js'
 import { cardContentWidth, SuggestionCard } from '../../../ui/SuggestionCard.js'
 import { listWindow } from '../../../ui/listWindow.js'
@@ -80,13 +78,9 @@ interface Context {
   readonly dockSelected: number | null
   readonly dockCount: number
   readonly dockedPending: PendingMessage[]
-  readonly helpOpen: boolean
   readonly fileOverlayOpen: boolean
   readonly terminalRows: number
-  readonly helpViewportHeight: number
-  readonly helpScrollRef: React.RefObject<ScrollBoxHandle | null>
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
-  readonly onToggleHelp: () => void
   readonly editDocked: (index: number) => void
   readonly sendDocked: () => void
   readonly fileMatches: readonly FileCandidate[]
@@ -100,7 +94,7 @@ interface Context {
 }
 
 export function useComposerView(view: Context): React.ReactNode {
-const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
+const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
 const suggestionAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : 'promptBorder'
@@ -463,7 +457,7 @@ const { start: dockStart, end: dockEnd } = listWindow(
   )
 const floatersOpen =
     !suspended &&
-    (helpOpen || composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || peekOpen)
+    (composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || peekOpen)
 const sessionTitle = context.sessions.getSnapshot().sessionTitle ?? ''
 const topRightLabel: InputBorderLabel | undefined =
     context.settings.getSnapshot().promptSessionLabel === true && sessionTitle !== ''
@@ -484,31 +478,12 @@ React.useLayoutEffect(() => {
 if (suspended) return null
 return (
     <Box flexDirection="column" marginTop={1}>
-      {/* 瞬态面板浮层（帮助/队列/补全）：零布局高度、向上覆盖转录尾部，
+      {/* 瞬态面板浮层（队列/补全）：零布局高度、向上覆盖转录尾部，
           帧高不随面板开关涨落——否则帧顶行会被滚进 scrollback 并在关闭
           重绘时二次写入（/model 切换多一份启动画的根因，见 OverlayAbove）。 */}
       {floatersOpen && (
       <OverlayAbove maxHeight={Math.max(terminalRows - 6, 1)}>
-        {helpOpen && (
-          <Box marginBottom={1}>
-            <SelectionPanel title="/help" footer={<Text dimColor wrap="wrap">↑/↓ 滚动 · Esc 关闭</Text>}>
-            <HelpMenu
-              commands={context.workbench.getSnapshot().commandList}
-              viewportHeight={Math.max(1, helpViewportHeight - 5)}
-              viewportWidth={columns}
-              scrollRef={helpScrollRef}
-              onCommandPick={(name) => {
-                // 点击命令行 = 填入 /name 并关闭帮助（Tab 补全的鼠标等价）
-                updateFoldBlock(null)
-                // `/${name} ` — the whole fill is one undo step.
-                setInput(`/${name} `, name.length + 2, 'step')
-                onToggleHelp()
-              }}
-            />
-            </SelectionPanel>
-          </Box>
-        )}
-        {!helpOpen && composer.store.getSnapshot().pending.length > 0 && (
+        {composer.store.getSnapshot().pending.length > 0 && (
           <Box flexDirection="column" paddingLeft={2} paddingBottom={1}>
             {composer.store.getSnapshot().pending.some(item => item.placement === 'steer' && item.docked !== true) && (
               <Box flexDirection="column">

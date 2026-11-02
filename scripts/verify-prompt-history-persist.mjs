@@ -106,8 +106,7 @@ async function mountComposer() {
   const instance = await render(
     React.createElement(PromptInput, {
       ...composerFixture(channel),
-      helpOpen: false,
-      onToggleHelp() {},
+      onOpenHelp() {},
       onRunCommand: () => false,
       selectionActive: false,
     }),

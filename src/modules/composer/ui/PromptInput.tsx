@@ -38,7 +38,7 @@ import { sanitizeEditableText, sanitizePastedText } from '../../../shared/platfo
 import { mentionAtCaret } from '../../../shared/platform/mentions.js'
 
 
-import { useInput, useTerminalSize, useTheme, type ScrollBoxHandle } from '../../../ui/primitives.js'
+import { useInput, useTerminalSize, useTheme } from '../../../ui/primitives.js'
 
 import { cursorGlyphColor, getTheme } from '../../../ui/theme.js'
 
@@ -135,8 +135,8 @@ export { sanitizeEditableText, sanitizePastedText } from '../../../shared/platfo
  * visible window scrolls to keep the caret row on screen past
  * MAX_VISIBLE_LINES. Enter submits, backspace/delete edit, ←/→ move the
  * cursor, Tab completes the selected command, Ctrl+G opens the draft in the
- * external editor ($VISUAL/$EDITOR), Escape clears (or closes the help
- * menu), `?` toggles the help menu. Windows ConPTY pipelines deliver
+ * external editor ($VISUAL/$EDITOR), Escape clears, and `?` opens the shared
+ * command help menu. Windows ConPTY pipelines deliver
  * whole lines with the Enter key lost: a trailing CR/LF in the input marks
  * a complete line to submit.
  *
@@ -155,8 +155,7 @@ export function PromptInput({
   toastSuppressed,
   suspended = false,
   draftCache,
-  helpOpen,
-  onToggleHelp,
+  onOpenHelp,
   onRunCommand,
   beforeSubmit,
   selectionActive,
@@ -517,22 +516,6 @@ export function PromptInput({
     lastClickColRef.current = -1
     lastClickRowRef.current = -1
   }, [columns, terminalRows])
-  const helpScrollRef = React.useRef<ScrollBoxHandle | null>(null)
-  // Help viewport budget: the overlay anchors at the composer's top edge
-  // (OverlayAbove bottom:'100%') and grows UP, so its budget is the space
-  // ABOVE that anchor — smallest on an empty session, where the whale
-  // splash (~15 rows) sits between the screen top and the composer
-  // (terminalRows minus chrome only applies once the transcript fills the
-  // viewport). Take the conservative intersection: 15 rows of viewport (16
-  // with the hint + margin) fits the empty-session anchor on the default
-  // layout at any terminal size, and the renderer's bottom-anchored
-  // clipping for absolute overlays (no negative-y clamp) then never has
-  // to eat the overlay's FIRST rows — the shortcut-column headers. The
-  // command registry scrolls inside the viewport, so a taller terminal
-  // loses nothing functional. (PR #446; restored after the picker
-  // snapshot's cherry-pick resurrected the old formula.)
-  const helpViewportHeight = Math.max(3, Math.min(terminalRows - 7, 15))
-
   // `@` file completion (issue #15): the trigger is the mention token at the
   // CARET, so `@` works mid-message (`看看 @src/a.ts 这个`), not only when it
   // is the input's first character. The cwd listing loads when the trigger
@@ -569,7 +552,6 @@ export function PromptInput({
   }, [value])
   const fileOverlayOpen =
     fileMatches.length > 0 &&
-    !helpOpen &&
     !selectionActive &&
     fileEscRef.current !== mention?.start
 
@@ -794,7 +776,7 @@ export function PromptInput({
   const readCommandSuggestions = () => commandSuggestions.read(
     valueRef.current,
     cursorRef.current,
-    !suspended && !helpOpen && !selectionActive && selectionRef.current === null
+    !suspended && !selectionActive && selectionRef.current === null
       && historyIndex.current < 0 && dockSelectedRef.current === null
       && foldBlockRef.current === null && !editorBusyRef.current && commandMaxRows() > 0,
   )
@@ -844,7 +826,7 @@ export function PromptInput({
       setDockSelected(null)
       return true
     }
-    if (selectionRef.current && !helpOpen && !fileOverlayOpen) {
+    if (selectionRef.current && !fileOverlayOpen) {
       clearSelection()
       return true
     }
@@ -900,7 +882,7 @@ export function PromptInput({
   const head = foldBlock ? value.slice(0, foldBlock.start) : ''
   const tail = foldBlock ? value.slice(foldBlock.end) : ''
 
-  useInput(createComposerKeyboard(() => ({ handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
+  useInput(createComposerKeyboard(() => ({ handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, onOpenHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention })), { isActive: !suspended })
 
   // === Render: hard-wrap every logical line at the input width, then show
   // the window of visual lines with the caret row always visible.
@@ -911,7 +893,7 @@ export function PromptInput({
   // （既有调用方的可用列数逐列不变）。用实测常量而不是 stringWidth：该字符
   // 是 U+1F3E0+VS15，stringWidth 按码点算 2（含 VS15 仍是 2），终端只给 1，
   // 见 HOME_BUTTON_COLS 的说明。
-  return useComposerView({ commandMaxRows: commandMaxRows(), commandSnapshot: readCommandSuggestions(), acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
+  return useComposerView({ commandMaxRows: commandMaxRows(), commandSnapshot: readCommandSuggestions(), acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
 }
 
 /**

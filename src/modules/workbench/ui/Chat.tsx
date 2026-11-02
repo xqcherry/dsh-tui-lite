@@ -17,6 +17,7 @@ import { abbreviateHomePath } from '../../../shared/platform/paths.js'
 import { ProductHeader } from './ProductHeader.js'
 import { ComposerStatusBar } from './ComposerStatusBar.js'
 import { CommandMenu } from './CommandMenu.js'
+import { createHelpMenu } from '../model/help-menu.js'
 
 export interface ChatProps {
   ports: WorkbenchModules
@@ -40,7 +41,6 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   const { stdout } = useApp()
   const [menu, setMenuState] = React.useState<ChatMenu | null>(null)
   const [focus, setFocusState] = React.useState(0)
-  const [help, setHelp] = React.useState(false)
   const [expanded, setExpanded] = React.useState(false)
   const [thinking, setThinking] = React.useState(true)
   const [expandedRows, setExpandedRows] = React.useState<ReadonlySet<number>>(new Set())
@@ -101,6 +101,11 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     setFocus(0)
     setMenu({ title, items })
   }
+  const openHelp = React.useMemo(() => createHelpMenu({
+    readCommands: () => workbench.store.getSnapshot().commandList,
+    openMenu,
+    fillCommand: name => setFillText(`/${name} `),
+  }), [workbench])
   const configuredRef = React.useRef(configured)
   configuredRef.current = configured
   const { runCommand } = React.useMemo(() => createChatCommands({
@@ -108,11 +113,11 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     ask: (request, options) => questionStore.ask(request, options),
     openMenu,
     onExit,
-    toggleHelp: () => setHelp(value => !value),
+    openHelp,
     toggleThinking: () => setThinking(value => !value),
     configured: () => configuredRef.current,
     refreshConfiguration,
-  }), [ports, questionStore, onExit, refreshConfiguration])
+  }), [ports, questionStore, onExit, refreshConfiguration, openHelp])
   const history = historyQuery === null ? [] : loadHistory(session.cwd).filter(entry => entry.text.toLowerCase().includes(historyQuery.toLowerCase()))
   const panelOpen = question !== null || approval !== null || menu !== null || historyQuery !== null
 
@@ -127,8 +132,10 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       else if (key.downArrow) setFocus(index => Math.min(menu.items.length - 1, index + 1))
       else if (isPlainReturnInput(input, key)) {
         const item = menu.items[focus]
-        setMenu(null)
-        if (item) perform(item.run)
+        if (item?.run) {
+          setMenu(null)
+          perform(item.run)
+        }
       }
       return
     }
@@ -220,8 +227,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
         cycleMode: sessions.commands.cycleMode,
       }}
       suspended={panelOpen}
-      helpOpen={help}
-      onToggleHelp={() => setHelp(value => !value)}
+      onOpenHelp={openHelp}
       onRunCommand={(name, raw, images) => runCommand(name, raw, images).catch(error => { report(error); return false })}
       selectionActive={false}
       fillText={fillText}

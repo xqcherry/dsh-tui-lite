@@ -87,8 +87,7 @@ const { stdout, stderr, stdin } = makeStreams(term)
 const instance = await render(
   React.createElement(PromptInput, {
     ...composerFixture(channel),
-    helpOpen: false,
-    onToggleHelp() {},
+    onOpenHelp() {},
     onRunCommand(name) { commands.push(name); return commandHandled },
     selectionActive: false,
   }),

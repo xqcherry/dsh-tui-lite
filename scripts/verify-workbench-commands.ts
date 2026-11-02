@@ -52,7 +52,7 @@ const commands = createChatCommands({
   ask: async () => { asked++; return { answers: [] } },
   openMenu: (_title, items) => { menuItems = items },
   onExit: () => { calls.push('exit') },
-  toggleHelp: () => { calls.push('help') },
+  openHelp: () => { calls.push('help') },
   toggleThinking: () => { calls.push('thinking') },
   configured: () => ready,
   refreshConfiguration: async () => { calls.push('refresh') },

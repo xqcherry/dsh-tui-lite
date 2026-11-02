@@ -118,8 +118,7 @@ const channel = {
 const controllerRef = { current: null }
 const baseProps = {
   ...composerFixture(channel),
-  helpOpen: false,
-  onToggleHelp() {},
+  onOpenHelp() {},
   onRunCommand: () => false,
   selectionActive: false,
   controllerRef,

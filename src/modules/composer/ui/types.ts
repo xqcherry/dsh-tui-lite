@@ -74,9 +74,8 @@ export interface PromptInputProps {
    * empty first value.
    */
   draftCache?: PromptDraftCache
-  /** Whether the `?` help menu is open (state lives in the Chat screen). */
-  helpOpen: boolean
-  onToggleHelp(): void
+  /** Open the same Chat command menu as `/help`. */
+  onOpenHelp(): void
   /**
    * Execute a slash command (built-in or plugin-registered) with its raw
    * argument text; returns false when the input should be sent to the model.
@@ -91,7 +90,7 @@ export interface PromptInputProps {
   /** Message-selection mode (Shift+↑): the input ignores keys while active. */
   selectionActive: boolean
   /**
-   * External fill from the ctrl+r history dialog: when this prop changes to
+   * External fill from history or help: when this prop changes to
    * a non-null string, the input replaces its value and moves the caret to
    * the end. The caller clears it via onFillConsumed once consumed.
    */
