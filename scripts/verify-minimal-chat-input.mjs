@@ -17,11 +17,12 @@ import { LOCAL_COMMANDS } from '../src/shared/commands.js'
 import { appendHistory } from '../src/modules/composer/model/history.js'
 import { render } from '../src/ui/primitives.js'
 import { settled, sleep, viewportLines } from './lib/term-test.mjs'
+import { stringWidth } from '../src/shared/platform/stringWidth.js'
 
 const { Terminal: XTerm } = xtermHeadless
 
 async function fixture(options = {}) {
-  const term = new XTerm({ cols: 100, rows: 32, scrollback: 200, allowProposedApi: true })
+  const term = new XTerm({ cols: options.columns ?? 100, rows: 32, scrollback: 200, allowProposedApi: true })
   const stdin = new PassThrough()
   stdin.isTTY = true
   stdin.setRawMode = () => stdin
@@ -29,7 +30,7 @@ async function fixture(options = {}) {
   stdin.ref = () => stdin
   stdin.unref = () => stdin
   const stdout = new Writable({ write(chunk, _encoding, callback) { term.write(String(chunk), callback) } })
-  stdout.columns = 100
+  stdout.columns = options.columns ?? 100
   stdout.rows = 32
   stdout.isTTY = true
   const stderr = new Writable({ write(_chunk, _encoding, callback) { callback() } })
@@ -263,3 +264,41 @@ try {
   await answer
   console.log('PASS: batched questionnaire navigation preserves the active question batch')
 } finally { questions.questionStore.rejectAll(); await questions.close() }
+
+// Exercise the complete Chat layout in a headless TTY, including live updates.
+for (const columns of [100, 40, 20]) {
+  const status = await fixture({ columns, initialPrompt: 'footer anchor' })
+  try {
+    status.channel.model = 'deepseek-flash'
+    status.channel.cwd = '/项目/long-workspace-directory'
+    status.channel.mode = { id: 'plan', plan: true }
+    status.channel.emit()
+    assert(await settled(() => {
+      const lines = status.screen().split('\n')
+      const prompt = lines.findIndex(line => line.includes('footer anchor'))
+      const footer = lines[prompt + 2] ?? ''
+      return prompt >= 0 && footer.trimEnd().endsWith('plan') && stringWidth(footer) === columns - 1
+    }), `status must appear immediately below the input border at ${columns} columns`)
+    assert(!/Ready|Working|ctx /.test(status.screen()), 'old combined status row must be removed')
+    if (columns === 100) {
+      assert(status.screen().split('\n').some(line => /deepseek-flash · \/项目\/long-workspace-directory +plan$/.test(line)))
+    }
+    status.channel.model = 'a-very-long-model-name-that-exceeds-the-terminal-width'
+    status.channel.mode = { id: 'custom-mode', label: '自定义模式', plan: false }
+    status.channel.emit()
+    assert(await settled(() => {
+      const lines = status.screen().split('\n')
+      const prompt = lines.findIndex(line => line.includes('footer anchor'))
+      const footer = lines[prompt + 2] ?? ''
+      return prompt >= 0 && footer.endsWith('自定义模式') && stringWidth(footer) === columns - 1
+        && footer.startsWith(columns === 100 ? ' a-very-long-model-name' : ' a-')
+        && (columns === 100 || (footer.includes('…') && !footer.includes(' · ')))
+        && lines.slice(prompt + 3).every(line => line.trim() === '')
+    }), 'long model and custom mode must share one aligned row without wrapping')
+    const prefix = 'x'.repeat(columns - 6)
+    status.channel.mode = { id: 'custom-mode', label: `${prefix}👩‍💻developer` }
+    status.channel.emit()
+    assert(await settled(() => status.screen().includes(`${prefix}👩‍💻d…`)), 'mode truncation must preserve complete emoji graphemes')
+    console.log(`PASS: status footer placement and live updates at ${columns} TTY columns`)
+  } finally { await status.close() }
+}

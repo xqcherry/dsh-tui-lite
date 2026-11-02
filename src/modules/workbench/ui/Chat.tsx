@@ -15,6 +15,7 @@ import { Box, Text, useApp, useInput, useTerminalSize } from '../../../ui/primit
 import instances from '../../../ink/instances.js'
 import { abbreviateHomePath } from '../../../shared/platform/paths.js'
 import { ProductHeader } from './ProductHeader.js'
+import { ComposerStatusBar } from './ComposerStatusBar.js'
 
 export interface ChatProps {
   ports: WorkbenchModules
@@ -186,13 +187,6 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       onLoadOlder={() => perform(() => transcript.commands.loadOlder())}
       thinkingVisible={thinking}
     />
-    <Text dimColor wrap="truncate-end">{[
-      session.working ? 'Working' : 'Ready',
-      setting.model,
-      session.mode?.id,
-      conversation.contextOccupancy ? `ctx ${conversation.contextOccupancy.usedTokens}/${setting.contextWindow ?? '?'}` : undefined,
-      displayCwd,
-    ].filter(Boolean).join(' · ')}</Text>
     {!configured ? <Text color="warning">Configure a model with /provider, /auth or /model to get started.</Text> : null}
     {menu && !question && !approval ? <Box flexDirection="column">
       <Text bold>{menu.title}</Text>
@@ -224,6 +218,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
         return false
       }}
     />
+    <ComposerStatusBar model={setting.model} cwd={displayCwd} mode={session.mode} />
     {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} />
       : question ? <AskUserQuestionPanel
         key={question.key}

@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix='dsh-tui-boot-') as temporary:
             text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', output.decode(errors='replace'))
             if 'startup failed' in text or 'did not activate' in text:
                 raise AssertionError(text[-3000:])
-            if 'Ready' in text and 'Configureamodel' in re.sub(r'\s', '', text) and not ready:
+            if 'default' in text and '╰' in text and 'Configureamodel' in re.sub(r'\s', '', text) and not ready:
                 ready = True
                 os.write(master, b'/help\r')
             if ready and 'PgUp/PgDn' in text and not sent_exit:
