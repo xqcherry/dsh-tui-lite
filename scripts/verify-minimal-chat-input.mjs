@@ -330,7 +330,8 @@ for (const columns of [100, 40, 20]) {
       return prompt >= 0 && footer.endsWith('自定义模式') && stringWidth(footer) === columns - 1
         && footer.startsWith(columns === 100 ? ' a-very-long-model-name' : ' a-')
         && (columns === 100 || (footer.includes('…') && !footer.includes(' · ')))
-        && lines.slice(prompt + 3).every(line => line.trim() === '')
+        && lines[prompt + 3] === ' ? for shortcuts'
+        && lines.slice(prompt + 4).every(line => line.trim() === '')
     }), 'long model and custom mode must share one aligned row without wrapping')
     const prefix = 'x'.repeat(columns - 6)
     status.channel.mode = { id: 'custom-mode', label: `${prefix}👩‍💻developer` }

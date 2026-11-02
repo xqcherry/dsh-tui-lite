@@ -240,6 +240,9 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       }}
     />
     <ComposerStatusBar model={setting.model} effort={setting.reasoningEffort} cwd={displayCwd} sessionTitle={session.sessionTitle} sessionColor={session.sessionColor} mode={session.mode} />
+    <Box paddingLeft={1} height={1} flexShrink={0}>
+      <Text dimColor wrap="truncate-end">? for shortcuts</Text>
+    </Box>
     {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} /> : null}
   </Box>
 }
