@@ -28,6 +28,10 @@ const runtime = createRuntimeModulesFixture({ commands: {
   sessions: {
     newSession: async () => { calls.push('new'); return true },
     resumeTo: async id => { calls.push(['resume', id]); return { ok: true } },
+    listSessions: async () => [
+      { id: 'named-hash', kind: { kind: 'root' }, title: { text: 'Readable session name', source: 'renamed' }, cwd: '/fixture', createdAt: 0, updatedAt: 0, bytes: undefined, hasPrompt: true, agentPreset: undefined, model: undefined, label: undefined, branch: undefined, childCount: 0 },
+      { id: 'empty-title-hash', kind: { kind: 'root' }, title: { text: '', source: 'fallback' }, cwd: '/fixture', createdAt: 0, updatedAt: 0, bytes: undefined, hasPrompt: true, agentPreset: undefined, model: undefined, label: undefined, branch: undefined, childCount: 0 },
+    ],
   },
   transcript: {
     compact: async () => { calls.push('compact') },
@@ -54,6 +58,11 @@ const commands = createChatCommands({
   refreshConfiguration: async () => { calls.push('refresh') },
 })
 try {
+  await commands.runCommand('resume', '', [])
+  assert.deepEqual(menuItems.map(item => item.label), ['Readable session name', 'empty-title-hash'])
+  await commands.runCommand('session', 'list', [])
+  assert.deepEqual(menuItems.map(item => item.label), ['Readable session name', 'empty-title-hash'])
+
   assert.equal(await commands.runCommand('model', ' provider/model/variant ', []), true)
   assert.deepEqual(calls.splice(0), [['model', 'provider', 'model/variant'], 'refresh', 'efforts'])
   efforts = [{ id: 'low', name: 'Low' }, { id: 'high', name: 'High' }]
