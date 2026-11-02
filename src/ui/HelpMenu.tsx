@@ -85,19 +85,21 @@ export function HelpMenu({
   // height so a growing command registry cannot escape the terminal.
   if (viewportHeight === undefined) return content
 
-  const compact = viewportWidth !== undefined && viewportWidth < 72
+  // Account for the surrounding SelectionPanel and this menu's own padding:
+  // below 90 columns the third column cannot keep a useful command width.
+  const compact = viewportWidth !== undefined && viewportWidth < 90
 
   return (
     <Box height={viewportHeight} flexDirection="column">
       {compact ? (
         <ScrollBox ref={scrollRef} flexDirection="column" flexGrow={1} flexShrink={1} paddingX={2}>
-          {/* Below 72 columns the two fixed shortcut columns would consume
-              almost the whole screen. Stack every section into one reachable
-              viewport instead of squeezing the command list to zero width. */}
-          {primaryShortcuts}
-          {secondaryShortcuts}
+          {/* Below 90 columns the two fixed shortcut columns would consume
+              almost the whole screen. Put commands first so the primary help
+              purpose is visible immediately, then keep shortcuts reachable. */}
           <Text dimColor>{t('help-commands-title')}</Text>
           {commandRows}
+          {primaryShortcuts}
+          {secondaryShortcuts}
         </ScrollBox>
       ) : (
         <Box paddingX={2} flexDirection="row" gap={4} flexGrow={1}>
@@ -111,9 +113,6 @@ export function HelpMenu({
           </ScrollBox>
         </Box>
       )}
-      <Box paddingX={2} flexShrink={0}>
-        <Text dimColor wrap="truncate-end">{t('help-scroll-hint')}</Text>
-      </Box>
     </Box>
   )
 }

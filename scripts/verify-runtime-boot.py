@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix='dsh-tui-boot-') as temporary:
             if 'default' in text and '╰' in text and 'Configureamodel' in re.sub(r'\s', '', text) and not ready:
                 ready = True
                 os.write(master, b'/help\r')
-            if ready and 'PgUp/PgDn' in text and not sent_exit:
+            if ready and 'Esc关闭' in text and not sent_exit:
                 os.write(master, b'\x1b')
                 time.sleep(0.1)
                 os.write(master, b'/exit\r')
@@ -52,6 +52,7 @@ with tempfile.TemporaryDirectory(prefix='dsh-tui-boot-') as temporary:
                 break
         assert ready, 'The bundled TUI never rendered its ready/configuration state: ' + text[-3000:]
         assert sent_exit, 'The help command never rendered: ' + text[-3000:]
+        assert 'PgUp/PgDn' not in text, 'Help rendered a duplicate inner footer: ' + text[-3000:]
         assert child.poll() == 0, 'The exit command did not stop cleanly: ' + text[-3000:]
         assert 'Resume: dsh-tui --resume' in text, 'Exit did not write its resume hint after terminal cleanup'
         restored = termios.tcgetattr(slave)
