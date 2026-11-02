@@ -5,6 +5,7 @@ import type { ExternalCommandOutcome } from '../../shared/protocol/session.js'
 import type { ReadableStore } from '../../shared/state/module-store.js'
 
 export interface WorkbenchSnapshot {
+  readonly backendVersion?: string
   readonly notifications: readonly NotificationItem[]
   readonly commandList: readonly LocalCommand[]
 }

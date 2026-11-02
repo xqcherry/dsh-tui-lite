@@ -42,6 +42,7 @@ import { createGitBranchRefresher } from './host.js'
 import { createCoreLocalActions } from './local-actions.js'
 import { createCoreReports } from './reports.js'
 import { createSessionSwitch, type NewSessionOpener } from './session-switch.js'
+import { readHarnessVersion } from '../../contract.js'
 
 /** Token buffer below the context window at which the context-low warning fires. */
 const CONTEXT_WARNING_BUFFER_TOKENS = 20_000
@@ -99,7 +100,7 @@ export function createCoreChannel(
   let services: ChannelServices = {}
   let started = false
 
-  const launch = { options, input: { agentId: initialSession.sessionId, sessionId: initialSession.sessionId, mode: DEFAULT_SESSION_MODES[0]!, cwdDescription: options.cwd } }
+  const launch = { options: { ...options, backendVersion: readHarnessVersion() }, input: { agentId: initialSession.sessionId, sessionId: initialSession.sessionId, mode: DEFAULT_SESSION_MODES[0]!, cwdDescription: options.cwd } }
   const state: RuntimeModules = {
     publication,
     sessions: createSessionsModule(launch, publication),

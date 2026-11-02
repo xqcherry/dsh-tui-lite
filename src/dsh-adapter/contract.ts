@@ -17,6 +17,11 @@ function versionOf(name: string): string | undefined {
   }
 }
 
+/** Presentation metadata uses the installed runtime, never the TUI version. */
+export function readHarnessVersion(): string | undefined {
+  return versionOf('@deepseek-ai/dsh')
+}
+
 /** Refuse an untested or incomplete host before acquiring any TUI resources. */
 export function assertUpstreamRuntime(versions?: Readonly<Record<string, string | undefined>>): void {
   for (const name of required) {

@@ -8,6 +8,7 @@ import type { ModuleLaunch } from '../../../shared/protocol/module-launch.js'
 export function createWorkbenchModule(launch: ModuleLaunch, publication: Publication) {
   const lifetime = createCommandLifetime<WorkbenchCommandHost>(publication)
   const owned = createModuleStore<MutableSnapshot<WorkbenchSnapshot>>({
+    backendVersion: launch.options.backendVersion,
     notifications: [],
     commandList: [],
   }, publication)

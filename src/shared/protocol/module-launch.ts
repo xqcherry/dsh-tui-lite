@@ -6,6 +6,7 @@ export interface ModuleLaunch {
     readonly model: string
     readonly provider: string
     readonly cwd: string
+    readonly backendVersion?: string
     readonly effort?: string
     readonly configuredPreset?: string
     readonly configuredProvider?: string
