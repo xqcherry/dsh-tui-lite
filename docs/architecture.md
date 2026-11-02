@@ -37,8 +37,8 @@ Arrows show startup and integration relationships, rather than a complete import
 
 ## 2. Startup and shutdown
 
-1. [`bin/dsh-tui.js`](../bin/dsh-tui.js) calls the compiled version of [`launcher.ts`](../src/dsh-adapter/launcher.ts). The launcher resolves the bundled dsh installation rather than searching the global PATH.
-2. The launcher prepares the dedicated `dsh-tui` profile, combines the official base bundle with this client, and links the profile to the current installation. It preserves user profile patches and backs up replaced profile data where needed.
+1. The `dsh-tui-lite` npm package exposes `dsl` and `dsh-tui-lite`, both backed by [`bin/dsh-tui.js`](../bin/dsh-tui.js), which calls the compiled version of [`launcher.ts`](../src/dsh-adapter/launcher.ts). The launcher resolves the bundled dsh installation rather than searching the global PATH and uses a separate `dsh-tui-lite` profile.
+2. The launcher prepares the dedicated `dsh-tui-lite` profile, combines the official base bundle with this client, and links the profile to the current installation. It preserves user profile patches and backs up replaced profile data where needed.
 3. [`plugin.ts`](../src/dsh-adapter/plugin.ts) checks the terminal and runtime, resolves the model and working directory, and creates or resumes an agent. An explicit CLI launch requires an interactive terminal; loading the plugin in a headless host does not mount the UI.
 4. [`channel.ts`](../src/dsh-adapter/channel.ts) assembles the runtime in three stages: create the core, configure dsh services, then start. Construction failures release resources acquired by the channel.
 5. The plugin renders `Chat` with restricted module bindings and separate approval/question stores. Host connections are installed before module commands are activated and event subscriptions begin.

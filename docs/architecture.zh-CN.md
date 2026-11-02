@@ -37,8 +37,8 @@ flowchart TB
 
 ## 2. 启动与退出
 
-1. [`bin/dsh-tui.js`](../bin/dsh-tui.js) 调用 [`launcher.ts`](../src/dsh-adapter/launcher.ts) 的编译产物。启动器解析随包安装的 dsh，不搜索全局 PATH。
-2. 启动器准备专用的 `dsh-tui` profile，组合官方基础 bundle 与当前客户端，并将 profile 链接到当前安装。用户 profile patch 会保留，需要替换的 profile 数据按实现保留备份。
+1. npm 包 `dsh-tui-lite` 提供 `dsl` 和 `dsh-tui-lite` 两个命令，均由 [`bin/dsh-tui.js`](../bin/dsh-tui.js) 调用 [`launcher.ts`](../src/dsh-adapter/launcher.ts) 的编译产物。启动器解析随包安装的 dsh，不搜索全局 PATH，并使用独立的 `dsh-tui-lite` profile。
+2. 启动器准备专用的 `dsh-tui-lite` profile，组合官方基础 bundle 与当前客户端，并将 profile 链接到当前安装。用户 profile patch 会保留，需要替换的 profile 数据按实现保留备份。
 3. [`plugin.ts`](../src/dsh-adapter/plugin.ts) 检查终端和运行版本，确定模型及工作目录，创建或恢复 agent。通过 CLI 显式启动需要交互式终端；在无终端宿主中加载插件不会挂载 UI。
 4. [`channel.ts`](../src/dsh-adapter/channel.ts) 分三步装配运行时：创建 core、配置 dsh 服务、启动。构造失败时释放 channel 已取得的资源。
 5. 插件将受限的模块绑定与独立审批、问答 store 交给 `Chat` 渲染。宿主能力连接完成后，才激活模块命令并开始订阅事件。

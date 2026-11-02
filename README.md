@@ -38,12 +38,32 @@ Currently, this version keeps the basic functionality. Further improvements will
 
 ## Quick start
 
-Requires Node.js matching `^22.19 || >=24` and pnpm. From the project directory, run:
+Requires Node.js matching `^22.19 || >=24` (Node.js 24 LTS is recommended). End users do not need pnpm or the source repository.
+
+**DeepSeek Harness (dsh) must be installed before running the client.** Harness is a runtime dependency of this package. Installing the client with npm or a local `.tgz` package automatically installs the required Harness version; no separate global dsh installation is needed beforehand.
+
+**Publication status: this project is not on npm yet.** The npm install and update commands below will work after `dsh-tui-lite` is published. The upstream package is a different project.
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm dev
+npm install -g dsh-tui-lite
 ```
+
+After installation, open a terminal in your working directory and run:
+
+```sh
+dsl
+```
+
+`dsh-tui-lite` is an equivalent full command.
+
+Update and uninstall (after publication):
+
+```sh
+npm install -g dsh-tui-lite@latest
+npm uninstall -g dsh-tui-lite
+```
+
+The launcher uses a separate `~/.dsh/profiles/dsh-tui-lite` profile (under `DSH_HOME` when set) and leaves the upstream `dsh-tui` profile untouched. Harness still manages sessions and credentials; uninstalling the npm package does not delete that data.
 
 On first launch:
 
@@ -72,6 +92,13 @@ Run `/help` to see available commands and keyboard shortcuts.
 
 ## Local development
 
+Developers need pnpm. Install dependencies and launch from the project directory:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
 `pnpm dev` builds the source and launches the client. You can also run these steps separately:
 
 ```sh
@@ -87,6 +114,17 @@ Before submitting changes, run:
 pnpm build
 pnpm verify
 ```
+
+Before npm publication, build a local installation package for users to install without compiling the source:
+
+```sh
+pnpm build
+npm pack --ignore-scripts
+npm install -g ./dsh-tui-lite-0.13.0.tgz
+dsl
+```
+
+After a version change, use the actual filename printed by `npm pack`. Run `pnpm verify:package` to install the tarball into a temporary prefix and verify both commands.
 
 See the [architecture guide](docs/architecture.md) for the system design, data flow, and contribution entry points. [Repository rules](AGENTS.md) are available in Chinese.
 

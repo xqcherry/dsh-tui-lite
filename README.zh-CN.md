@@ -38,12 +38,32 @@
 
 ## 快速开始
 
-需要 Node.js 22.19 或 24+，以及 pnpm。在项目目录运行：
+需要 Node.js，版本须满足 `^22.19 || >=24`（建议安装 Node.js 24 LTS）。普通用户无需安装 pnpm 或下载源码。
+
+**运行前需要安装 DeepSeek Harness（dsh）。** 本项目将所需版本的 Harness 声明为运行依赖，使用 npm 或本地 `.tgz` 安装包安装客户端时会自动安装，无需提前单独安装全局 dsh。
+
+**发布状态：本项目尚未发布到 npm。** 以下 npm 安装和升级命令在发布 `dsh-tui-lite` 后可用，请勿安装上游包来代替本项目。
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm dev
+npm install -g dsh-tui-lite
 ```
+
+安装后，在你希望使用的工作目录打开终端，运行：
+
+```sh
+dsl
+```
+
+`dsh-tui-lite` 是同等功能的完整命令。
+
+升级和卸载（发布后）：
+
+```sh
+npm install -g dsh-tui-lite@latest
+npm uninstall -g dsh-tui-lite
+```
+
+启动器使用独立的 `~/.dsh/profiles/dsh-tui-lite` profile（设置 `DSH_HOME` 时跟随该目录），不会修改上游 `dsh-tui` profile。会话和认证仍由 Harness 管理，卸载 npm 包不会主动删除这些数据。
 
 首次使用：
 
@@ -72,6 +92,13 @@ pnpm dev
 
 ## 本地开发
 
+开发者需要 pnpm。在项目目录安装依赖并启动：
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
 `pnpm dev` 会先构建源码，再启动客户端。也可以分别执行：
 
 ```sh
@@ -87,6 +114,17 @@ pnpm start
 pnpm build
 pnpm verify
 ```
+
+发布前可以构建本地安装包，交给用户直接安装，无需用户构建源码：
+
+```sh
+pnpm build
+npm pack --ignore-scripts
+npm install -g ./dsh-tui-lite-0.13.0.tgz
+dsl
+```
+
+版本变更后，使用 `npm pack` 输出的实际文件名。打包安装检查运行 `pnpm verify:package`，会在临时目录中安装并验证两个启动命令。
 
 更多说明见 [项目架构](docs/architecture.zh-CN.md) 和 [开发规范](AGENTS.md)。
 
