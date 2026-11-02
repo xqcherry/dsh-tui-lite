@@ -427,3 +427,19 @@ for (const columns of [40, 20]) {
     console.log(`PASS: color picker, cancellation, border/title RGB and Plan priority at ${columns} TTY columns`)
   } finally { await colors.close() }
 }
+
+// A narrow permission menu keeps readable labels when some presets omit help.
+const narrowPermissions = await fixture({ columns: 40 })
+try {
+  narrowPermissions.channel.permissionPresets = () => ({ options: [
+    { value: 'read-only', name: 'Read-only', description: 'Read-only session: no file writes, no commands' },
+    { value: 'custom-preset', name: 'Custom preset' },
+  ] })
+  await narrowPermissions.key('/permission')
+  await narrowPermissions.key('\r')
+  assert(narrowPermissions.screen().includes('Read-only'), 'built-in permission option remains visible in a narrow TTY')
+  assert(narrowPermissions.screen().includes('Custom preset'), 'custom option without a description remains visible in a narrow TTY')
+  assert(!narrowPermissions.screen().includes('undefined'), 'missing permission descriptions never leak into the menu')
+  await narrowPermissions.key('\x1b')
+  console.log('PASS: permission descriptions and missing custom help at 40 TTY columns')
+} finally { await narrowPermissions.close() }

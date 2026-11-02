@@ -87,9 +87,17 @@ export function normalizePermissionPresetOption(value: unknown): PermissionPrese
   const name = cleanRenderText(value.name, PERMISSION_PRESET_NAME_CELLS)
   if (name === '') return undefined
   if (value.description !== undefined && typeof value.description !== 'string') return undefined
-  const description = value.description === undefined
+  const fallbackDescriptionKey = value.value === 'read-only'
+    ? 'permission-preset-readonly-desc'
+    : value.value === 'workspace-write'
+      ? 'permission-preset-workspace-write-desc'
+      : value.value === 'danger-full-access'
+        ? 'permission-preset-full-access-desc'
+        : undefined
+  const rawDescription = value.description ?? (fallbackDescriptionKey === undefined ? undefined : t(fallbackDescriptionKey))
+  const description = rawDescription === undefined
     ? undefined
-    : cleanRenderText(value.description, PERMISSION_PRESET_DESCRIPTION_CELLS)
+    : cleanRenderText(rawDescription, PERMISSION_PRESET_DESCRIPTION_CELLS)
   if (value.description !== undefined && description === '') return undefined
   return {
     value: value.value,
