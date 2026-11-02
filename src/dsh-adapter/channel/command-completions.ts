@@ -1,7 +1,7 @@
 import type { LocalCommand } from '../../shared/protocol/commands.js'
 import type { SettingsSnapshot } from '../../modules/settings/contracts.js'
 import type { PermissionPresetSnapshot } from '../../shared/protocol/models.js'
-import { completeTuiCommands, isCommandCompletionToken, type CommandCompletionNode } from '../../shared/commands.js'
+import { completeTuiCommands, isCommandCompletionToken, LOCAL_COMMAND_CHILDREN, type CommandCompletionNode } from '../../shared/commands.js'
 
 /** Complete only supported chat controls and host commands. */
 export function createCommandCompletions(deps: {
@@ -36,7 +36,7 @@ export function createCommandCompletions(deps: {
         }
         return []
       }
-      return deps.commandTrees?.children(path) ?? []
+      return LOCAL_COMMAND_CHILDREN[path.join(' ')] ?? deps.commandTrees?.children(path) ?? []
     })
   }
 }

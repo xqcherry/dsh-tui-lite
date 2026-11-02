@@ -15,6 +15,7 @@ export type { CommandCompletion, LocalCommand, LocalizedDescriptions } from './p
  */
 
 import { tOr } from './i18n.js'
+import { SESSION_COLOR_NAMES } from './session-colors.js'
 
 /** One child in a slash-command tree contributed by a local feature/plugin. */
 export interface CommandCompletionNode {
@@ -48,6 +49,7 @@ export const LOCAL_COMMANDS: LocalCommand[] = [
   { name: 'new', description: 'Start a new conversation' },
   { name: 'resume', description: 'Continue a saved session' },
   { name: 'session', description: 'List saved sessions' },
+  { name: 'color', description: 'Set the current session color' },
   { name: 'rename', description: 'Rename the current session' },
   { name: 'export', description: 'Export the current session' },
   { name: 'compact', description: 'Summarize earlier turns to free context space' },
@@ -93,6 +95,10 @@ export function isImmediateHiddenCommandName(name: string): boolean {
 
 export const LOCAL_COMMAND_CHILDREN: Readonly<Record<string, readonly CommandCompletionNode[]>> = {
   session: [{ name: 'list', description: 'List saved sessions' }],
+  color: [
+    { name: 'default', description: 'Restore the default session color' },
+    ...SESSION_COLOR_NAMES.map(name => ({ name, description: 'Session color' })),
+  ],
 }
 
 /** The session command is a short alias for the saved-session list. */

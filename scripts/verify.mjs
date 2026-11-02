@@ -11,6 +11,7 @@ export const checks = [
   'verify-module-command-lifecycle.ts',
   'verify-transcript-restoration.ts',
   'verify-workbench-commands.ts',
+  'verify-session-color.ts',
   'verify-composer-delivery.ts',
   'verify-settings-actions.ts',
   'verify-session-transitions.ts',
