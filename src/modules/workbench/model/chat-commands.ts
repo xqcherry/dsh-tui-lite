@@ -67,7 +67,7 @@ export function createChatCommands(deps: ChatCommandHost) {
   const openSessions = async (): Promise<void> => {
     const savedSessions = await sessions.commands.listSessions()
     openMenu('/session', savedSessions.filter(saved => saved.cwd === sessions.store.getSnapshot().cwd && saved.id !== sessions.store.getSnapshot().agentId).map(session => ({
-      label: typeof session.title === 'string' ? session.title : session.id,
+      label: session.title.text || session.id,
       run: () => sessions.commands.resumeTo(session.id),
     })))
   }
