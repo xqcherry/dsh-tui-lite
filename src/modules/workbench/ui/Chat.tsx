@@ -218,7 +218,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
         return false
       }}
     />
-    <ComposerStatusBar model={setting.model} cwd={displayCwd} mode={session.mode} />
+    <ComposerStatusBar model={setting.model} cwd={displayCwd} sessionTitle={session.sessionTitle} mode={session.mode} />
     {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} />
       : question ? <AskUserQuestionPanel
         key={question.key}

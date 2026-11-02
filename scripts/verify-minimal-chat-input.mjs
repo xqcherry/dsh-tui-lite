@@ -283,6 +283,23 @@ for (const columns of [100, 40, 20]) {
     if (columns === 100) {
       assert(status.screen().split('\n').some(line => /deepseek-flash · \/项目\/long-workspace-directory +plan$/.test(line)))
     }
+    if (columns >= 40) {
+      status.channel.sessionTitle = '首次对话'
+      status.channel.emit()
+      assert(await settled(() => {
+        const lines = status.screen().split('\n')
+        const prompt = lines.findIndex(line => line.includes('footer anchor'))
+        const footer = lines[prompt + 2] ?? ''
+        return /deepseek-flash · .+ · 首次(?:对话|…) +plan$/.test(footer)
+          && stringWidth(footer) === columns - 1
+      }), 'real session title must follow the directory once published')
+      status.channel.sessionTitle = '已重命名'
+      status.channel.emit()
+      assert(await settled(() => / · 已重(?:命名|…) +plan/.test(status.screen())), 'renames must update the footer')
+      status.channel.sessionTitle = ''
+      status.channel.emit()
+      assert(await settled(() => !status.screen().includes('已重命名') && !status.screen().includes('已重…')), 'a new session must clear the previous title')
+    }
     status.channel.model = 'a-very-long-model-name-that-exceeds-the-terminal-width'
     status.channel.mode = { id: 'custom-mode', label: '自定义模式', plan: false }
     status.channel.emit()
