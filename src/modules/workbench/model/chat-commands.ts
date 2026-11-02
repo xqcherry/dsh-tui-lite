@@ -22,13 +22,25 @@ export function createChatCommands(deps: ChatCommandHost) {
   const { sessions, settings, transcript, workbench } = deps.ports
   const { openMenu, onExit, refreshConfiguration } = deps
   let loading = false
+  const switchModelAndChooseEffort = async (provider: string, model: string): Promise<void> => {
+    const switched = await settings.commands.switchModel(provider, model)
+    await refreshConfiguration()
+    if (!switched) return
+    const { efforts, defaultEffort } = await settings.commands.listEfforts()
+    if (efforts.length <= 1) return
+    const current = settings.store.getSnapshot().reasoningEffort ?? defaultEffort
+    openMenu('Reasoning effort', efforts.map(option => ({
+      label: `${option.name}${option.id === current ? ' (current)' : ''}`,
+      run: () => settings.commands.setEffort(option.id),
+    })))
+  }
   const openModels = async (): Promise<void> => {
     const models = await settings.commands.listModels()
     openMenu('Model', [
       { label: 'Configure a provider or API key', run: configureProvider },
       ...models.map(model => ({
         label: `${model.provider} / ${model.name || model.id}`,
-        run: async () => { await settings.commands.switchModel(model.provider, model.id); await refreshConfiguration() },
+        run: () => switchModelAndChooseEffort(model.provider, model.id),
       })),
     ])
   }
@@ -70,8 +82,7 @@ export function createChatCommands(deps: ChatCommandHost) {
       case 'model':
         if (argument.includes('/')) {
           const separator = argument.indexOf('/')
-          await settings.commands.switchModel(argument.slice(0, separator), argument.slice(separator + 1))
-          await refreshConfiguration()
+          await switchModelAndChooseEffort(argument.slice(0, separator), argument.slice(separator + 1))
         } else await openModels()
         break
       case 'provider': await configureProvider(); break

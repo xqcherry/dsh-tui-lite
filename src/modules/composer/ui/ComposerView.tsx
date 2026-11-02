@@ -34,7 +34,6 @@ import { sessionColorHex } from '../../../ui/text/sessionColors.js'
 
 import { EffortChargeGlyph } from './EffortChargeGlyph.js'
 import { EffortInputBorder, type InputBorderLabel } from './EffortInputBorder.js'
-import { EffortTierBadge } from './EffortTierBadge.js'
 import { FileSuggestions } from './FileSuggestions.js'
 import { HelpMenu } from '../../../ui/HelpMenu.js'
 import { OverlayAbove, useOverlayListRows } from '../../../ui/OverlayAbove.js'
@@ -690,19 +689,7 @@ return (
               // Solid block caret on a BLANK cell: the terminal paints the
               // IME preedit (pinyin) at the physical cursor, which is parked
               // right here, so nothing else may occupy this cell.
-              <>
-                {caretCell('empty', ' ')}
-                {/* 三幕点焰第二幕：空输入行居中短暂浮现档名大写（纯文
-                    本流自带偏移空格——不引入嵌套 Box，行数恒定；有文字
-                    时不显示）。3 = 行内 `❯ `（2 列）+ 空输入块光标（1
-                    列）；另留 1 列右边框，行首 ⌂ 入口也计入宽度预算。 */}
-                <EffortTierBadge
-                  effort={context.settings.getSnapshot().reasoningEffort}
-                  levels={context.settings.getSnapshot().effortLevels}
-                  columns={columns}
-                  leadingColumns={4 + homeButtonCols}
-                />
-              </>
+              caretCell('empty', ' ')
             ) : (
               <Box flexDirection="column">{rendered}</Box>
             )}

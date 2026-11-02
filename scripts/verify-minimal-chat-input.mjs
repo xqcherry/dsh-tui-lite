@@ -69,6 +69,8 @@ async function fixture(options = {}) {
     cancel() { cancels++ },
     async listModels() { return [{ id: 'configured', name: 'Configured model', provider: 'deepseek' }] },
     async switchModel(provider, model) { channel.provider = provider; channel.model = model; configured = true; channel.emit(); return true },
+    async listEfforts() { return { efforts: options.efforts ?? [], defaultEffort: 'high' } },
+    async setEffort(id) { channel.reasoningEffort = id; channel.emit(); return true },
     providerSetup: () => undefined,
     async renameSession(title) { renamed.push(title); if (rejectRename) throw new Error('rename failed'); return true },
     permissionPresets: () => ({ options: [{ value: 'first', name: 'First', description: '' }, { value: 'second', name: 'Second', description: '' }] }),
@@ -318,4 +320,34 @@ for (const columns of [100, 40, 20]) {
     assert(await settled(() => status.screen().includes(`${prefix}👩‍💻d…`)), 'mode truncation must preserve complete emoji graphemes')
     console.log(`PASS: status footer placement and live updates at ${columns} TTY columns`)
   } finally { await status.close() }
+}
+
+// The second model-selection step owns keys even in a narrow terminal.
+for (const columns of [40, 20]) {
+  const flow = await fixture({ columns, efforts: [{ id: 'low', name: 'Low' }, { id: 'high', name: 'High' }] })
+  try {
+    flow.channel.reasoningEffort = 'high'
+    flow.channel.emit()
+    await sleep(110)
+    assert(!flow.screen().includes('HIGH'), 'empty composer must not display the effort badge')
+    await flow.key('/model')
+    await flow.key('\r')
+    await flow.key('\x1b[B')
+    await flow.key('\r')
+    assert(flow.screen().includes('High (current)'))
+    await flow.key('\r')
+    assert.equal(flow.channel.reasoningEffort, 'low')
+    assert.equal(flow.submitted.length, 0, 'tier confirmation must not submit a prompt')
+    await flow.key('/model deepseek/other')
+    await flow.key('\r')
+    assert(flow.screen().includes('Reasoning effort'))
+    await flow.key('\x1b')
+    assert.equal(flow.channel.model, 'other', 'Escape keeps the switched model')
+    assert.equal(flow.channel.reasoningEffort, 'low', 'Escape keeps the applied tier')
+    await flow.key('中文输入')
+    assert(flow.screen().includes('中文输入'))
+    await flow.key('\r')
+    assert.deepEqual(flow.submitted, ['中文输入'])
+    console.log(`PASS: model/effort selection, cancellation and Chinese input at ${columns} TTY columns`)
+  } finally { await flow.close() }
 }
