@@ -103,6 +103,7 @@ export function useComposerView(view: Context): React.ReactNode {
 const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, helpOpen, fileOverlayOpen, terminalRows, helpViewportHeight, helpScrollRef, setInput, onToggleHelp, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
+const suggestionAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : 'promptBorder'
 const promptAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
 // Reserve the prefix, a cursor cell at the wrap boundary, and the right rail.
 const inputWidth = Math.max(1, columns - 4 - homeButtonCols)
@@ -546,7 +547,7 @@ return (
                       // 点击停靠行 = 撤回该条进输入框编辑（与选择器 ⏎ 同路径）
                       onClick={() => { editDocked(absoluteIndex) }}
                     >
-                      <Text wrap="truncate" dimColor={dockSelected === null || dockSelected !== absoluteIndex} color={dockSelected === absoluteIndex ? promptAccent : undefined}>
+                      <Text wrap="truncate" dimColor={dockSelected === null || dockSelected !== absoluteIndex} color={dockSelected === absoluteIndex ? suggestionAccent : undefined}>
                         {'  '}{dockSelected === absoluteIndex ? '❯' : '↳'} {item.text}
                       </Text>
                     </Box>
@@ -569,7 +570,7 @@ return (
             selectedIndex={fileSelected}
             columns={columns}
             query={mention?.query ?? ''}
-            accent={promptAccent}
+            accent={suggestionAccent}
             // 点击行 = 接受该项（与 Enter 同路径）
             onPick={(index) => {
               const file = fileMatches[index]
@@ -590,7 +591,7 @@ return (
             <SuggestionCard
               title={stats}
               columns={columns}
-              accent={promptAccent}
+              accent={suggestionAccent}
               footer={
                 peekClipped
                   ? t('input-fold-peek-footer', { lines: foldText.split('\n').length })
@@ -668,7 +669,7 @@ return (
               <Text
                 dimColor={!homeHovered}
                 bold={homeHovered}
-                color={homeHovered ? promptAccent : undefined}
+                color={homeHovered ? suggestionAccent : undefined}
               >
                 {HOME_BUTTON_TEXT}
               </Text>

@@ -9,6 +9,7 @@ import './lib/fake-home.mjs'
 import assert from 'node:assert/strict'
 import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
+import chalk from 'chalk'
 import xtermHeadless from '@xterm/headless'
 import { fixtureModules } from './lib/module-fixtures.mjs'
 import { Chat } from '../src/modules/workbench/ui/Chat.js'
@@ -18,6 +19,9 @@ import { appendHistory } from '../src/modules/composer/model/history.js'
 import { render } from '../src/ui/primitives.js'
 import { settled, sleep, viewportLines } from './lib/term-test.mjs'
 import { stringWidth } from '../src/shared/platform/stringWidth.js'
+
+// Piped test output still represents a truecolor terminal.
+chalk.level = 3
 
 const { Terminal: XTerm } = xtermHeadless
 
@@ -72,6 +76,7 @@ async function fixture(options = {}) {
     async listEfforts() { return { efforts: options.efforts ?? [], defaultEffort: 'high' } },
     async setEffort(id) { channel.reasoningEffort = id; channel.emit(); return true },
     providerSetup: () => undefined,
+    setSessionColor(color) { channel.sessionColor = color; channel.emit() },
     async renameSession(title) { renamed.push(title); if (rejectRename) throw new Error('rename failed'); return true },
     permissionPresets: () => ({ options: [{ value: 'first', name: 'First', description: '' }, { value: 'second', name: 'Second', description: '' }] }),
     async runPermissionPreset(value) { permissions.push(value); return true },
@@ -102,6 +107,14 @@ async function fixture(options = {}) {
   return {
     channel, questionStore, submitted, renamed, permissions, notices, decisions,
     screen, key,
+    foreground(text, offset = 0) {
+      for (let row = 0; row < term.rows; row++) {
+        const line = term.buffer.active.getLine(term.buffer.active.viewportY + row)
+        const col = line?.translateToString().indexOf(text) ?? -1
+        if (col >= 0) return line.getCell(col + offset)?.getFgColor()
+      }
+      return undefined
+    },
     setConfigurationProbe(probe) { configurationProbe = probe },
     setRejectRename(value) { rejectRename = value },
     showApproval() {
@@ -127,7 +140,7 @@ try {
   await f.key('\r')
   assert(f.screen().includes('Configured model'))
   assert(f.screen().includes('╭') && f.screen().includes('╮') && f.screen().includes('╰') && f.screen().includes('╯'), 'model menu has a closed rounded frame')
-  assert(f.screen().includes('❯ Configure'), 'model menu marks the focused option')
+  assert(/❯ (?:● )?Configure/.test(f.screen()), 'model menu marks the focused option')
   await f.key('\x1b[B')
   await f.key('\r')
   assert.equal(f.channel.model, 'configured')
@@ -352,4 +365,62 @@ for (const columns of [40, 20]) {
     assert.deepEqual(flow.submitted, ['中文输入'])
     console.log(`PASS: model/effort selection, cancellation and Chinese input at ${columns} TTY columns`)
   } finally { await flow.close() }
+}
+
+// /color owns menu keys and changes only the border and session title.
+for (const columns of [40, 20]) {
+  const colors = await fixture({ columns })
+  try {
+    colors.channel.model = 'm'
+    colors.channel.cwd = '/w'
+    colors.channel.sessionTitle = 'zz'
+    colors.channel.mode = { id: 'N', plan: false }
+    colors.channel.emit()
+    assert(await settled(() => colors.screen().includes('m · /w ·')))
+    const original = {
+      model: colors.foreground('m · /w'), cwd: colors.foreground('/w'),
+      mode: colors.foreground('N'), title: colors.foreground('zz'),
+      border: colors.foreground('╭'),
+    }
+    await colors.key('/color')
+    await colors.key('\r')
+    assert(colors.screen().includes('default'))
+    await colors.key('\x1b[B')
+    await colors.key('\x1b')
+    assert.equal(colors.channel.sessionColor, undefined, 'Escape must cancel without applying the highlighted color')
+    await colors.key('/color')
+    await colors.key('\r')
+    for (let index = 0; index < 8; index++) await colors.key('\x1b[B')
+    assert(colors.screen().includes('cyan'), 'last color remains reachable in a narrow picker')
+    await colors.key('\r')
+    assert.equal(colors.channel.sessionColor, 'cyan')
+    assert(await settled(() => colors.foreground('╭') === 0x12A594))
+    assert.equal(colors.foreground('zz'), 0x12A594)
+    assert.equal(colors.foreground('m · /w'), original.model)
+    assert.equal(colors.foreground('/w'), original.cwd)
+    assert.equal(colors.foreground('N'), original.mode)
+    colors.channel.mode = { id: 'Plan', plan: true }
+    colors.channel.emit()
+    assert(await settled(() => colors.foreground('╭') !== 0x12A594), 'Plan border overrides session color')
+    assert.equal(colors.foreground('zz'), 0x12A594, 'Plan mode must preserve the chosen title color')
+    colors.channel.mode = { id: 'N', plan: false }
+    colors.channel.emit()
+    await colors.key('/color default')
+    await colors.key('\r')
+    assert.equal(colors.channel.sessionColor, '')
+    assert(await settled(() => colors.foreground('╭') === original.border))
+    assert.equal(colors.foreground('zz'), original.title)
+    assert.deepEqual(colors.submitted, [], 'local colors never reach the model')
+    colors.channel.pending = [{ id: 'dock', text: 'dock-note', docked: true }]
+    colors.channel.emit()
+    assert(await settled(() => colors.screen().includes('dock-note')))
+    await colors.key('\x1b[A')
+    assert(colors.screen().includes('❯ dock-note'))
+    const dockColor = colors.foreground('dock-note')
+    colors.channel.sessionColor = 'cyan'
+    colors.channel.emit()
+    assert(await settled(() => colors.foreground('╭') === 0x12A594))
+    assert.equal(colors.foreground('dock-note'), dockColor, 'session color must not change selected pending-message text')
+    console.log(`PASS: color picker, cancellation, border/title RGB and Plan priority at ${columns} TTY columns`)
+  } finally { await colors.close() }
 }
