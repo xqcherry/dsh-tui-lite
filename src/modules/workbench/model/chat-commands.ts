@@ -120,7 +120,8 @@ export function createChatCommands(deps: ChatCommandHost) {
       case 'permission': {
         if (argument) await sessions.commands.runPermissionPreset(argument)
         else openMenu('/permission', sessions.commands.permissionPresets().options.map(option => ({
-          label: `${option.name} — ${option.description}`, run: () => sessions.commands.runPermissionPreset(option.value),
+          label: option.description === undefined ? option.name : `${option.name} — ${option.description}`,
+          run: () => sessions.commands.runPermissionPreset(option.value),
         })))
         break
       }

@@ -1,6 +1,6 @@
 /** Commands keep model admission and draft consumption independent of React. */
 import assert from 'node:assert/strict'
-import type { EffortOption } from '../src/shared/protocol/models.js'
+import type { EffortOption, PermissionPresetSnapshot } from '../src/shared/protocol/models.js'
 import type { ProviderSetupHost } from '../src/shared/protocol/provider-settings.js'
 import { createChatCommands, type ChatMenuItem } from '../src/modules/workbench/model/chat-commands.js'
 import { createConfigurationCheck } from '../src/modules/settings/model/configuration-check.js'
@@ -11,6 +11,7 @@ let ready = false
 let switchSucceeded = true
 let effortReadFailed = false
 let efforts: readonly EffortOption[] = []
+let permissionSnapshot: PermissionPresetSnapshot = { availability: 'runtime', options: [] }
 const runtime = createRuntimeModulesFixture({ commands: {
   settings: {
     listModels: async () => [{ provider: 'provider', id: 'model/variant', name: 'Test model' }],
@@ -26,6 +27,7 @@ const runtime = createRuntimeModulesFixture({ commands: {
     switchModel: async (provider, model) => { calls.push(['model', provider, model]); return switchSucceeded },
   },
   sessions: {
+    permissionPresets: () => permissionSnapshot,
     newSession: async () => { calls.push('new'); return true },
     resumeTo: async id => { calls.push(['resume', id]); return { ok: true } },
     listSessions: async () => [
@@ -100,6 +102,22 @@ try {
   await commands.runCommand('effort', '', [])
   await menuItems[1]!.run()
   assert.deepEqual(calls.splice(0), ['efforts', ['effort', 'high']], '/effort remains independently usable')
+  permissionSnapshot = {
+    availability: 'runtime',
+    options: [
+      { value: 'read-only', name: 'Read-only', description: 'Custom read-only help' },
+      { value: 'workspace-write', name: 'Workspace write', description: 'Read/write inside the workspace; writes need a prior read' },
+      { value: 'danger-full-access', name: 'Full access', description: 'Unrestricted access, no approvals' },
+      { value: 'custom-preset', name: 'Custom preset' },
+    ],
+  }
+  await commands.runCommand('permission', '', [])
+  assert.deepEqual(menuItems.map(item => item.label), [
+    'Read-only — Custom read-only help',
+    'Workspace write — Read/write inside the workspace; writes need a prior read',
+    'Full access — Unrestricted access, no approvals',
+    'Custom preset',
+  ])
   await commands.runCommand('compact', '', [])
   assert.deepEqual(calls.splice(0), [['notice', 'Configure a model first: /provider or /auth']])
   ready = true
