@@ -1,39 +1,41 @@
-# 贡献指南
+# Contributing
 
-欢迎反馈问题、提出建议和提交 PR。本项目专注于简单、轻量的 dsh TUI 层，贡献请围绕终端输入、展示与交互展开，优先复用 Harness 已有能力，保持命令集中、内部风格一致。
+**English** | [简体中文](CONTRIBUTING.zh-CN.md)
 
-本指南参考 [pi 的贡献指南](https://github.com/badlogic/pi-mono/blob/main/CONTRIBUTING.md)，核心要求只有两条。
+Bug reports, suggestions, and pull requests are welcome. This project focuses on a simple, lightweight dsh TUI layer, so contributions should center on terminal input, presentation, and interaction, reuse existing Harness capabilities where possible, keep commands consolidated, and stay consistent with the existing internal style.
 
-## 1. 按模板提交 Issue
+This guide references [pi's contributing guide](https://github.com/badlogic/pi-mono/blob/main/CONTRIBUTING.md). There are only two core requirements.
 
-提交前先搜索已有 Issue，避免重复反馈，并选择对应模板：
+## 1. Submit issues with the templates
 
-- [问题反馈](.github/ISSUE_TEMPLATE/bug_report.md)：说明实际行为、预期行为、最少复现步骤和运行环境。
-- [功能建议](.github/ISSUE_TEMPLATE/feature_request.md)：说明真实使用场景、遇到的不便，以及建议如何改善。
+Search existing issues before submitting to avoid duplicates, then choose the matching template:
 
-内容保持简短、具体，提供自己确认过的信息。日志与截图中请隐去 API Key 等敏感信息。愿意参与实现的话，也请一并说明。
+- [Bug report](.github/ISSUE_TEMPLATE/bug_report.md): describe the actual behavior, the expected behavior, minimal reproduction steps, and the runtime environment.
+- [Feature request](.github/ISSUE_TEMPLATE/feature_request.md): describe the real use case, the inconvenience you hit, and how the change would help.
 
-## 2. 对自己的代码负责，敬畏生产
+Keep it short and specific, and provide information you have verified yourself. Redact sensitive data such as API keys from logs and screenshots. If you are willing to implement the change, say so as well.
 
-**允许使用 AI 生成或辅助编写代码，前提是你理解自己的改动，并对提交结果负责。**
+## 2. Own your code and treat production with care
 
-提交前，请确保你能解释每一处改动的目的、实现方式，以及它与现有系统的关系。亲自审查 diff，确认改动的影响范围，完成必要验证；出现问题时，能够定位并修正。
+**AI-generated or AI-assisted code is allowed, provided you understand your changes and take responsibility for the result.**
 
-不欢迎未经理解、未经审查、未经验证、粗制滥造的 AI 代码提交。AI 生成的解释和“测试通过”结论不能代替你对代码的理解与实际验证。
+Before submitting, make sure you can explain the purpose of every change, how it is implemented, and how it relates to the existing system. Review the diff yourself, confirm the impact, and complete the necessary verification; if something breaks, you should be able to locate and fix it.
 
-PR 请写清楚：
+Submissions that are not understood, not reviewed, not verified, or carelessly AI-generated are not welcome. AI-generated explanations and "tests pass" conclusions do not replace your understanding of the code and actual verification.
 
-- 解决了什么问题，为什么需要这项改动。
-- 主要改动和影响范围；有对应 Issue 时附上链接。
-- 实际执行的验证及结果，以及尚未解决的问题。
+In a pull request, state clearly:
 
-开发前请阅读 [仓库开发规范](AGENTS.md)。修改 `src/`，不手改生成目录 `lib/`，保持改动目的单一。
+- What problem the change solves and why it is needed.
+- The main changes and their impact; link the related issue when one exists.
+- The verification you actually ran and its results, plus anything still unresolved.
 
-代码改动提交前运行：
+Read the [repository development rules](AGENTS.md) before starting. Modify `src/`, do not hand-edit the generated `lib/` directory, and keep each change focused on a single purpose.
+
+Run the following before submitting code changes:
 
 ```sh
 pnpm build
 pnpm verify
 ```
 
-同时完成与改动相关的专项检查；终端界面改动需在窄 TTY 中验证。纯文档改动检查 diff 和链接即可。
+Also complete the focused checks relevant to your change; terminal UI changes additionally require verification in a narrow TTY. Documentation-only changes only need a diff and link check.
