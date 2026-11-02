@@ -16,6 +16,7 @@ import instances from '../../../ink/instances.js'
 import { abbreviateHomePath } from '../../../shared/platform/paths.js'
 import { ProductHeader } from './ProductHeader.js'
 import { ComposerStatusBar } from './ComposerStatusBar.js'
+import { WorkingStatusLine } from './WorkingStatusLine.js'
 import { CommandMenu } from './CommandMenu.js'
 import { createHelpMenu } from '../model/help-menu.js'
 
@@ -120,6 +121,18 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   }), [ports, questionStore, onExit, refreshConfiguration, openHelp])
   const history = historyQuery === null ? [] : loadHistory(session.cwd).filter(entry => entry.text.toLowerCase().includes(historyQuery.toLowerCase()))
   const panelOpen = question !== null || approval !== null || menu !== null || historyQuery !== null
+  const runningTool = React.useMemo(() => {
+    if (!session.working || conversation.spinnerMode !== 'tool-use') return undefined
+    for (let index = conversation.rows.length - 1; index >= 0; index--) {
+      const row = conversation.rows[index]
+      if (row?.kind !== 'tool' || row.tool?.status !== 'running') continue
+      const title = row.tool.callView?.title?.replace(/\s+/g, ' ').trim()
+      if (title) return title
+      const name = row.tool.name.trim()
+      return name === '' ? undefined : name[0]!.toUpperCase() + name.slice(1)
+    }
+    return undefined
+  }, [conversation.rows, conversation.spinnerMode, session.working])
 
   useInput((input, key) => {
     if (question !== null || approval !== null) return
@@ -216,6 +229,13 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       onBack={question.canGoBack ? draft => questionStore.backCurrent(draft) : undefined}
       onForward={question.canGoForward ? draft => questionStore.forwardCurrent(draft) : undefined}
     /> : null}
+    <WorkingStatusLine
+      working={session.working && !panelOpen}
+      spinnerMode={conversation.spinnerMode}
+      turnStart={conversation.turnStart}
+      activeToolCount={conversation.activeToolCount}
+      toolName={runningTool}
+    />
     <PromptInput
       key={generation}
       composer={composer}

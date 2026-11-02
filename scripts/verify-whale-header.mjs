@@ -145,6 +145,17 @@ try {
   assert(lines.some(line => line.includes('/display/cwd')), 'header uses the display directory')
   assert.equal(JSON.stringify(channel.rows), rowsBefore, 'branding creates no transcript rows')
   const emit = () => { channel.version++; for (const listener of listeners) listener() }
+  channel.working = true
+  channel.spinnerMode = 'thinking'
+  channel.turnStart = Date.now()
+  emit()
+  assert(await settled(() => f.screen().some(line => line.includes('Thinking'))), 'working line appears while a turn runs')
+  const workingRow = f.screen().findIndex(line => line.includes('Thinking'))
+  const composerRow = f.screen().findIndex(line => line.includes('╭'))
+  assert(workingRow >= 0 && composerRow > workingRow, 'working line sits above the composer')
+  channel.working = false
+  emit()
+  assert(await settled(() => !f.screen().some(line => line.includes('Thinking'))), 'working line clears when the turn ends')
   channel.cwd = join(homedir(), 'rep', '项目')
   channel.displayCwd = channel.cwd
   channel.model = 'm'
