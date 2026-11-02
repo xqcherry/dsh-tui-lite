@@ -60,6 +60,11 @@ for (const [columns, rows] of [[100, 32], [80, 24], [40, 24], [40, 12], [20, 12]
   const questions = new QuestionStore()
   const app = await render(<Chat ports={runtime} questionStore={questions} approvalStore={{ subscribe: () => () => {}, getSnapshot: () => null, decide() {} }} onExit={() => { throw new Error('Help must not exit') }} />, { stdin, stdout, stderr, exitOnCtrlC: false, patchConsole: false })
   const screen = () => viewportLines(term).join('\n')
+  // Inline mode keeps rows that scrolled off the viewport in the terminal
+  // scrollback; a long local command result must be checked there too.
+  const bufferText = () => Array.from({ length: term.buffer.active.length }, (_, row) =>
+    term.buffer.active.getLine(row)?.translateToString(true) ?? '',
+  ).join('\n')
   const key = async (input: string) => {
     stdin.write(input)
     await sleep(55) // 固定窗:pacing stdin/React/xterm must finish before the next navigation event.
@@ -149,13 +154,13 @@ for (const [columns, rows] of [[100, 32], [80, 24], [40, 24], [40, 12], [20, 12]
       await key('/status')
       await key('\r')
       assert(await settled(() => {
-        const output = screen()
+        const output = bufferText()
         return output.includes('Context: 50 tokens / 100 tokens')
           && output.includes('(50%)')
           && output.includes('Tokens: input 0')
           && output.includes('cache write 0')
           && output.includes('Estimated session cost: ¥4.0000')
-      }), `The /status command renders its session metrics in the 40-column TTY:\n${screen()}`)
+      }), `The /status command renders its session metrics in the 40-column TTY:\n${bufferText()}`)
     }
     console.log(`PASS: unified help categories, command fill, shortcuts, key ownership and resize at ${columns}x${rows}`)
   } finally {
