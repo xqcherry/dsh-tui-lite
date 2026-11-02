@@ -21,6 +21,9 @@ export interface ChatCommandHost {
 export function createChatCommands(deps: ChatCommandHost) {
   const { sessions, settings, transcript, workbench } = deps.ports
   const { openMenu, onExit, refreshConfiguration } = deps
+  const showCommandResult = (title: string, lines: readonly string[]): void => {
+    transcript.commands.pushLocal(title, lines, { commandResult: true })
+  }
   let loading = false
   const switchModelAndChooseEffort = async (provider: string, model: string): Promise<void> => {
     const switched = await settings.commands.switchModel(provider, model)
@@ -29,14 +32,14 @@ export function createChatCommands(deps: ChatCommandHost) {
     const { efforts, defaultEffort } = await settings.commands.listEfforts()
     if (efforts.length <= 1) return
     const current = settings.store.getSnapshot().reasoningEffort ?? defaultEffort
-    openMenu('Reasoning effort', efforts.map(option => ({
+    openMenu('/model · Reasoning effort', efforts.map(option => ({
       label: `${option.name}${option.id === current ? ' (current)' : ''}`,
       run: () => settings.commands.setEffort(option.id),
     })))
   }
   const openModels = async (): Promise<void> => {
     const models = await settings.commands.listModels()
-    openMenu('Model', [
+    openMenu('/model', [
       { label: 'Configure a provider or API key', run: configureProvider },
       ...models.map(model => ({
         label: `${model.provider} / ${model.name || model.id}`,
@@ -63,7 +66,7 @@ export function createChatCommands(deps: ChatCommandHost) {
   }
   const openSessions = async (): Promise<void> => {
     const savedSessions = await sessions.commands.listSessions()
-    openMenu('Resume session', savedSessions.filter(saved => saved.cwd === sessions.store.getSnapshot().cwd && saved.id !== sessions.store.getSnapshot().agentId).map(session => ({
+    openMenu('/session', savedSessions.filter(saved => saved.cwd === sessions.store.getSnapshot().cwd && saved.id !== sessions.store.getSnapshot().agentId).map(session => ({
       label: typeof session.title === 'string' ? session.title : session.id,
       run: () => sessions.commands.resumeTo(session.id),
     })))
@@ -100,7 +103,7 @@ export function createChatCommands(deps: ChatCommandHost) {
           notify: (text: string, options?: { color?: 'error' | 'warning' | 'success'; timeoutMs?: number }) => workbench.commands.notify(text, options),
           pushLocal: (title: string, lines: readonly string[]) => transcript.commands.pushLocal(title, lines),
         }
-        openMenu('Account login', (await oauth.providers()).map(status => ({
+        openMenu('/auth', (await oauth.providers()).map(status => ({
           label: `${status.label}${status.signedIn ? ' (signed in)' : ''}`,
           run: async () => { await runOAuthLogin(loginDeps, oauth, status.provider); await refreshConfiguration() },
         })))
@@ -109,14 +112,14 @@ export function createChatCommands(deps: ChatCommandHost) {
       }
       case 'effort': {
         if (argument) await settings.commands.setEffort(argument)
-        else openMenu('Reasoning effort', (await settings.commands.listEfforts()).efforts.map(option => ({
+        else openMenu('/effort', (await settings.commands.listEfforts()).efforts.map(option => ({
           label: option.name, run: () => settings.commands.setEffort(option.id),
         })))
         break
       }
       case 'permission': {
         if (argument) await sessions.commands.runPermissionPreset(argument)
-        else openMenu('Permissions', sessions.commands.permissionPresets().options.map(option => ({
+        else openMenu('/permission', sessions.commands.permissionPresets().options.map(option => ({
           label: `${option.name} — ${option.description}`, run: () => sessions.commands.runPermissionPreset(option.value),
         })))
         break
@@ -129,9 +132,9 @@ export function createChatCommands(deps: ChatCommandHost) {
       }
       case 'compact': if (deps.configured()) await transcript.commands.compact(); else workbench.commands.notify('Configure a model first: /provider or /auth'); break
       case 'thinking': deps.toggleThinking(); break
-      case 'mcp': transcript.commands.pushLocal('MCP', workbench.commands.mcpStatus()); break
-      case 'status': transcript.commands.pushLocal('Status', [sessions.store.getSnapshot().status, `${settings.store.getSnapshot().provider}/${settings.store.getSnapshot().model}`, sessions.store.getSnapshot().cwd]); break
-      case 'doctor': transcript.commands.pushLocal('Diagnostics', await workbench.commands.doctorInfo()); break
+      case 'mcp': showCommandResult('/mcp', workbench.commands.mcpStatus()); break
+      case 'status': showCommandResult('/status', [sessions.store.getSnapshot().status, `${settings.store.getSnapshot().provider}/${settings.store.getSnapshot().model}`, sessions.store.getSnapshot().cwd]); break
+      case 'doctor': showCommandResult('/doctor', await workbench.commands.doctorInfo()); break
       default: {
         const outcome = await workbench.commands.runExternalCommandOutcome(name, raw, images)
         if (outcome?.text) workbench.commands.notify(outcome.text, { color: outcome.kind === 'error' ? 'error' : undefined })

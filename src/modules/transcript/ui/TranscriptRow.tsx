@@ -42,6 +42,7 @@ export type MemoRowProps = {
    *  expanded body shows the revealed slice in `text`. */
   textFull?: string
   executionTarget: string | undefined
+  commandResult: ChatRow['commandResult']
   /** IDE selection indicator (user rows): rendered above the prompt bubble. */
   selectionAttached: ChatRow['selectionAttached']
   /** Session cwd for the indicator's display-path relativization (T-FIX-01). */
@@ -134,6 +135,7 @@ export function TranscriptRow({
   images,
   textFull,
   executionTarget,
+  commandResult,
   selectionAttached,
   sessionCwd,
   streaming,
@@ -400,6 +402,26 @@ export function TranscriptRow({
     case 'turn-summary':
       return null
     case 'local':
+      if (commandResult !== undefined) {
+        const starts = commandResult === 'start' || commandResult === 'only'
+        const ends = commandResult === 'end' || commandResult === 'only'
+        return <Box
+          flexDirection="column"
+          width="100%"
+          flexShrink={0}
+          marginTop={starts ? 1 : 0}
+          paddingX={1}
+          borderStyle="single"
+          borderColor="permission"
+          borderTop={starts}
+          borderBottom={ends}
+          borderLeft
+          borderRight
+          ref={ref}
+        >
+          <Text color="permission" bold wrap="truncate-end">{displayText}</Text>
+        </Box>
+      }
       // `!` mode command echo.
       return (
         <Box marginTop={1} backgroundColor={background} ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
@@ -407,6 +429,23 @@ export function TranscriptRow({
         </Box>
       )
     case 'local-output':
+      if (commandResult !== undefined) {
+        const ends = commandResult === 'end' || commandResult === 'only'
+        return <Box
+          width="100%"
+          flexShrink={0}
+          paddingX={1}
+          borderStyle="single"
+          borderColor="permission"
+          borderTop={false}
+          borderBottom={ends}
+          borderLeft
+          borderRight
+          ref={ref}
+        >
+          <Text dimColor wrap="wrap">{displayText}</Text>
+        </Box>
+      }
       return (
         <Box paddingLeft={2} backgroundColor={background} ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
           <Text dimColor>{displayText}</Text>

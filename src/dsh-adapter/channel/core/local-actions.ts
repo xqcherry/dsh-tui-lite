@@ -56,9 +56,18 @@ export function createCoreLocalActions(ctx: Context, deps: {
       deps.publish()
     },
 
-    pushLocal(title: string, lines: readonly string[]): void {
-      deps.appendLocalRow({ id: rowIds.value++, kind: 'local', text: title })
-      for (const line of lines) deps.appendLocalRow({ id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT) })
+    pushLocal(title: string, lines: readonly string[], options?: { commandResult?: boolean }): void {
+      const commandResult = options?.commandResult === true
+      const position = (index: number): 'start' | 'middle' | 'end' | 'only' =>
+        lines.length === 0 ? 'only' : index === 0 ? 'start' : index === lines.length ? 'end' : 'middle'
+      deps.appendLocalRow({ id: rowIds.value++, kind: 'local', text: title, ...(commandResult ? { commandResult: position(0) } : {}) })
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index]!
+        deps.appendLocalRow({
+          id: rowIds.value++, kind: 'local-output', text: preview(line, LOCAL_OUTPUT_LIMIT),
+          ...(commandResult ? { commandResult: position(index + 1) } : {}),
+        })
+      }
       deps.publish()
     },
 

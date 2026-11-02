@@ -14,6 +14,8 @@ export interface ChatRow {
   label?: string
   /** Actual execution location for `!command` rows. */
   executionTarget?: string
+  /** Ephemeral grouping for a command result shown in the transcript. */
+  commandResult?: 'start' | 'middle' | 'end' | 'only'
   text: string
   /** Durable session image blocks, loaded lazily through the attachment store. */
   images?: readonly TranscriptImage[]

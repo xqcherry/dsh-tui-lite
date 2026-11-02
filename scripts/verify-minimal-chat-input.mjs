@@ -126,6 +126,8 @@ try {
   await f.key('/model')
   await f.key('\r')
   assert(f.screen().includes('Configured model'))
+  assert(f.screen().includes('╭') && f.screen().includes('╮') && f.screen().includes('╰') && f.screen().includes('╯'), 'model menu has a closed rounded frame')
+  assert(f.screen().includes('❯ Configure'), 'model menu marks the focused option')
   await f.key('\x1b[B')
   await f.key('\r')
   assert.equal(f.channel.model, 'configured')

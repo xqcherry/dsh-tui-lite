@@ -36,6 +36,7 @@ import { EffortChargeGlyph } from './EffortChargeGlyph.js'
 import { EffortInputBorder, type InputBorderLabel } from './EffortInputBorder.js'
 import { FileSuggestions } from './FileSuggestions.js'
 import { HelpMenu } from '../../../ui/HelpMenu.js'
+import { SelectionPanel } from '../../../ui/SelectionPanel.js'
 import { OverlayAbove, useOverlayListRows } from '../../../ui/OverlayAbove.js'
 import { cardContentWidth, SuggestionCard } from '../../../ui/SuggestionCard.js'
 import { listWindow } from '../../../ui/listWindow.js'
@@ -489,9 +490,10 @@ return (
       <OverlayAbove maxHeight={Math.max(terminalRows - 6, 1)}>
         {helpOpen && (
           <Box marginBottom={1}>
+            <SelectionPanel title="/help" footer={<Text dimColor wrap="wrap">↑/↓ 滚动 · Esc 关闭</Text>}>
             <HelpMenu
               commands={context.workbench.getSnapshot().commandList}
-              viewportHeight={helpViewportHeight}
+              viewportHeight={Math.max(1, helpViewportHeight - 5)}
               viewportWidth={columns}
               scrollRef={helpScrollRef}
               onCommandPick={(name) => {
@@ -502,6 +504,7 @@ return (
                 onToggleHelp()
               }}
             />
+            </SelectionPanel>
           </Box>
         )}
         {!helpOpen && composer.store.getSnapshot().pending.length > 0 && (

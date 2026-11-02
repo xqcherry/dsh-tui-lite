@@ -10,7 +10,7 @@ import { isPlainReturnInput } from '../../shared/platform/modifiers.js'
 import { stringWidth } from '../../shared/platform/stringWidth.js'
 import { Box, Text, useInput, useTerminalSize } from '../primitives.js'
 import { POINTER } from '../text/figures.js'
-import { Divider } from '../design-system/Divider.js'
+import { SelectionPanel } from '../SelectionPanel.js'
 import { listWindow } from '../listWindow.js'
 
 type TextField = 'contextWindow' | 'maxTokens' | 'reasoningEfforts'
@@ -54,8 +54,10 @@ export function ProviderModelEditor({ model, editor, onClose, onAbort, readClipb
   const pasteBusy = React.useRef(false)
   React.useEffect(() => () => { mounted.current = false }, [])
   const { columns, rows } = useTerminalSize()
-  const width = Math.max(1, columns - 6)
+  const width = Math.max(1, columns - 4)
+  const spacing = rows < 18 ? 0 : 1
   const compact = columns < 64
+  const labelWidth = compact ? Math.max(1, Math.min(9, width - 7)) : 26
   const field = FIELDS[focus]
   const textFocused = field !== 'input' && field !== 'save'
     && (field !== 'reasoningEfforts' || editor.reasoningEditable)
@@ -237,14 +239,13 @@ export function ProviderModelEditor({ model, editor, onClose, onAbort, readClipb
     </Text>
   }
 
-  return <Box flexDirection="column" marginTop={1} paddingX={2} width="100%">
-    <Divider color="permission" title={t('provider-model-editor-title')} />
-    <Box marginTop={1} marginBottom={1}><Text bold wrap="truncate">{cleanRenderText(model, Math.max(1, columns - 4))}</Text></Box>
+  return <SelectionPanel title={t('provider-model-editor-title')} footer={<Text dimColor wrap="wrap">{columns < 40 || rows < 18 ? '↑↓/Tab · Enter · Esc' : t('hint-provider-model-editor')}</Text>}>
+    <Box marginBottom={spacing}><Text bold wrap="truncate">{cleanRenderText(model, Math.max(1, columns - 4))}</Text></Box>
     {FIELDS.slice(start, end).map((name, index) => {
       const absolute = start + index
       const focused = absolute === focus
       const isText = name !== 'input' && name !== 'save'
-      const valueWidth = Math.max(1, width - (compact ? 10 : 27))
+      const valueWidth = Math.max(1, width - labelWidth - 3)
       return <Box
         key={name}
         flexDirection="row"
@@ -261,13 +262,13 @@ export function ProviderModelEditor({ model, editor, onClose, onAbort, readClipb
           }
         }}
       >
-        <Box width={1} flexShrink={0}>
+        <Box width={2} flexShrink={0}>
           <Text
             color={focused ? 'accent' : undefined}
             dimColor={name === 'reasoningEfforts' && !editor.reasoningEditable}
           >{focused ? POINTER : absolute === start && start > 0 ? '↑' : absolute === end - 1 && end < FIELDS.length ? '↓' : ' '}</Text>
         </Box>
-        <Box width={compact ? 9 : 26} flexShrink={0}>
+        <Box width={labelWidth} marginRight={1} flexShrink={0}>
           <Text
             bold={focused}
             color={focused ? 'accent' : undefined}
@@ -286,10 +287,9 @@ export function ProviderModelEditor({ model, editor, onClose, onAbort, readClipb
         </Box>
       </Box>
     })}
-    <Box marginTop={1}><Text dimColor wrap="truncate">{field === 'reasoningEfforts'
+    <Box marginTop={spacing}><Text dimColor wrap="truncate">{field === 'reasoningEfforts'
       ? editor.reasoningEditable ? t('provider-model-reasoning-hint') : t('provider-model-reasoning-unavailable')
       : field === 'input' ? t('provider-model-input-hint') : t('provider-model-capacity-hint')}</Text></Box>
     {error !== null ? <Text color="error" wrap="truncate">{error}</Text> : null}
-    <Text dimColor wrap="truncate">{t('hint-provider-model-editor')}</Text>
-  </Box>
+  </SelectionPanel>
 }

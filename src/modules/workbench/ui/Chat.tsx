@@ -11,11 +11,12 @@ import { HistorySearchDialog } from '../../composer/index.js'
 import { MessageList } from '../../transcript/index.js'
 import { PromptInput, type PromptController } from '../../composer/index.js'
 import { AskUserQuestionPanel } from '../../decisions/index.js'
-import { Box, Text, useApp, useInput, useTerminalSize } from '../../../ui/primitives.js'
+import { Box, Text, useApp, useInput } from '../../../ui/primitives.js'
 import instances from '../../../ink/instances.js'
 import { abbreviateHomePath } from '../../../shared/platform/paths.js'
 import { ProductHeader } from './ProductHeader.js'
 import { ComposerStatusBar } from './ComposerStatusBar.js'
+import { CommandMenu } from './CommandMenu.js'
 
 export interface ChatProps {
   ports: WorkbenchModules
@@ -36,7 +37,6 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   const composerState = React.useSyncExternalStore(composer.store.subscribe, composer.store.getSnapshot)
   const question = React.useSyncExternalStore(listener => questionStore.subscribe(listener), () => questionStore.getSnapshot())
   const approval = React.useSyncExternalStore(listener => approvalStore.subscribe(listener), () => approvalStore.getSnapshot())
-  const { rows: terminalRows } = useTerminalSize()
   const { stdout } = useApp()
   const [menu, setMenuState] = React.useState<ChatMenu | null>(null)
   const [focus, setFocusState] = React.useState(0)
@@ -163,7 +163,6 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       }
     }
   })
-  const start = Math.max(0, focus - Math.max(2, Math.floor((terminalRows - 8) / 2)))
   return <Box flexDirection="column">
     <ProductHeader
       key={`product-${generation}`}
@@ -188,12 +187,28 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       thinkingVisible={thinking}
     />
     {!configured ? <Text color="warning">Configure a model with /provider, /auth or /model to get started.</Text> : null}
-    {menu && !question && !approval ? <Box flexDirection="column">
-      <Text bold>{menu.title}</Text>
-      {menu.items.slice(start, start + Math.max(3, terminalRows - 8)).map((item, index) => <Text key={start + index} inverse={start + index === focus}>{item.label}</Text>)}
-      <Text dimColor>{menu.items.length ? '↑/↓ select · Enter confirm · Esc cancel' : 'No saved sessions'}</Text>
-    </Box> : null}
+    {menu && !question && !approval ? <CommandMenu menu={menu} focus={focus} /> : null}
     {historyQuery !== null && !question && !approval ? <HistorySearchDialog query={historyQuery} cursorOffset={historyQuery.length} matches={history} focusIndex={focus} /> : null}
+    {question && !approval ? <AskUserQuestionPanel
+      key={question.key}
+      question={question.question}
+      position={question.position}
+      total={question.total}
+      answered={question.answered}
+      initialDraft={question.draft}
+      onAnswer={selection => { if (questionStore.stillCurrent(question.key)) questionStore.answerCurrent(selection) }}
+      onCancel={() => questionStore.cancelCurrent()}
+      onEscape={draft => {
+        const live = questionStore.getSnapshot()
+        if (live?.canGoBack) {
+          questionStore.backCurrent(questionStore.stillCurrent(question.key) ? draft : undefined)
+        } else if (live && questionStore.stillCurrent(question.key)) {
+          questionStore.cancelCurrent()
+        }
+      }}
+      onBack={question.canGoBack ? draft => questionStore.backCurrent(draft) : undefined}
+      onForward={question.canGoForward ? draft => questionStore.forwardCurrent(draft) : undefined}
+    /> : null}
     <PromptInput
       key={generation}
       composer={composer}
@@ -219,26 +234,6 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       }}
     />
     <ComposerStatusBar model={setting.model} cwd={displayCwd} sessionTitle={session.sessionTitle} mode={session.mode} />
-    {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} />
-      : question ? <AskUserQuestionPanel
-        key={question.key}
-        question={question.question}
-        position={question.position}
-        total={question.total}
-        answered={question.answered}
-        initialDraft={question.draft}
-        onAnswer={selection => { if (questionStore.stillCurrent(question.key)) questionStore.answerCurrent(selection) }}
-        onCancel={() => questionStore.cancelCurrent()}
-        onEscape={draft => {
-          const live = questionStore.getSnapshot()
-          if (live?.canGoBack) {
-            questionStore.backCurrent(questionStore.stillCurrent(question.key) ? draft : undefined)
-          } else if (live && questionStore.stillCurrent(question.key)) {
-            questionStore.cancelCurrent()
-          }
-        }}
-        onBack={question.canGoBack ? draft => questionStore.backCurrent(draft) : undefined}
-        onForward={question.canGoForward ? draft => questionStore.forwardCurrent(draft) : undefined}
-      /> : null}
+    {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} /> : null}
   </Box>
 }

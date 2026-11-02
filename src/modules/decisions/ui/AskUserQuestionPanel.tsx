@@ -39,7 +39,8 @@ import { isPlainReturnInput } from '../../../shared/platform/modifiers.js'
 import { Box, Text, useInput, useTerminalSize } from '../../../ui/primitives.js'
 import { POINTER } from '../../../ui/text/figures.js'
 import { createHyperlink } from '../../../ui/text/hyperlink.js'
-import { Divider } from '../../../ui/design-system/Divider.js'
+import wrapText from '../../../ink/wrap-text.js'
+import { SelectionPanel } from '../../../ui/SelectionPanel.js'
 import { listWindow } from '../../../ui/listWindow.js'
 import { PlanReviewPanel } from './PlanReviewPanel.js'
 import { ProviderModelEditor } from '../../../ui/forms/ProviderModelEditor.js'
@@ -179,7 +180,8 @@ export function AskUserQuestionPanel({
   // Opening Tab and later keys may share one stdin batch. Stop the list
   // synchronously, before the nested editor has had a chance to mount.
   const editingRef = React.useRef(false)
-  const { rows: terminalRows } = useTerminalSize()
+  const { columns, rows: terminalRows } = useTerminalSize()
+  const spacing = terminalRows < 18 ? 0 : 1
   /** Rows: the real options plus the inline input row at the tail. */
   const rowCount = options.length + (hideCustomInput ? 0 : 1)
   // A saved draft wins over the wizard's default selection (returning to a
@@ -257,26 +259,7 @@ export function AskUserQuestionPanel({
   const [error, setError] = React.useState<string | null>(null)
 
   const inputFocused = !hideCustomInput && focusIndex === options.length
-  // Chat chrome + panel scaffolding consume twelve rows before the option
-  // list: status line, outer/divider/question/list/hint spacing and content.
-  // Optional header/detail/input/error rows are charged explicitly. Long
-  // lists then use fixed one/two-line rows so listWindow's budget is exact;
-  // short questionnaires retain their existing wrapped presentation.
   const linkText = question.link === undefined || question.link === '' ? '' : createHyperlink(question.link)
-  const detailRows = (question.detail === undefined ? 0 : question.detail.split('\n').length + 1)
-    + (linkText === '' ? 0 : question.detail === undefined ? 2 : 1)
-  const reservedRows = 12
-    + (question.header === undefined ? 0 : 1)
-    + detailRows
-    + (hideCustomInput ? 0 : 1)
-    + (error === null ? 0 : 2)
-  const optionBudget = Math.max(terminalRows - reservedRows, 2)
-  const optionHeights = options.map(option => option.description === undefined ? 1 : 2)
-  const windowedOptions = optionHeights.reduce((sum, height) => sum + height, 0) > optionBudget
-  const optionFocus = Math.min(focusIndex, Math.max(options.length - 1, 0))
-  const optionWindow = windowedOptions
-    ? listWindow(optionHeights, optionFocus, optionBudget)
-    : { start: 0, end: options.length }
 
   // Park the native terminal cursor on the custom-answer caret: terminal
   // emulators render IME preedit (pinyin) at the physical cursor, so without
@@ -638,7 +621,10 @@ export function AskUserQuestionPanel({
   const remaining = total - answered
   /** Fold shortcut label for the hint row (follows /settings remaps). */
   const foldCombo = effectiveComboDisplay('questionFold')
-  const headerTitle = ` ${t('question-header-progress', { position, total, remaining: remaining > 1 ? t('question-remaining-more', { n: remaining }) : '' })} `
+  const genericProgress = ` ${t('question-header-progress', { position, total, remaining: remaining > 1 ? t('question-remaining-more', { n: remaining }) : '' })} `
+  const panelTitle = question.header !== undefined
+    ? `${question.header}${total > 1 ? ` · ${position}/${total}` : ''}`
+    : total > 1 ? genericProgress.trim() : 'Question'
   /** First line of the question body for the minimized bar (whitespace
    *  flattened the same way windowedOptions flattens labels). */
   const questionText = question.question.split('\n')[0]?.replace(/\s+/gu, ' ').trim() ?? ''
@@ -678,7 +664,7 @@ export function AskUserQuestionPanel({
   const renderInputRow = (): React.ReactNode => (
     <Box
       flexDirection="row"
-      marginTop={inputFocused ? 1 : 0}
+      marginTop={inputFocused ? spacing : 0}
       onClick={focusInputRow}
       onMouseEnter={() => setHoverIndex(options.length)}
       onMouseLeave={() => setHoverIndex(current => (current === options.length ? -1 : current))}
@@ -692,49 +678,53 @@ export function AskUserQuestionPanel({
       <Box width={1} flexShrink={0}>
         <Text color={inputFocused ? 'accent' : 'suggestion'}>{PENCIL}</Text>
       </Box>
-      <Box flexDirection="row" marginLeft={1}>
-        <Text bold={inputFocused} color={inputFocused ? 'accent' : 'suggestion'}>
-          {t('question-custom-tab')}
-        </Text>
-        {attached !== null && (
-          <Text color="suggestion">{t('question-attached-label', { label: attached })}</Text>
-        )}
-        <Text dimColor>：</Text>
-        {customText === '' && !inputFocused ? (
-          // The IME anchor must sit on a cell styled exactly like the answer
-          // text the user is about to commit: the terminal draws the preedit
-          // at the physical cursor USING THAT CELL'S STYLE, so an anchor over
-          // the dim placeholder turned pinyin dim, and one on the suggestion-
-          // colored caret turned it blue (reported from a real session).
-          // Hence a bare leading cell takes the anchor — no color prop, same
-          // "terminal default foreground" the typed run gets — and the
-          // placeholder starts one column later.
-          <>
-            <Text ref={caretRef}>{' '}</Text>
-            <Text dimColor>{t('question-direct-input')}</Text>
-          </>
-        ) : (
-          <>
-            <Text wrap="wrap">{textPoints.slice(0, customCursor).join('')}</Text>
-            {/* Focused keeps the inverse block caret (same contract as the
-                composer's value box): the preedit then renders inverted,
-                which reads as "the block is filling with text". */}
-            {inputFocused
-              ? <Text ref={caretRef} inverse>{cursorChar}</Text>
-              : <Text ref={caretRef}>▏</Text>}
-            <Text wrap="wrap">{textPoints.slice(inputFocused ? customCursor + 1 : customCursor).join('')}</Text>
-          </>
-        )}
+      <Box flexDirection={columns < 40 ? 'column' : 'row'} marginLeft={1} flexGrow={1} minWidth={0}>
+        <Box flexDirection="row" flexShrink={1} minWidth={0}>
+          <Text bold={inputFocused} color={inputFocused ? 'accent' : 'suggestion'}>
+            {t('question-custom-tab')}
+          </Text>
+          {attached !== null && (
+            <Text color="suggestion">{t('question-attached-label', { label: attached })}</Text>
+          )}
+          <Text dimColor>：</Text>
+        </Box>
+        <Box flexDirection="row" flexShrink={1} minWidth={0}>
+          {customText === '' && !inputFocused ? (
+            // The IME anchor must sit on a cell styled exactly like the answer
+            // text the user is about to commit: the terminal draws the preedit
+            // at the physical cursor USING THAT CELL'S STYLE, so an anchor over
+            // the dim placeholder turned pinyin dim, and one on the suggestion-
+            // colored caret turned it blue (reported from a real session).
+            // Hence a bare leading cell takes the anchor — no color prop, same
+            // "terminal default foreground" the typed run gets — and the
+            // placeholder starts one column later.
+            <>
+              <Text ref={caretRef}>{' '}</Text>
+              <Text dimColor>{t('question-direct-input')}</Text>
+            </>
+          ) : (
+            <>
+              <Text wrap="wrap">{textPoints.slice(0, customCursor).join('')}</Text>
+              {/* Focused keeps the inverse block caret (same contract as the
+                  composer's value box): the preedit then renders inverted,
+                  which reads as "the block is filling with text". */}
+              {inputFocused
+                ? <Text ref={caretRef} inverse>{cursorChar}</Text>
+                : <Text ref={caretRef}>▏</Text>}
+              <Text wrap="wrap">{textPoints.slice(inputFocused ? customCursor + 1 : customCursor).join('')}</Text>
+            </>
+          )}
+        </Box>
       </Box>
     </Box>
   )
 
   const renderOptions = (): React.ReactNode => (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column" marginTop={spacing}>
       {options.slice(optionWindow.start, optionWindow.end).map((option, index) => {
         const absoluteIndex = optionWindow.start + index
         const focused = absoluteIndex === focusIndex
-        const selected = multiSelect ? checked.has(absoluteIndex) : focused
+        const selected = multiSelect && checked.has(absoluteIndex)
         const pointer = focused
           ? POINTER
           : absoluteIndex === optionWindow.start && optionWindow.start > 0
@@ -750,7 +740,7 @@ export function AskUserQuestionPanel({
           <Box
             key={`${absoluteIndex}:${option.label}`}
             flexDirection="row"
-            marginTop={!windowedOptions && focused ? 1 : 0}
+            marginTop={!windowedOptions && focused ? spacing : 0}
             onClick={() => clickOption(absoluteIndex)}
             onMouseEnter={() => setHoverIndex(absoluteIndex)}
             onMouseLeave={() => setHoverIndex(current => (current === absoluteIndex ? -1 : current))}
@@ -761,12 +751,10 @@ export function AskUserQuestionPanel({
                 {pointer}
               </Text>
             </Box>
-            <Box width={1} flexShrink={0}>
-              <Text color={focused ? 'accent' : undefined} bold={selected}>
-                {selected ? (multiSelect ? CHECKED : '●') : UNCHECKED}
-              </Text>
-            </Box>
-            <Box flexDirection="column" marginLeft={1}>
+            {multiSelect ? <Box width={1} flexShrink={0}>
+              <Text color={selected ? 'success' : undefined} bold={selected}>{selected ? CHECKED : UNCHECKED}</Text>
+            </Box> : null}
+            <Box flexDirection="column" marginLeft={1} flexGrow={1} minWidth={0}>
               <Text
                 bold={focused || selected}
                 color={focused ? 'accent' : undefined}
@@ -827,11 +815,36 @@ export function AskUserQuestionPanel({
         t('question-fold-hint', { combo: foldCombo }),
       ]
 
+  // Compact hints keep the essential controls visible in narrow/short TTYs.
+  const compactHints = columns < 40 || terminalRows < 18
+  const hintText = compactHints
+    ? ['↑↓ · Enter · Esc', [multiSelect ? 'Space' : '', modelEditor !== undefined || !hideCustomInput ? 'Tab' : ''].filter(Boolean).join(' · ')].filter(Boolean).join('\n')
+    : hintParts.join(' · ')
+  const contentWidth = Math.max(1, columns - 4)
+  const wrappedRows = (text: string): number => wrapText(text, contentWidth, 'wrap').split('\n').length
+  const detailRows = (question.detail === undefined ? 0 : wrappedRows(question.detail) + spacing)
+    + (linkText === '' ? 0 : wrappedRows(linkText) + (question.detail === undefined ? spacing : 0))
+  // Charge the frame, chat chrome and every wrapped header/hint before options.
+  const reservedRows = 10 + spacing * 3 + (question.question === '' ? 0 : wrappedRows(question.question)) + wrappedRows(hintText)
+    + detailRows + (hideCustomInput ? 0 : wrappedRows(customText) + (columns < 40 ? 2 : 1))
+    + (error === null ? 0 : wrappedRows(error) + spacing)
+  const optionBudget = Math.max(terminalRows - reservedRows, 2)
+  const optionHeights = options.map(option => option.description === undefined ? 1 : 2)
+  const optionTextWidth = Math.max(1, contentWidth - 3)
+  const naturalOptionRows = options.reduce((sum, option) => sum
+    + wrapText(option.label, optionTextWidth, 'wrap').split('\n').length
+    + (option.description === undefined ? 0 : wrapText(option.description, optionTextWidth, 'wrap').split('\n').length), 0)
+  const windowedOptions = naturalOptionRows + spacing > optionBudget
+  const optionFocus = Math.min(focusIndex, Math.max(options.length - 1, 0))
+  const optionWindow = windowedOptions
+    ? listWindow(optionHeights, optionFocus, optionBudget)
+    : { start: 0, end: options.length }
+
   // Folded: render only the minimized bar. This branch sits AFTER every
   // hook (and after the intent early-return), so folding never reorders
   // hooks and the draft refs above stay alive for the expand.
   if (collapsed) {
-    return <QuestionMinimizedBar progress={headerTitle} questionText={questionText} onExpand={onExpand ?? (() => {})} />
+    return <QuestionMinimizedBar progress={panelTitle} questionText={questionText} onExpand={onExpand ?? (() => {})} />
   }
 
   if (editingModel !== null && modelEditor !== undefined) {
@@ -848,27 +861,19 @@ export function AskUserQuestionPanel({
   }
 
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={2} paddingRight={2} width="100%">
-      <Box
+    <SelectionPanel title={<Box
         flexDirection="column"
         onClick={onToggleFold}
         onMouseEnter={() => setHeaderHovered(true)}
         onMouseLeave={() => setHeaderHovered(false)}
         backgroundColor={headerHovered ? 'userMessageBackgroundHover' : undefined}
       >
-        <Divider color="permission" title={`▾${headerTitle}`} />
-      </Box>
-      <Box flexDirection="column" marginTop={1}>
-        {question.header !== undefined && (
-          <Text color="suggestion" bold>
-            ◈ {question.header}
-          </Text>
-        )}
-        <Text bold wrap="wrap">
-          {question.question}
-        </Text>
+        <Text color="permission" bold wrap="truncate-end">{panelTitle}</Text>
+      </Box>} footer={<Text dimColor wrap="wrap">{hintText}</Text>}>
+      <Box flexDirection="column">
+        {question.question !== '' ? <Text bold wrap="wrap">{question.question}</Text> : null}
         {(question.detail !== undefined || linkText !== '') && (
-          <Box flexDirection="column" marginTop={1}>
+          <Box flexDirection="column" marginTop={spacing}>
             {question.detail?.split('\n').map((line, index) => (
               <Text key={index} dimColor italic wrap="wrap">
                 {line}
@@ -884,9 +889,6 @@ export function AskUserQuestionPanel({
           <Text color="error">{error}</Text>
         </Box>
       )}
-      <Box marginTop={1}>
-        <Text dimColor>{hintParts.join(' · ')}</Text>
-      </Box>
-    </Box>
+    </SelectionPanel>
   )
 }

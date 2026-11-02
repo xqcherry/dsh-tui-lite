@@ -46,7 +46,7 @@ export interface TranscriptCommands {
   compact(): void
   cancelCompact(): void
   exportSession(): string | null
-  pushLocal(title: string, lines: readonly string[]): void
+  pushLocal(title: string, lines: readonly string[], options?: { commandResult?: boolean }): void
 }
 
 export interface TranscriptBinding {
