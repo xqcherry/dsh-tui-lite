@@ -278,7 +278,7 @@ const dict = {
   'question-select-or-answer': 'Select at least one option, or type an answer on the last line',
   'question-answer-or-check': 'Type an answer or check options before submitting',
   'question-type-answer-first': 'Type your answer before submitting',
-  'question-header-progress': ' 📋 Question {{position}}/{{total}} {{remaining}} ',
+  'question-header-progress': 'Questionnaire · {{position}}/{{total}}{{remaining}}',
   'question-remaining-more': ' · {{n}} left',
   'question-hint-type': 'Type answer',
   'question-hint-paste': '{{key}} paste',

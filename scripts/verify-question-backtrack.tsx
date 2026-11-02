@@ -151,6 +151,8 @@ const app = await render(React.createElement(AskUserQuestionPanel, {
 }), { stdout, stdin, stderr: new FakeStdout(), exitOnCtrlC: false, patchConsole: false })
 assert.ok(await settled(() => screen().includes('draft text')))
 assert.ok(await settled(() => screen().includes('● Beta')))
+assert.ok(await settled(() => screen().includes('Questionnaire · 2/2')), screen())
+assert.equal(screen().includes('📋'), false, 'live panel title has no emoji')
 
 stdin.write('\x1b')
 // onBack 回调同步整体赋值 backDraft；等回调触发后值即终态，深比较为同步派生断言。
