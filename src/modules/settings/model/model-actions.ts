@@ -45,6 +45,7 @@ export function createSettingsModelActions<Capture>(settings: SettingsModelState
   settings.setReasoningEffort(preferredEffort)
   let effortLevelsGeneration = 0
   let effortOperation = 0
+  let preferredEffortUpdate: Promise<void> | undefined
   const effortWarm = { tried: false }
   const modelNodeCache = { nodes: undefined as readonly CommandCompletionNode[] | undefined, load: undefined as Promise<void> | undefined, generation: 0 }
 
@@ -116,7 +117,7 @@ export function createSettingsModelActions<Capture>(settings: SettingsModelState
       return 'error'
     }
   }
-  const applyPreferredEffort = async (): Promise<void> => {
+  const applyPreferredEffortNow = async (): Promise<void> => {
     if (llmRuntime === undefined || typeof llmRuntime.resolveModelInfo !== 'function') return
     const capture = captureEffort()
     const resolved = await resolveEfforts(capture)
@@ -179,6 +180,10 @@ export function createSettingsModelActions<Capture>(settings: SettingsModelState
     host.pin({ provider: capture.provider, model: capture.model, effort: applied })
     host.publish()
   }
+  const applyPreferredEffort = (): Promise<void> => {
+    preferredEffortUpdate = applyPreferredEffortNow()
+    return preferredEffortUpdate
+  }
   const refreshEffortLevels = (): void => {
     if (llmRuntime === undefined || typeof llmRuntime.resolveModelInfo !== 'function') return
     const capture = captureEffort()
@@ -201,6 +206,9 @@ export function createSettingsModelActions<Capture>(settings: SettingsModelState
     host.publish()
   }
   const listEfforts = async (): Promise<{ efforts: readonly EffortOption[]; defaultEffort: string | undefined }> => {
+    // Binding restores the saved preference asynchronously. Listing tiers must
+    // let that finish before starting an operation that would invalidate it.
+    await preferredEffortUpdate
     const capture = captureEffort()
     const resolved = await resolveEfforts(capture)
     if (resolved === 'stale') return { efforts: [], defaultEffort: undefined }

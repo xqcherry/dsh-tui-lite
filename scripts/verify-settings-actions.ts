@@ -32,6 +32,18 @@ try {
   assert.equal(await first, false)
   assert.equal(pin, undefined)
   assert.equal(runtime.settings.store.getSnapshot().contextWindow, 100, 'same route metadata survives binding change')
+  // Opening the post-model picker must not cancel the bind-time preference.
+  runtime.settings.ingress.setReasoningEffort(undefined)
+  const restoring = model.applyPreferredEffort()
+  const listing = model.listEfforts()
+  const reasoning = { efforts: [{ id: 'low', name: 'Low' }, { id: 'high', name: 'High' }], defaultEffort: 'low' }
+  pending.shift()!({ reasoning })
+  await restoring
+  assert.deepEqual(pin, { provider: 'fixture', model: 'fixture-model', effort: 'high' }, 'listing must preserve the restored effort pin even if the picker is cancelled')
+  await new Promise(resolve => setImmediate(resolve))
+  pending.shift()!({ reasoning })
+  assert.equal((await listing).efforts.length, 2)
+  assert.equal(runtime.settings.store.getSnapshot().reasoningEffort, 'high', 'the picker must observe the restored effort')
   const fallback = model.applyPreferredEffort()
   pending.shift()!({ reasoning: { efforts: [{ id: 'low', name: 'Low' }], defaultEffort: 'low' } })
   await fallback
