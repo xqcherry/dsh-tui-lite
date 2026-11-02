@@ -41,9 +41,21 @@ backup before linking the current installation. Other installed plugins remain.
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm dev
+```
+
+`pnpm dev` builds the current source and launches it. To launch an existing build
+without rebuilding:
+
+```sh
 pnpm build
+pnpm start
+```
+
+Before submitting changes, run the required checks:
+
+```sh
 pnpm verify
-node bin/dsh-tui.js
 ```
 
 Edit `src/`; `lib/` is generated. Start with the feature entries under

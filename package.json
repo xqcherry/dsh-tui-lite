@@ -64,6 +64,8 @@
     "clean": "node scripts/clean-lib.mjs",
     "compile": "node scripts/clean-lib.mjs && tsc -p tsconfig.json",
     "build": "npm run compile",
+    "dev": "pnpm build && pnpm start",
+    "start": "node bin/dsh-tui.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "node scripts/verify.mjs",
     "prepare": "npm run compile",
