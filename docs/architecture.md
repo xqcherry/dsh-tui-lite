@@ -1,70 +1,156 @@
-# 客户端架构
+# Architecture
 
-项目是一个 npm 包，以 Cordis 插件形式在随包安装的 dsh 进程中运行。dsh 负责 agent、模型、工具、会话持久化和策略；客户端负责输入、展示和交互。
+**English** | [简体中文](architecture.zh-CN.md) · [README](../README.md)
 
-## 从哪里开始读
+This guide explains how dsh TUI Lite runs, how its parts communicate, and where to make changes. It describes the current implementation; development plans under `docs/superpowers/` are historical context.
 
-| 想理解的功能 | 入口 | 内部职责 |
+## 1. System overview
+
+The client runs as a Cordis plugin inside the dsh process launched by its CLI. DeepSeek Harness owns agents, model execution, tools, durable sessions, and policies. The client translates those capabilities into terminal input, conversation views, menus, and approval panels.
+
+```mermaid
+flowchart TB
+  CLI["CLI launcher"] --> DSH["dsh process / Cordis profile"]
+  DSH --> Plugin["TUI plugin"]
+  Plugin --> Adapter["dsh-adapter: host integration and channel assembly"]
+  Adapter --> Modules["Feature modules: state, commands, projections"]
+  Modules --> UI["React views and shared UI"]
+  UI --> Terminal["Terminal facade and local renderer"]
+  Adapter <--> Harness["Harness services: agents, tools, models, persistence, policies"]
+```
+
+Arrows show startup and integration relationships, rather than a complete import graph. User actions travel back through module commands; host events return through the adapter and module stores.
+
+### Source map
+
+| Location | Responsibility |
+| --- | --- |
+| `bin/` | Executable entry that loads the compiled launcher |
+| [`src/dsh-adapter/`](../src/dsh-adapter/) | Launcher, Cordis plugin, Harness integration, event translation, and channel assembly |
+| [`src/modules/`](../src/modules/) | Feature logic, state, public contracts, and feature views |
+| [`src/shared/`](../src/shared/) | Internal protocols, platform utilities, state publication, and resource lifetimes |
+| [`src/ui/`](../src/ui/) | Shared themed components, forms, Markdown, and presentation helpers |
+| [`src/terminal/`](../src/terminal/) | Rendering and input facade, external editor, and shutdown |
+| `src/ink/`, `src/native-ts/` | Local terminal renderer, input parsing, graphics, and layout implementation |
+| [`scripts/`](../scripts/) | Architecture checks and behavior verification |
+| `lib/` | Generated JavaScript and declarations; edit `src/` instead |
+
+## 2. Startup and shutdown
+
+1. [`bin/dsh-tui.js`](../bin/dsh-tui.js) calls the compiled version of [`launcher.ts`](../src/dsh-adapter/launcher.ts). The launcher resolves the bundled dsh installation rather than searching the global PATH.
+2. The launcher prepares the dedicated `dsh-tui` profile, combines the official base bundle with this client, and links the profile to the current installation. It preserves user profile patches and backs up replaced profile data where needed.
+3. [`plugin.ts`](../src/dsh-adapter/plugin.ts) checks the terminal and runtime, resolves the model and working directory, and creates or resumes an agent. An explicit CLI launch requires an interactive terminal; loading the plugin in a headless host does not mount the UI.
+4. [`channel.ts`](../src/dsh-adapter/channel.ts) assembles the runtime in three stages: create the core, configure dsh services, then start. Construction failures release resources acquired by the channel.
+5. The plugin renders `Chat` with restricted module bindings and separate approval/question stores. Host connections are installed before module commands are activated and event subscriptions begin.
+
+On user exit, the exit funnel restores the terminal and performs host cleanup. Plugin unload also releases the channel, subscriptions, timers, and pending decisions. Resource cleanup belongs to the owner that acquired each resource.
+
+## 3. Feature modules and their interfaces
+
+| Module | Owns | Typical change |
 | --- | --- | --- |
-| 输入 | `src/modules/composer/index.ts` | 草稿编辑、撤销、历史、图片、补全、提交、键盘与布局 |
-| 消息 | `src/modules/transcript/index.ts` | 事件投影、用量、历史窗口、行签名与具体消息渲染 |
-| 会话 | `src/modules/sessions/index.ts` | 会话状态、切换事务、占用账本、恢复标记与投影重置 |
-| 设置 | `src/modules/settings/index.ts` | 模型操作、偏好、服务商向导；添加、编辑、发现与认证分开 |
-| 审批问答 | `src/modules/decisions/index.ts` | 问题队列、回答取消、审批面板 |
-| 任务与子代理 | `src/modules/activity/index.ts` | 任务与子代理归约、费用、任务卡片和分组 |
-| 聊天主界面 | `src/modules/workbench/index.ts` | 页面、菜单、焦点、通知与命令协调 |
+| `composer` | Pending input, cancellation state, draft editing controllers, history, completion, and image input | Change editing or submission behavior |
+| `transcript` | Conversation rows, event projection, usage, streaming presentation, and history windows | Change how a persisted message or tool result appears |
+| `sessions` | Current session identity and status, session browsing, and switching workflows | Change new/resume/rename behavior |
+| `settings` | Model and effort selection, preferences, provider configuration, and authentication workflows | Add a provider configuration step |
+| `activity` | Task and subagent projections, cards, and controls | Change background activity presentation |
+| `workbench` | Command catalog, notifications, cross-module projection coordination, and the main chat view | Add a menu or coordinate a user action |
+| `decisions` | Approval and question contracts, interaction rules, and panels | Change approval or question interaction |
 
-每个模块的 `contracts.ts` 是公开类型入口，`index.ts` 是公开运行时入口；`model/` 放不依赖 React、终端或 dsh 的逻辑，`ui/` 放界面和控制器。跨模块不得访问私有文件。
+Six modules expose state owners constructed by the channel. `decisions` uses separate approval and question stores wired by the plugin; it is not a seventh owner in the six-store runtime.
 
-例如理解输入，先看 `contracts.ts` 的 `ComposerBinding`，再看输入组件与 `ui/controllers/` 下的提交、历史、附件和撤销控制器；编辑和图片 token 的纯规则在 `model/`。不必先读终端渲染器。
+### Public and internal surfaces
 
-## 基础设施与宿主接入
+Every feature has `index.ts` for runtime exports and `contracts.ts` for public types. Other modules and the adapter consume these entries instead of private implementation files. Feature `model/` code contains logic independent of React and terminal rendering; `ui/` contains views and interaction controllers.
 
-- `src/dsh-adapter/`：唯一允许导入官方包的目录，负责 profile、agent、宿主服务、持久化事件翻译与装配。
-- `src/shared/protocol/`：规范化事件和跨模块传输数据，不包含业务执行流程。
-- `src/shared/platform/`：文件、剪贴板、文本和图像等基础能力，不反向依赖功能模块或界面。
-- `src/shared/lifecycle/`、`src/shared/state/`：所有权、退出与模块快照、批量发布与只读投影的公共机制。
-- `src/ui/`：主题、Markdown、代码框、通用表单及展示工具，不依赖功能模块。
-- `src/ui/primitives.ts`：带主题的业务组件入口；`src/terminal/`：渲染、输入和终端恢复门面。
-- `src/ink/`、`src/native-ts/`：保留的终端渲染器与布局实现。本轮只调整基础工具的导入路径。
+The six state owners expose these surfaces:
 
-依赖检查覆盖静态导入、类型导入、动态导入和转导出，并检查功能模块之间无依赖环。功能 model 不得依赖 React 或渲染器。
+| Surface | Consumer | Meaning |
+| --- | --- | --- |
+| `store.getSnapshot()` / `store.subscribe()` | UI | Read and subscribe to a module's committed snapshot |
+| `commands` | UI and coordinating logic | Request an operation through the owning module |
+| `ingress` | Runtime assembly and event routing | Apply specific host facts or projection updates |
+| `connectHost()` / `startCommands()` / `dispose()` | Runtime assembly | Connect capabilities, activate commands, and end the module lifetime |
 
-## 启动与数据流
+[`workbench-bindings.ts`](../src/dsh-adapter/workbench-bindings.ts) exposes only `store` and `commands` to the renderer. Writers and lifecycle controls remain internal. Commands are stable objects, require an active host connection, and become unusable after disposal. This also applies to controls retained by an old view.
 
-1. `bin/dsh-tui.js` 调用启动器，定位当前安装的 dsh，不搜索全局 PATH。
-2. 专用 profile 组合官方 `dsh-base` 与当前 TUI bundle，并链接到当前 npm 安装。用户 patch 继续保留。
-3. `dsh-adapter/plugin.ts` 创建或恢复 agent，装配宿主服务、审批问答与工作台。
-4. adapter 创建六个状态模块与独立审批问答队列，分别连接各模块需要的宿主接口；全部接线完成后才启用公开命令。`workbench-bindings.ts` 只向工作台公开各模块的 `store` 和 `commands`。
-5. 输入经宿主服务送入 dsh；持久化事件和临时流式帧被翻译，由模块入口归约并发布快照，通知界面渲染。
-6. 用户退出先恢复终端再清理宿主；插件卸载只释放当前实例。
+UI state has several owners: module snapshots hold shared feature facts, while local React state holds transient editing or menu interaction. A module snapshot is not a copy of the entire Harness state.
 
-持久化 transcript 始终是事实来源。事件顺序、序列锚点、工具调用 ID、绑定 generation、输入 FIFO 和释放事务继续保留。
+## 4. Following a user action
 
-## 状态与发布
+### Sending a message
 
-每个状态模块公开 `Snapshot`、`Commands` 和 `Binding`。`store.getSnapshot()` 在状态无变化时返回同一不可变快照；`subscribe()` 只订阅所属模块。界面不再依赖全局版本号。输入控制器通过上下文读取会话、设置和通知事实，调用显式命令。
+```mermaid
+sequenceDiagram
+  participant UI as Composer view
+  participant C as Composer commands
+  participant A as Adapter input delivery
+  participant H as Harness session
+  participant P as Event router and projection
+  participant S as Module stores
+  UI->>C: Submit input
+  C->>A: Call connected host operation
+  A->>H: Deliver input and attachments
+  H-->>P: Persisted events and live frames via adapter
+  P->>S: Update feature projections
+  S-->>UI: Notify snapshot subscribers
+```
 
-`src/shared/state/module-store.ts` 提供发布协调器。一次事件批次或会话重置中的所有模块先安装快照，再通知订阅者。流式内容立即进入快照，通知约 16 ms 合并；上游 `wake: none` 提交事实但不主动唤醒界面。历史消息保留 dirty 标记优化，无关状态更新不重新遍历历史行。图片 Buffer 等不透明对象保留原有语义。
+Start with [`composer/ui/controllers/submission.ts`](../src/modules/composer/ui/controllers/submission.ts), then follow [`input-delivery.ts`](../src/dsh-adapter/channel/input-delivery.ts). The input queue preserves delivery order and session ownership. Pending previews belong to the composer; they do not prove that Harness has accepted or executed an input.
 
-模块的 `ingress` 仅供运行时接线使用，提供设置会话身份、归约元数据、更新待发队列、重置投影等明确操作；通用 `patch/update` 保留在模块内部，不交给其他模块或 adapter。`read()` 读取同批操作中的当前不可变事实，UI 则通过已提交快照读取。transcript 的私有 reducer 保留工具调用与消息行身份；activity 通过 transcript 的任务行入口更新展示，不持有消息数组。审批问答保留已有独立队列。
+### Running a command
 
-模块自行构造稳定的公开命令，分别连接宿主接口，在完整装配后启用。释放模块后，已经取得的命令及嵌套控制对象均失效；UI 绑定继续提供独立的只读和撤权边界。运行时不再合并全量命令表或维护中央命令转发注册表。
+[`shared/commands.ts`](../src/shared/commands.ts) declares local slash commands. [`workbench/model/chat-commands.ts`](../src/modules/workbench/model/chat-commands.ts) routes them to module operations and menus. The adapter merges commands supplied by the Harness registry into the runtime catalog; local names take precedence. `/help` and completion use the runtime catalog, so available commands can depend on installed services.
 
-## 会话与宿主边界
+A new command therefore needs both a catalog entry and an implementation route. If it needs a new Harness capability, expose that through the adapter and the owning module's host contract.
 
-`sessions/model/` 协调新建、恢复和模型 fork 的客户端流程；adapter 提供实际 agent、绑定、句柄、预约、preset、工作区与持久化服务。各用例通过宿主接口传递不透明资源，不在模块中读取真实 agent。新建、恢复和模型 fork 保留各自的竞争检查与操作次序，不统一成一种切换政策。提交前失败保留旧会话，提交后初始化失败撤销新绑定并报错。批量重置和重放完成后才通知界面；generation 继续隔离过期回调。
+## 5. Transcript, snapshots, and session changes
 
-`dsh-adapter/module-runtime.ts` 是装配类型，组合模块引用和资源释放，不保存另一份聚合状态。旧 `runtime/` 中的完整 `Client`、`ClientState`、初始状态和界面选择器已移除。adapter 仍负责官方事件订阅、宿主资源与模块的连接；专业服务通过窄接口接线，完整模块集合只用于 `channel/core/compose.ts` 和 `channel/composition.ts` 两个装配入口。终端渲染器和键盘布局控制器继续保留。
+### From Harness events to terminal rows
 
-## 业务流程归属
+The persisted transcript is the source of truth for conversation history. Live frames supply in-progress presentation; the client must preserve event order, sequence anchors, and tool call IDs so that replay and live updates agree.
 
-- **设置**：`settings/model/model-actions.ts` 管理模型目录缓存、推理强度、偏好回退及异步结果有效性。adapter 查询官方模型服务并应用模型选择；模型切换通过会话交接用例执行。
-- **输入**：`composer/model/input-queue.ts` 保证发送顺序与原会话归属，`image-capabilities.ts` 管理图片引用、epoch 和失效。adapter 保留文件展开、官方消息与附件创建、策略及 pre-step 钩子。取消和 dock 收敛状态归 composer。
-- **消息事件**：工作台先执行现有整批状态/待发队列预处理，再按 reset 分段投影。transcript 只读取其他模块必要事实，通过同步语义回调触发更新，回调在原事件阶段执行，不延迟至批末。
-- **任务**：activity 根据已验证归属的任务快照生成状态、通知与消息行更新。adapter 保留宿主订阅、attachment token、当前调用者授权、输出游标读取和同步回调防护。
-- **主界面**：工作台命令控制器处理命令路由与跨模块操作；设置模块负责配置就绪检查。`Chat` 保留 React 展示、菜单、焦点和键盘交互。
+- [`backend/translate.ts`](../src/dsh-adapter/backend/translate.ts) normalizes Harness records and live frames into the internal event protocol.
+- [`channel/core/binding-feed.ts`](../src/dsh-adapter/channel/core/binding-feed.ts) connects session subscriptions to the event router and projection.
+- [`workbench/model/session-batch.ts`](../src/modules/workbench/model/session-batch.ts) checks the current binding, handles status and pending-input bookkeeping, and preserves reset boundaries within a batch.
+- [`transcript/model/projection.ts`](../src/modules/transcript/model/projection.ts) reduces normalized events into transcript rows; workbench projection coordinates the required facts across modules.
 
-不引入全局事件总线；跨模块事件、重置与采用协调分别使用各流程所需的接口，不持有另一份聚合状态。
+Task and subagent projections also update activity views and their transcript rows through explicit interfaces. Folded history is restored through the session's durable transcript; display truncation must not become data loss.
 
-`pnpm verify` 默认串行运行检查，避免同时启动多个渲染和图片测试。涉及终端的改动还需窄 TTY 验证，打包另运行 `pnpm verify:package`。前一阶段验收见 [模块状态计划](superpowers/plans/2026-10-31-module-state.md)，本轮职责迁移见 [adapter 解耦计划](superpowers/plans/2026-10-31-adapter-decoupling.md)。
+### Snapshot publication
+
+[`shared/state/module-store.ts`](../src/shared/state/module-store.ts) supplies per-module stores and a shared publication coordinator. A batch installs all changed snapshots before notifying subscribers, so a view does not observe a partially applied cross-module update. Unchanged snapshots retain their identity.
+
+Streaming updates commit snapshots while coalescing subscriber notifications on an approximately 16 ms timer. Events marked `wake: none` can commit facts without waking the UI. This is notification scheduling, not persistence or a separate event bus.
+
+### Switching sessions safely
+
+New-session, resume, and model-fork workflows have different host operations and race checks. Their orchestration lives in `sessions/model/`; the adapter acquires and binds real Harness resources.
+
+A binding capture includes a generation. Event handlers and asynchronous work check that capture before updating the current view, preventing late results from the previous binding from entering the replacement session. Session adoption resets and replays projections before subscribers are notified. Failures before adoption keep the old session; failures during initialization after adoption revoke the new binding and report the error.
+
+## 6. Dependency rules
+
+The source boundary checker enforces the following rules, including type imports, re-exports, and literal dynamic imports:
+
+- `@deepseek-ai/*` imports stay in `src/dsh-adapter/`. Feature code uses host contracts and internal protocol types.
+- Cross-feature imports use `index.ts` or `contracts.ts`, and feature dependencies must be acyclic.
+- Feature models do not import React, their UI, or terminal rendering code.
+- Shared infrastructure does not import features or rendering layers. Shared UI does not import features or the adapter; the terminal facade does not import business UI.
+
+The channel's two composition points have distinct jobs: [`core/compose.ts`](../src/dsh-adapter/channel/core/compose.ts) creates module owners, input/event plumbing, and lifecycle management; [`composition.ts`](../src/dsh-adapter/channel/composition.ts) connects Harness-specific services. Neither should become another aggregate copy of module state.
+
+## 7. Making and checking a change
+
+| Change | Start here | Relevant verification scripts |
+| --- | --- | --- |
+| Input editing or delivery | `composer` and adapter input delivery | `verify-composer-delivery.ts`, `verify-prompt-*.mjs` |
+| Message rendering or replay | Translator, transcript projection, transcript UI | `verify-dsh-translate.ts`, `verify-projection-golden.ts`, `verify-transcript-restoration.ts` |
+| Session switching | `sessions/model/` and adapter binding | `verify-session-transitions.ts`, `verify-binding-transaction.ts`, `verify-session-adoption.ts` |
+| Providers or models | `settings/model/` and adapter settings/model services | `verify-provider-wizard.mjs`, `verify-model-configuration.ts`, `verify-settings-actions.ts` |
+| Commands or help | Command catalog and workbench routing/UI | `verify-workbench-commands.ts`, `verify-command-suggestions.mjs`, `verify-help-panel.tsx` |
+| Module boundaries or wiring | Module contracts and channel composition | `verify-boundaries.mjs`, `verify-feature-modules.mjs`, `verify-adapter-composition.ts` |
+
+These scripts live in `scripts/`. Read [`scripts/verify.mjs`](../scripts/verify.mjs) for the supported suite and loader requirements of individual checks.
+
+For code changes, run `pnpm build`, relevant focused checks, and `pnpm verify`. Terminal UI changes also require narrow-TTY verification. Packaging changes additionally use `pnpm verify:package`. Documentation-only changes require diff and link checks. See [CONTRIBUTING](../CONTRIBUTING.md) and [repository rules](../AGENTS.md) for contribution requirements.

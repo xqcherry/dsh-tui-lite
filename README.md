@@ -1,117 +1,119 @@
 # dsh TUI Lite
 
+**English** | [简体中文](README.zh-CN.md)
+
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green?style=flat)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](tsconfig.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%7C%20%3E%3D24-339933?style=flat&logo=node.js&logoColor=white)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-F69220?style=flat&logo=pnpm&logoColor=white)](pnpm-lock.yaml)
 
-一个简洁、轻量的开源 dsh 终端客户端，专注于做好 DeepSeek Harness 的 TUI 层。
+A simple, lightweight, open-source terminal client focused on the TUI layer for DeepSeek Harness.
 
-基于 dsh-TUI 二次开发，对架构、命令和内部实现做了重新整理，删除冗余逻辑，保留日常使用所需的基础能力。目标是提供一个小巧、顺手、易维护的终端界面。
+Derived from dsh-TUI, this version reworks the architecture, command handling, and internal structure, removes redundant logic, and keeps the essentials for everyday use. The goal is a small, practical terminal interface that is easy to maintain.
 
-## 与 dsh-TUI 的区别
+## What differs from dsh-TUI
 
-这个版本围绕“简单、轻量的 TUI 层”重新梳理了实现，主要调整了以下几个方面：
+The implementation has been reorganized around a simple, lightweight TUI layer:
 
-| 方向 | 本项目的调整 |
+| Area | Changes in this project |
 | --- | --- |
-| 架构重构 | 按功能重新划分模块，明确界面、交互逻辑与 dsh 接入的职责，清理重复状态和冗余逻辑 |
-| 命令整理 | 集中梳理命令入口与处理流程，精简常用操作，让命令组织更清晰 |
-| 内部风格统一 | 统一模块结构、公开接口与界面基础组件，减少分散实现，方便维护和扩展 |
-| 专注 TUI | 聚焦输入、展示与交互，通过现有 adapter/channel 接入 dsh 的能力 |
+| Architecture | Organize modules by feature, clarify UI, interaction, and dsh integration responsibilities, and remove duplicated state and redundant logic |
+| Commands | Consolidate command entry points and handling, and simplify common operations |
+| Internal consistency | Standardize module structure, public interfaces, and shared UI components for easier maintenance and extension |
+| TUI focus | Handle input, presentation, and interaction through the existing dsh adapter/channel integration |
 
-**核心原则：只做好简单、轻量的 TUI 层。** agent、模型、工具执行、会话持久化与策略交给 Harness；TUI 围绕这些能力提供必要的终端交互，避免重复实现和冗余逻辑。
+**Core principle: keep the TUI layer simple and lightweight.** Harness owns agents, models, tool execution, session persistence, and policies. The TUI provides the terminal interactions needed to use those capabilities, avoiding duplicate implementations and redundant logic.
 
-目前仅保留基本功能，后续会根据实际需求持续补充功能、打磨体验，并保持清晰的职责边界。
+Currently, this version keeps the basic functionality. Further improvements will follow practical needs while preserving clear responsibilities.
 
-## 目前能做什么
+## Current features
 
-| 功能 | 说明 |
+| Feature | Description |
 | --- | --- |
-| 终端对话 | 在终端中与 agent 交互，查看流式回复和工具执行结果 |
-| 模型配置 | 配置服务商、认证信息，选择和切换模型 |
-| 会话管理 | 新建、恢复、重命名与导出会话 |
-| 上下文管理 | 压缩较早的对话内容，释放上下文空间 |
-| 交互确认 | 处理工具执行中的权限确认与提问 |
+| Terminal chat | Interact with agents and view streaming responses and tool results |
+| Model configuration | Configure providers and authentication, and select or switch models |
+| Session management | Create, resume, rename, and export sessions |
+| Context management | Compact earlier conversation turns to free context space |
+| Approvals and questions | Respond to permission requests and questions during tool execution |
 
-## 快速开始
+## Quick start
 
-需要 Node.js 22.19 或 24+，以及 pnpm。在项目目录运行：
+Requires Node.js matching `^22.19 || >=24` and pnpm. From the project directory, run:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-首次使用：
+On first launch:
 
-1. 输入 `/provider` 配置服务商与 API 信息；需要账户登录时使用 `/auth`。
-2. 输入 `/model` 选择可用模型。
-3. 输入你的任务或问题，开始对话。
+1. Run `/provider` to configure a provider and API details. Use `/auth` for account login when needed.
+2. Run `/model` to select an available model.
+3. Enter a task or question to start a conversation.
 
-输入 `/help` 查看可用命令与快捷键。
+Run `/help` to see available commands and keyboard shortcuts.
 
-## 常用命令
+## Common commands
 
-| 命令 | 用途 |
+| Command | Purpose |
 | --- | --- |
-| `/provider` | 配置服务商与 API 地址 |
-| `/auth` | 管理服务商登录与认证 |
-| `/model` | 查看或切换模型 |
-| `/new` | 开始新对话 |
-| `/resume` | 选择并恢复已保存的会话 |
-| `/rename <名称>` | 重命名当前会话 |
-| `/export` | 导出当前会话 |
-| `/compact` | 压缩较早的对话内容 |
-| `/permission` | 查看或切换权限模式 |
-| `/status` | 查看当前会话、模型与工作目录信息 |
-| `/help` | 查看帮助 |
-| `/exit` | 退出客户端 |
+| `/provider` | Configure providers and API endpoints |
+| `/auth` | Manage provider login and authentication |
+| `/model` | View or switch models |
+| `/new` | Start a new conversation |
+| `/resume` | Select and resume a saved session |
+| `/rename <name>` | Rename the current session |
+| `/export` | Export the current session |
+| `/compact` | Compact earlier conversation turns |
+| `/permission` | View or switch permission modes |
+| `/status` | View the current session, model, and working directory |
+| `/help` | Show help |
+| `/exit` | Exit the client |
 
-## 本地开发
+## Local development
 
-`pnpm dev` 会先构建源码，再启动客户端。也可以分别执行：
+`pnpm dev` builds the source and launches the client. You can also run these steps separately:
 
 ```sh
 pnpm build
 pnpm start
 ```
 
-源码位于 `src/`，`lib/` 为构建产物。界面通过 adapter/channel 接入 dsh，agent、工具执行和会话持久化由 Harness 提供。
+Edit source files in `src/`; `lib/` is generated. The UI connects to dsh through the adapter/channel integration. Harness provides agents, tool execution, and session persistence.
 
-提交改动前运行：
+Before submitting changes, run:
 
 ```sh
 pnpm build
 pnpm verify
 ```
 
-更多说明见 [项目架构](docs/architecture.md) 和 [开发规范](AGENTS.md)。
+See the [architecture guide](docs/architecture.md) for the system design, data flow, and contribution entry points. [Repository rules](AGENTS.md) are available in Chinese.
 
-## 后续方向
+## Roadmap
 
-- 优化 goal 的终端交互与目标进度展示。
-- 优化 compact 的操作体验与压缩状态反馈。
-- 加入 Vim 模式，完善键盘编辑体验。
-- 加入 btw 等常用交互功能，并根据实际使用反馈逐步完善。
-- 持续完善对话、工具结果展示和会话管理体验。
-- 完善使用文档、问题排查说明与开发指引。
+- Improve goal interactions and progress display in the terminal.
+- Improve compact interactions and compaction status feedback.
+- Add Vim mode for keyboard editing.
+- Add btw and other common interactions based on practical feedback.
+- Refine chat, tool result presentation, and session management.
+- Expand usage, troubleshooting, and development documentation.
 
-新增功能以终端交互需求为出发点，优先复用 dsh 已有能力，持续清理重复实现，保持简单、轻量。
+New features should serve terminal interaction needs, reuse existing dsh capabilities, and keep the implementation simple and lightweight.
 
-## 参与贡献
+## Contributing
 
-欢迎通过 Issue 反馈问题、提出建议，也欢迎提交 PR。
+Bug reports, suggestions, and pull requests are welcome.
 
-提交前请阅读 [贡献指南](CONTRIBUTING.md)，核心要求只有两条：
+Read the [contribution guide](CONTRIBUTING.md) (currently in Chinese) before submitting. There are two core requirements:
 
-1. **按模板提交 Issue。** 说明问题或实际需求，保持简短、具体。
-2. **对自己的代码负责，敬畏生产。** 允许 AIGC，但必须理解、审查并验证自己的改动，不欢迎粗制滥造的 AI 代码提交。
+1. **Use the issue templates.** Describe the problem or practical need clearly and concisely.
+2. **Own your code and treat production with care.** AI-generated code is welcome only when you understand, review, and verify your changes. Careless AI-generated submissions are not welcome.
 
-## 许可证
+## License
 
-本项目采用 [Apache License 2.0](LICENSE)。上游 dsh-TUI 的 MIT 版权与许可声明，以及其他第三方许可，保留在 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) 中。
+Licensed under [Apache License 2.0](LICENSE). The upstream dsh-TUI MIT copyright and license notice, along with other third-party notices, are preserved in [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
 
-## 致谢
+## Acknowledgments
 
-本项目基于 [ccch1mneyyy/dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) 二次开发，是在原项目基础上精简而来的轻量版本。感谢原作者及贡献者的开源工作。
+This project is a simplified, lightweight derivative of [ccch1mneyyy/dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI). Thanks to the original author and contributors for their open-source work.
