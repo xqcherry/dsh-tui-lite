@@ -26,7 +26,6 @@ import { actionMatches } from '../../../../shared/platform/keymap.js'
 import { isMod } from '../../../../shared/platform/modifiers.js'
 import { imagePathMediaType, parsePastedImagePath, stageClipboardFilePaths } from '../../../../shared/platform/pastedImagePath.js'
 
-import { type ScrollBoxHandle } from '../../../../terminal/index.js'
 
 
 interface Context {
@@ -42,8 +41,7 @@ interface Context {
   readonly foldBlockRef: React.RefObject<{ start: number; end: number; } | null>
   readonly updateFoldBlock: (block: { start: number; end: number; } | null) => void
   readonly setInput: (next: string, cursorOffset?: number, undo?: UndoMode, snapshotBlock?: DraftUndoEntry["block"]) => void
-  readonly helpOpen: boolean
-  readonly onToggleHelp: () => void
+  readonly onOpenHelp: () => void
   readonly captureDraftImageLease: () => DraftImageLease
   readonly enqueueImageWork: <T>(work: () => Promise<T>) => Promise<T>
   readonly stageImagePath: (path: string, lease: DraftImageLease) => Promise<StagedImageHandle>
@@ -67,8 +65,6 @@ interface Context {
   readonly fileSelected: number
   readonly acceptFile: (candidate: FileCandidate) => void
   readonly queueSend: (text: string) => void
-  readonly helpViewportHeight: number
-  readonly helpScrollRef: React.RefObject<ScrollBoxHandle | null>
   readonly pullBackLast: () => void
   readonly dockSelectedRef: React.RefObject<number | null>
   readonly setDockSelected: (index: number | null) => void
@@ -93,7 +89,7 @@ interface Context {
 
 export function createComposerKeyboard(getContext: () => Context) {
   return (input: string, key: Key, event: InputEvent) => {
-const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, helpOpen, onToggleHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, helpViewportHeight, helpScrollRef, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
+const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cursorRef, selectionRef, consumeEditingEscape, deleteInputRange, setFileSelected, foldBlockRef, updateFoldBlock, setInput, onOpenHelp, captureDraftImageLease, enqueueImageWork, stageImagePath, bindStagedImage, insertClipboardAtCaret, composer, context, stagedImageNotice, draftImageLeaseIsCurrent, clipboardBusyRef, draftImagesRef, discardStagedHandles, syncImageGeneration, advanceDraftRevision, handleEnter, tryRunCommand, submitText, interruptSend, fileOverlayOpen, fileMatches, fileSelected, acceptFile, queueSend, pullBackLast, dockSelectedRef, setDockSelected, dockCount, historyIndex, cursorLine, tail, cursorColumn, seedHistory, history, restoreHistoryDraft, historyDraft, imageRefsFor, retractRecalledCopy, restoreDraftImages, head, undoDraft, clearDraftUndoably, fileEscRef, mention } = getContext()
 
     if (selectionActive) return
     // The editor round-trip ends by resuming stdin one microtask before the
@@ -170,7 +166,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
      *  semantics). Returns the insertion offset so callers can derive the
      *  inserted span (paste fold). */
     const insertAtCaret = (text: string, undo: UndoMode = 'group'): number => {
-      if (helpOpen) onToggleHelp()
       const sel = selectionRef.current
       const at = sel ? sel.start : cursor
       const next = sel
@@ -196,7 +191,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
       const droppedPath = parsePastedImagePath(text)
       if (droppedPath !== null) {
         const lease = captureDraftImageLease()
-        if (helpOpen) onToggleHelp()
         setFileSelected(0)
         void enqueueImageWork(async () => {
           const handle = await stageImagePath(droppedPath, lease)
@@ -230,10 +224,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
     if (actionMatches('paste', input, key)) {
       if (clipboardBusyRef.current) return
       const lease = captureDraftImageLease()
-      // Match insertAtCaret's overlay/selection dismissal up front: the
-      // async continuation below only sets value/cursor, so a paste landing
-      // while the help overlay is open would otherwise insert behind it.
-      if (helpOpen) onToggleHelp()
       setFileSelected(0)
       clipboardBusyRef.current = true
       void readClipboard()
@@ -361,16 +351,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
       return
     }
 
-    // Help is modal for modified keys and every Enter variant. The paste
-    // branch above is the intentional exception: paste closes Help and
-    // inserts visibly.
-    // Swallow here before editor/submit/interrupt branches can mutate hidden
-    // composer or working-turn state; plain typing still dismisses Help below.
-    if (helpOpen && !key.escape && (key.ctrl || key.meta || key.super || key.return || input.includes('\n') || input.includes('\r'))) {
-      event.stopImmediatePropagation()
-      return
-    }
-
     if (handleCommandSuggestionKey(key, event)) return
 
     // Ctrl+G (remappable via /settings): edit the current draft in
@@ -468,12 +448,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
       handleEnter()
       return
     }
-    // Help is modal over the composer. Backtab must not cycle the session
-    // mode invisibly behind it, and plain Tab has no Help action.
-    if (helpOpen && key.tab) {
-      event.stopImmediatePropagation()
-      return
-    }
     // File completion owns Backtab just like plain Tab; do not mutate the
     // background session mode while the user is choosing a candidate.
     if (key.tab && key.shift && fileOverlayOpen) {
@@ -508,41 +482,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
     if (key.tab && context.sessions.getSnapshot().working && value.trim() !== '') {
       queueSend(value)
       return
-    }
-    // Help is a viewport, not prompt history. It deliberately owns every
-    // vertical navigation event while visible; otherwise Up/Down silently
-    // walk the input history and the clipped command rows remain unreachable.
-    if (helpOpen) {
-      const page = Math.max(1, helpViewportHeight - 2)
-      if (key.upArrow || key.wheelUp) {
-        helpScrollRef.current?.scrollBy(key.wheelUp ? -3 : -1)
-        event.stopImmediatePropagation()
-        return
-      }
-      if (key.downArrow || key.wheelDown) {
-        helpScrollRef.current?.scrollBy(key.wheelDown ? 3 : 1)
-        event.stopImmediatePropagation()
-        return
-      }
-      if (key.pageUp || key.pageDown) {
-        helpScrollRef.current?.scrollBy(key.pageUp ? -page : page)
-        event.stopImmediatePropagation()
-        return
-      }
-      if (key.home) {
-        helpScrollRef.current?.scrollTo(0)
-        event.stopImmediatePropagation()
-        return
-      }
-      if (key.end) {
-        // Use a deliberately oversized absolute target rather than the
-        // sticky-bottom path: compact Help may still be measuring nested
-        // sections in this commit, while ScrollBox's render clamp resolves
-        // the target to the exact current maximum without a follow-up frame.
-        helpScrollRef.current?.scrollTo(Number.MAX_SAFE_INTEGER)
-        event.stopImmediatePropagation()
-        return
-      }
     }
     if (key.meta && key.upArrow) {
       // Alt+Up: pull the last pending message back for editing (pi/Codex).
@@ -818,11 +757,6 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
       return
     }
     if (key.escape) {
-      if (helpOpen) {
-        event.stopImmediatePropagation()
-        onToggleHelp()
-        return
-      }
       // File overlay: Esc dismisses the menu for THIS token only — clearing
       // the input would nuke a mid-message `@` mention's surrounding text.
       if (fileOverlayOpen) {
@@ -868,13 +802,12 @@ const { handleCommandSuggestionKey, selectionActive, editorBusyRef, valueRef, cu
       return
     }
     if (input === '?' && value.length === 0) {
-      onToggleHelp()
+      event.stopImmediatePropagation()
+      onOpenHelp()
       return
     }
     if (input && !key.ctrl && !key.meta && !key.super && !key.tab && !key.escape) {
-      // Typing anything else dismisses the help menu…
-      if (helpOpen) onToggleHelp()
-      // …and leaves the docked-queue selector: the draft is no longer empty,
+      // Typing leaves the docked-queue selector: the draft is no longer empty,
       // so ↑ goes back to cursor movement.
       if (dockSelectedRef.current !== null) setDockSelected(null)
       // An active selection is REPLACED by the typed text, caret after it.

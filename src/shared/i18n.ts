@@ -243,8 +243,6 @@ const dict = {
   'help-history-nav': '↑/↓ for history',
   'help-move-cursor': '←/→ to move cursor',
   'help-open-editor': '{{key}} to open editor',
-  'help-commands-title': 'commands:',
-  'help-scroll-hint': '↑/↓ scroll · PgUp/PgDn page · Home/End jump · Esc close',
   'interrupted-by-user': 'Interrupted ',
   'interrupted-ask-next': '· What should DeepSeek do instead?',
   'load-earlier': ' ↑ load earlier messages (full session log; /export for full text) ',

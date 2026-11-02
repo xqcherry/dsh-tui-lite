@@ -32,7 +32,7 @@ async function checkPrompt(homeButton, plan, alternate = false) {
   }
   const tree = React.createElement(Box, { flexDirection: 'column', ...(alternate ? { height: 24 } : {}) }, React.createElement(PromptInput, {
     ...composerFixture(channel), controllerRef: controller,
-    helpOpen: false, onToggleHelp() {}, onRunCommand() { return false },
+    onOpenHelp() {}, onRunCommand() { return false },
     selectionActive: false, ...(homeButton ? { onOpenSessions() {} } : {}),
   }))
   const app = await render(tree, { stdout, stdin, stderr, patchConsole: false, exitOnCtrlC: false })

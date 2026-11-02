@@ -4,7 +4,7 @@ import type { ComposerImageRef } from '../../../shared/protocol/composer.js'
 import type { QuestionStore } from '../../decisions/contracts.js'
 import { runOAuthLogin, runProviderWizard } from '../../settings/index.js'
 
-export interface ChatMenuItem { label: string; run(): void | Promise<unknown> }
+export interface ChatMenuItem { label: string; run?(): void | Promise<unknown> }
 export interface ChatMenu { title: string; items: readonly ChatMenuItem[] }
 
 export interface ChatCommandHost {
@@ -12,7 +12,7 @@ export interface ChatCommandHost {
   ask: QuestionStore['ask']
   openMenu(title: string, items: readonly ChatMenuItem[]): void
   onExit(): void
-  toggleHelp(): void
+  openHelp(): void
   toggleThinking(): void
   configured(): boolean
   refreshConfiguration(): Promise<void>
@@ -76,7 +76,7 @@ export function createChatCommands(deps: ChatCommandHost) {
     const argument = raw.trim()
     switch (name) {
       case 'exit': onExit(); break
-      case 'help': deps.toggleHelp(); break
+      case 'help': deps.openHelp(); break
       case 'new': await sessions.commands.newSession(); break
       case 'resume':
         if (argument && argument !== 'list') await sessions.commands.resumeTo(argument)

@@ -70,8 +70,7 @@ const channel = {
 const props = {
   ...composerFixture(channel),
   controllerRef,
-  helpOpen: false,
-  onToggleHelp() {},
+  onOpenHelp() {},
   selectionActive: false,
   beforeSubmit() { if (!ready) refusals++; return ready },
   onRunCommand(name) { commands.push(name); return true },

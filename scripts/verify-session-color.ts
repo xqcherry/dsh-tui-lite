@@ -20,7 +20,7 @@ const runtime = createRuntimeModulesFixture({ commands: {
 const commands = createChatCommands({
   ports: runtime, ask: async () => ({ answers: [] }),
   openMenu: (_title, items) => { menu = items },
-  onExit() {}, toggleHelp() {}, toggleThinking() {}, configured: () => false,
+  onExit() {}, openHelp() {}, toggleThinking() {}, configured: () => false,
   refreshConfiguration: async () => {},
 })
 try {

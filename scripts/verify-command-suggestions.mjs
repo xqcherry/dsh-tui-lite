@@ -56,7 +56,7 @@ async function fixture(historyRows, cols = 40, rows = 16, alternate = false) {
   const makeTree = () => React.createElement(Box, { flexDirection: 'column', ...(alternate ? { height: rows } : {}) },
     React.createElement(Text, null, markers.join('\n')),
     React.createElement(PromptInput, {
-      ...composerFixture(channel), composer: { ...composerFixture(channel).composer, store: composerOwner.store }, controllerRef: controller, helpOpen: false, onToggleHelp() {}, selectionActive: false,
+      ...composerFixture(channel), composer: { ...composerFixture(channel).composer, store: composerOwner.store }, controllerRef: controller, onOpenHelp() {}, selectionActive: false,
       onRunCommand(name, raw) { commands.push([name, raw]); return true },
     }),
   )
