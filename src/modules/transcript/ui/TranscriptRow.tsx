@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import type { TranscriptImage } from '../../../shared/protocol/composer.js'
 import type { JobGroupRow, JobRow } from '../../../shared/protocol/jobs.js'
 import type { SubagentRow } from '../../../shared/protocol/subagents.js'
-import type { ChatRow, ToolCallView, ToolResultView, ToolRow } from '../../../shared/protocol/transcript.js'
+import type { ChatRow, ToolCallView, ToolGroupRow, ToolResultView, ToolRow } from '../../../shared/protocol/transcript.js'
 import { t } from '../../../shared/i18n.js'
 import type { ToolBackground } from '../../../shared/platform/display-preferences.js'
 
@@ -26,6 +26,7 @@ import { Divider } from '../../../ui/design-system/Divider.js'
 import { MessageMetadata } from './MessageMetadata.js'
 import { TranscriptImages } from './TranscriptImages.js'
 import { AssistantTextLeafRow, ThinkingLeafRow, ToolLeafRow } from './TranscriptLeaves.js'
+import { ToolGroupHeader } from './ToolGroupHeader.js'
 import { UserPromptMessage } from './UserPromptMessage.js'
 
 
@@ -56,6 +57,8 @@ export type MemoRowProps = {
   marginTopOnTurn: boolean
   isSelected: boolean
   isExpanded: boolean
+  /** Per-card body expansion (click); separate from group folds. */
+  isDetailExpanded: boolean
   expanded: boolean
   model: string
   /** Edit/Write diff presentation preference (forwarded to tool cards). */
@@ -68,8 +71,6 @@ export type MemoRowProps = {
   revealVersion: number
   thinkingFold: 'preview' | 'full'
   toolBackground: ToolBackground
-  /** Terminal-card header folding (forwarded to tool cards). */
-  foldTerminalCommand: boolean
   /** Working-activity preset name; drives the subagent card's running glyph. */
   background: 'messageActionsBackground' | undefined
   // ToolRow, flattened: the channel writes status/result fields in place,
@@ -100,7 +101,10 @@ export type MemoRowProps = {
   job: JobRow | undefined
   /** Group decoration for a run of consecutive job cards (see JobGroupRow). */
   jobGroup: JobGroupRow | undefined
+  /** Group decoration for a settled run of shell/job tool calls. */
+  toolGroup: ToolGroupRow | undefined
   onToggleRow: (rowId: number) => void
+  onToggleDetail: (rowId: number) => void
   /** 流式 reasoning 行在三行预览/全文间切换；落定行用 onToggleRow。 */
   onToggleStreamView: (rowId: number) => void
   /** 是否反转该流式行的 thinkingFold 默认视图。 */
@@ -146,6 +150,7 @@ export function TranscriptRow({
   marginTopOnTurn,
   isSelected,
   isExpanded,
+  isDetailExpanded,
   expanded,
   model,
   diffLayout,
@@ -154,7 +159,6 @@ export function TranscriptRow({
   revealVersion,
   thinkingFold,
   toolBackground,
-  foldTerminalCommand,
   background,
   toolCallId,
   toolName,
@@ -173,7 +177,9 @@ export function TranscriptRow({
   subagent,
   job,
   jobGroup,
+  toolGroup,
   onToggleRow,
+  onToggleDetail,
   onToggleStreamView,
   streamViewToggled,
   onOpenSubagent,
@@ -204,11 +210,19 @@ export function TranscriptRow({
     if (event.cellIsBlank) return
     onToggleStreamView(rowId)
   }, [onToggleStreamView, rowId])
-  // 任务组：点击组头行折叠/展开整组（与工具卡的折叠同一套手势：行点击 =
-  // expandedRows 切换，Ctrl+O 展开全部）。
-  const toggleJobGroup = React.useCallback((): void => {
+  // 任务/工具组：点击组头行折叠/展开整组（与工具卡的折叠同一套手势：
+  // 行点击 = expandedRows 切换，Ctrl+O 展开全部）。
+  const toggleGroup = React.useCallback((): void => {
     onToggleRow(rowId)
   }, [onToggleRow, rowId])
+  // 卡片正文展开与组折叠分开：组内点击卡片只看自己的输出，不会收起整组。
+  const toggleDetail = React.useCallback((): void => {
+    onToggleDetail(rowId)
+  }, [onToggleDetail, rowId])
+  const detailOnClick = React.useCallback((event: ClickEvent): void => {
+    if (event.cellIsBlank) return
+    onToggleDetail(rowId)
+  }, [onToggleDetail, rowId])
   // 子代理卡：点击打开详情场景（不是折叠）。
   const openSubagent = React.useCallback(() => {
     if (subagent !== undefined) onOpenSubagent?.(subagent.agentId)
@@ -364,26 +378,36 @@ export function TranscriptRow({
         startedAt: toolStartedAt,
         durationMs: toolDurationMs,
       }
+      const groupHead = toolGroup !== undefined && toolGroup.head
+      const onToolCardClick = toolGroup === undefined ? foldOnClick : detailOnClick
       return (
-        <Box flexDirection="column" ref={ref}>
-          <ToolLeafRow
-            tool={tool}
-            marginTopOnTurn={marginTopOnTurn}
-            verbose={isExpanded || expanded}
-            isSelected={isSelected}
-            isExpanded={isExpanded}
-            footnote={toolFootnote}
-            diffLayout={diffLayout}
-            toolBackground={toolBackground}
-            smoothReveal={smoothStreaming}
-            fresh={fresh}
-            revealVersion={revealVersion}
-            foldTerminalCommand={foldTerminalCommand}
-            onClick={foldOnClick}
-            onOpenFile={onOpenFile}
-            images={images}
-            sourceFolded={toolSourceFolded}
-          />
+        <Box
+          flexDirection="column"
+          marginTop={groupHead && marginTopOnTurn ? 1 : 0}
+          ref={ref}
+        >
+          {toolGroup !== undefined && toolGroup.head && (
+            <ToolGroupHeader group={toolGroup} onToggle={toggleGroup} />
+          )}
+          {!(toolGroup !== undefined && toolGroup.folded) && (
+            <ToolLeafRow
+              tool={tool}
+              marginTopOnTurn={toolGroup === undefined ? marginTopOnTurn : false}
+              verbose={expanded || isDetailExpanded}
+              isSelected={isSelected}
+              isExpanded={isDetailExpanded}
+              footnote={toolFootnote}
+              diffLayout={diffLayout}
+              toolBackground={toolBackground}
+              smoothReveal={smoothStreaming}
+              fresh={fresh}
+              revealVersion={revealVersion}
+              onClick={onToolCardClick}
+              onOpenFile={onOpenFile}
+              images={images}
+              sourceFolded={toolSourceFolded}
+            />
+          )}
         </Box>
       )
     }
@@ -495,6 +519,7 @@ export function TranscriptRow({
       // line, members hang off the shared rail, and a FOLDED run keeps only
       // that summary (its members were dropped from the window upstream).
       const groupHead = jobGroup !== undefined && jobGroup.head
+      const onJobCardToggle = jobGroup === undefined ? toggleGroup : toggleDetail
       return (
         <Box
           flexDirection="column"
@@ -504,12 +529,12 @@ export function TranscriptRow({
           marginTop={groupHead && marginTopOnTurn ? 1 : 0}
           ref={ref}
         >
-          {groupHead && <JobGroupHeader group={jobGroup} onToggle={toggleJobGroup} />}
+          {groupHead && <JobGroupHeader group={jobGroup} onToggle={toggleGroup} />}
           {groupHead && jobGroup.folded ? null : (
             <JobCard
               job={job}
-              expanded={isExpanded !== expanded}
-              onToggle={toggleJobGroup}
+              expanded={expanded || isDetailExpanded}
+              onToggle={onJobCardToggle}
               marginTopOnTurn={groupHead ? false : marginTopOnTurn}
               // Clicking a card opens the panel focused on THAT job, not the roster head.
               onClick={onOpenJobs === undefined ? undefined : () => onOpenJobs(job.id)}

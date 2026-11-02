@@ -21,7 +21,6 @@ export function createSettingsModule(launch: ModuleLaunch, publication: Publicat
     effortLevels: undefined,
     diffLayout: 'auto',
     thinkingFold: 'preview',
-    jobGroupFold: 'auto',
     toolBackground: 'none',
     promptSessionLabel: false,
     expandEditor: false,

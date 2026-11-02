@@ -93,14 +93,12 @@ export function jobOutputRows(
   return rows
 }
 /** Command content shares normalization and wrapping with the full jobs panel. */
-export function jobCommandRows(text: string, width: number, expanded: boolean): string[] {
+export function jobCommandRows(text: string, width: number): string[] {
   const command = text.trim()
   const script = command.replace(/^(?:pwsh|powershell)(?:\.exe)?\s+(?:(?:-(?:NoProfile|NoLogo|NonInteractive)|-ExecutionPolicy\s+\S+)\s+)*-Command\s+/i, '')
   const body = (script === command ? script : script.replace(/^(['"])([\s\S]*)\1$/, '$2')).replace(/\r\n?/g, '\n').trim()
   const source = body.split('\n').filter((line, index, lines) => line.trim() !== '' || index === 0 || lines[index - 1]?.trim() !== '').join('\n')
-  const shown = expanded ? source : source.split('\n')[0]!
-  const rows = wrapText(COMMAND_MARK + ' ' + shown, Math.max(1, width), 'wrap').split('\n')
-  return expanded ? rows : rows.slice(0, 1)
+  return wrapText(COMMAND_MARK + ' ' + source, Math.max(1, width), 'wrap').split('\n')
 }
 
 /** The renderer draws the continuous section edge across all content rows. */
@@ -133,8 +131,14 @@ export function JobCard({ job, marginTopOnTurn, onClick, onWatchOutput, expanded
   const info = statusInfo(job.status)
   const [hovered, setHovered] = React.useState(false)
   const contentWidth = Math.max(1, columns - 2)
-  const commandRows = jobCommandRows(job.label, contentWidth, expanded)
-  const output = jobOutputRows(job.outputLines, Math.max(1, contentWidth - 1), WATERFALL_ROWS)
+  // Settled jobs are a single header row: the command is already on the
+  // paired Bash card and the /jobs panel owns the full detail. A live job
+  // keeps its output tail (progress is the point of watching it); expanding
+  // the card restores the command and output for both states.
+  const showCommand = expanded
+  const showOutput = expanded || !settled
+  const commandRows = showCommand ? jobCommandRows(job.label, contentWidth) : []
+  const output = showOutput ? jobOutputRows(job.outputLines, Math.max(1, contentWidth - 1), WATERFALL_ROWS) : []
   const outputRows = output.map((entry, index) => (index === 0 ? '≡ ' : '') + (entry.gap === true ? t('jobs-output-gap') : entry.text))
   const headerDetail = job.detail !== undefined && job.detail !== '' ? job.detail : undefined
   const headerName = `${t('jobs-card-prefix')}${job.id}`

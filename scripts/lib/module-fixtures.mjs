@@ -1,7 +1,7 @@
 /** Test-only bridge for historical raw channel fixtures. Production receives modules. */
 const fields = {
   sessions: ['status', 'sessionTitle', 'sessionColor', 'agentId', 'sessionId', 'agentBindingGeneration', 'cwd', 'displayCwd', 'gitBranch', 'working', 'compaction', 'mode', 'modeIndex', 'agentPreset'],
-  settings: ['model', 'provider', 'configuredProvider', 'configuredModel', 'configuredPreset', 'contextWindow', 'reasoningEffort', 'effortLevels', 'diffLayout', 'thinkingFold', 'jobGroupFold', 'toolBackground', 'promptSessionLabel', 'expandEditor'],
+  settings: ['model', 'provider', 'configuredProvider', 'configuredModel', 'configuredPreset', 'contextWindow', 'reasoningEffort', 'effortLevels', 'diffLayout', 'thinkingFold', 'toolBackground', 'promptSessionLabel', 'expandEditor'],
   composer: ['selection', 'cancelPending', 'pending'],
   transcript: ['rows', 'costReport', 'olderHistory', 'tokens', 'mainCost', 'spinnerMode', 'responseChars', 'activeToolCount', 'turnStart', 'lastUserText', 'lastUsage', 'turnUsage', 'contextOccupancy', 'tps', 'tpsSamples', 'goal', 'todos', 'loadedContext', 'contextSegments'],
   activity: ['subagentCost', 'subagents', 'backgroundJobs'],

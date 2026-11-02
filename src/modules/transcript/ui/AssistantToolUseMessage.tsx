@@ -1,7 +1,8 @@
 import { extname } from 'node:path'
 import React from 'react'
 import type { ToolCallView, ToolFileDiff, ToolResultView, ToolRow } from '../../../shared/protocol/transcript.js'
-import { t, tOr, type I18nKey } from '../../../shared/i18n.js'
+import { t } from '../../../shared/i18n.js'
+import { isQuietTool, toolDisplayName } from '../../../shared/platform/tool-name.js'
 import type { ToolBackground } from '../../../shared/platform/display-preferences.js'
 import type { ClickEvent } from '../../../ink/events/click-event.js'
 import { useAnimationFrame } from '../../../ink/hooks/use-animation-frame.js'
@@ -60,12 +61,6 @@ type Props = {
    */
   onOpenFile?: (path: string) => void
   /**
-   * Terminal-card header folding (settings `dsh-tui.foldTerminalCommand`):
-   * collapsed cards keep the command title's first source line plus a
-   * `+N lines` hint; verbose/expanded cards render the full title.
-   */
-  foldTerminalCommand?: boolean
-  /**
    * Smooth streaming reveal (settings `dsh-tui.smoothStreaming`): the card
    * BODY (diff hunks / write content — model-authored prose, not tool
    * output) paints through an even ~30fps line reveal when it first appears,
@@ -84,36 +79,6 @@ type Props = {
    *  remain — the expanded card says so instead of passing the preview off
    *  as the full text. */
   sourceFolded?: boolean
-}
-
-/** Tool display names localize through the `tool-name-*` dictionary family
- *  (i18n.ts): DSH emits lowercase tool ids (`bash`), display names resolve
- *  per language — proper nouns (Bash, PowerShell) stay identical in zh.
- *  Unmapped ids (plugins, new upstream tools) fall back to the id with its
- *  first letter uppercased: that is a name, not copy — there is nothing to
- *  translate. Keys appear as literals here, so verify-i18n's dead-key scan
- *  sees them without a DYNAMIC_PREFIXES entry. */
-const TOOL_NAME_KEYS: Record<string, I18nKey> = {
-  bash: 'tool-name-bash',
-  powershell: 'tool-name-powershell',
-  read: 'tool-name-read',
-  glob: 'tool-name-glob',
-  grep: 'tool-name-grep',
-  write: 'tool-name-write',
-  edit: 'tool-name-edit',
-  todo_write: 'tool-name-todo_write',
-  subagent: 'tool-name-subagent',
-  web_search: 'tool-name-web_search',
-}
-
-function displayName(name: string, displayKey?: string): string {
-  // A backend that names its tools its own way (Claude `Read`, `Bash`)
-  // supplies the key with the card view; the raw name is the fallback.
-  if (displayKey !== undefined) return tOr(displayKey, name)
-  const key = TOOL_NAME_KEYS[name]
-  if (key !== undefined) return t(key)
-  if (name.length === 0) return name
-  return name[0]!.toUpperCase() + name.slice(1)
 }
 
 function parseJsonArgs(args: string): unknown {
@@ -433,8 +398,8 @@ type FoldedTitle = { first: string; hiddenLines: number; hiddenChars: number }
  *  first line only.)
  *
  *  Two independent folds:
- *   - `foldLines` (the `dsh-tui.foldTerminalCommand` setting): a multi-line
- *     script collapses to its first source line, reported as `+N lines`.
+ *   - Multi-line scripts collapse to their first source line, reported as
+ *     `+N lines`.
  *   - The long-line clip (always on — utils/fold-long-lines.ts): a command is
  *     frequently ONE enormous line (`python -c …`, a minified blob, a pasted
  *     `curl` body). This header Text WRAPS, so an unclipped 200k-char command
@@ -443,11 +408,11 @@ type FoldedTitle = { first: string; hiddenLines: number; hiddenChars: number }
  *
  *  Single short titles return undefined: nothing to fold, rendering stays
  *  byte-identical to the unfolded card (and the header stays tooltip-silent). */
-function foldTerminalTitle(title: string, foldLines: boolean): FoldedTitle | undefined {
+function foldTerminalTitle(title: string): FoldedTitle | undefined {
   const firstEnd = title.indexOf('\n')
   let hiddenLines = 0
   let body = title
-  if (firstEnd !== -1 && foldLines) {
+  if (firstEnd !== -1) {
     let separators = 1
     for (let at = title.indexOf('\n', firstEnd + 1); at !== -1; at = title.indexOf('\n', at + 1)) separators++
     // Same trailing-newline rule as sideLines: a terminator is not a line.
@@ -645,7 +610,6 @@ export function AssistantToolUseMessage({
   diffLayout = 'auto',
   toolBackground = 'none',
   onOpenFile,
-  foldTerminalCommand = false,
   smoothReveal = false,
   fresh = false,
   revealVersion,
@@ -669,7 +633,7 @@ export function AssistantToolUseMessage({
   // The settled view carries the applied diff / actual output; while running,
   // the call view already shows the pending change.
   const view = tool.resultView ?? tool.callView
-  const name = displayName(tool.name, view?.displayKey ?? tool.callView?.displayKey)
+  const name = toolDisplayName(tool.name, view?.displayKey ?? tool.callView?.displayKey)
   const minWidth = stringWidth(name) + 2
   const filePath = filePathFromTool(tool, view)
   const syntaxLanguage = view?.card === 'read' || view?.card === 'generic' || view === undefined
@@ -680,20 +644,20 @@ export function AssistantToolUseMessage({
   // its header outright: `SendMessage → <target>` (+ the resume mark), the
   // raw args parens stay out of the header.
   const headerTitle = sendMessage !== undefined
-    ? `${displayName(tool.name)} → ${sendMessage.target}${sendMessage.resuming ? ` · ${t('send-message-card-resuming')}` : ''}`
+    ? `${toolDisplayName(tool.name)} → ${sendMessage.target}${sendMessage.resuming ? ` · ${t('send-message-card-resuming')}` : ''}`
     : tool.resultView?.title ?? tool.callView?.title
   const headerIsTerminal = view?.card === 'terminal'
-  // Fold the terminal header: multi-line command script (setting-gated) plus
-  // the always-on long-line clip, both off once the card is verbose/expanded
-  // (Ctrl+O and the row click both land in `verbose`, so expansion reuses the
-  // existing state machine). Memoized on the title reference: settled titles
-  // never change, so the 1s useAnimationFrame tick of a running card
-  // re-renders without rescanning.
+  // Fold the terminal header: multi-line command script plus the always-on
+  // long-line clip, both off once the card is verbose/expanded (Ctrl+O and
+  // the row click both land in `verbose`, so expansion reuses the existing
+  // state machine). Memoized on the title reference: settled titles never
+  // change, so the 1s useAnimationFrame tick of a running card re-renders
+  // without rescanning.
   const foldedHeader = React.useMemo(
     () => headerIsTerminal && !verbose && headerTitle !== undefined
-      ? foldTerminalTitle(headerTitle, foldTerminalCommand)
+      ? foldTerminalTitle(headerTitle)
       : undefined,
-    [headerIsTerminal, foldTerminalCommand, verbose, headerTitle],
+    [headerIsTerminal, verbose, headerTitle],
   )
 
   // Live elapsed clock while the call runs: the
@@ -717,20 +681,14 @@ export function AssistantToolUseMessage({
   // i.e. exactly while that column is present — so the budget must reserve
   // it for clickable cards only; non-interactive rows never render it.
   const interactive = onClick !== undefined
-  // Header-row budget for the title Text. useTerminalSize() already reports
-  // the margin-adjusted content width, so this is the fixed chrome of the
-  // line only: loader dot 2 + hover ▾ indicator 2 (interactive rows, present
-  // while the pointer dwells) + the settled elapsed chip. Calibrated against
-  // the renderer (probe-tooltip-truncation): a truncate-end title whose
-  // width exceeds columns − loader − ▾ − chip is really cut on screen at
-  // tooltip time; anything at or under the budget fits fully and must NOT
-  // pop a tooltip. No extra slack, and the tool name is NOT deducted — a
-  // non-terminal title carries its own first word, so double-counting name
-  // pushed the gate ~10 cols too tight and floated fully visible titles.
-  const headerTextBudget = Math.max(0, columns - 2 - (interactive ? 2 : 0)
-    - (!isRunning && elapsedText !== '' ? stringWidth(elapsedText) : 0))
   const useSplitDiff = !isError && view?.card === 'diff' &&
     (diffLayout === 'split' || (diffLayout !== 'unified' && columns >= SPLIT_DIFF_MIN_COLS))
+  // Quiet tools (shell / job control) keep their settled output behind a
+  // click: the header already carries the command, and the transcript should
+  // read as a record of what ran, not a log dump. Live calls keep their tail
+  // (progress is useful), and failures / non-zero exits stay visible below.
+  const quietTool = isQuietTool(tool, view)
+  const collapseBody = quietTool && !verbose && !isError && !isRunning && !sendMessageRawOpen
   let body: BodyLine[] = []
   if (sendMessage !== undefined) {
     // 正文 = message 文本预览（长文走既有的三行折叠），summary 作副行；
@@ -773,20 +731,38 @@ export function AssistantToolUseMessage({
   const bodyUncapped = verbose || sendMessageRawOpen
   // Long-line clip before anything downstream reads the body: the syntax
   // highlighter walks `bodySource` by line index, so the folded text must be
-  // the single source of truth for both.
-  const foldedBody = bodyUncapped ? { lines: body, hiddenChars: 0 } : foldBodyLines(body)
+  // the single source of truth for both. A collapsed body skips the fold
+  // entirely — the header chip only needs its line count.
+  const foldedBody = collapseBody || bodyUncapped ? { lines: body, hiddenChars: 0 } : foldBodyLines(body)
   const bodyLines = foldedBody.lines
-  const bodySource = bodyLines.map(line => line.text).join('\n')
+  const bodySource = collapseBody ? '' : bodyLines.map(line => line.text).join('\n')
   const argsLanguage = jsonArgsLanguage(displayArgs)
-  const capped = capLines(bodyLines, cap, bodyUncapped, foldedBody.hiddenChars)
+  const capped = collapseBody ? [] : capLines(bodyLines, cap, bodyUncapped, foldedBody.hiddenChars)
   // Verbose bodies walk a bounded window (see VERBOSE_BODY_WINDOW): the tail
   // stays in the retained source, and the card says what it is showing.
-  const lines = verbose && capped.length > VERBOSE_BODY_WINDOW
-    ? [
-        ...capped.slice(0, VERBOSE_BODY_WINDOW),
-        { ...dim(t('tool-card-window-shown', { shown: VERBOSE_BODY_WINDOW, total: capped.length })), revealOnHover: false },
-      ]
-    : capped
+  const lines = collapseBody
+    ? []
+    : verbose && capped.length > VERBOSE_BODY_WINDOW
+      ? [
+          ...capped.slice(0, VERBOSE_BODY_WINDOW),
+          { ...dim(t('tool-card-window-shown', { shown: VERBOSE_BODY_WINDOW, total: capped.length })), revealOnHover: false },
+        ]
+      : capped
+  // The hidden-volume chip is header chrome, not a body row: a collapsed
+  // card stays exactly one line tall.
+  const hiddenLineCount = collapseBody ? body.length : 0
+  const hiddenChipText = hiddenLineCount > 0 ? ` · ${t('tool-card-compact-hidden', { n: hiddenLineCount, count: hiddenLineCount })}` : ''
+  // Header-row budget for the title Text. useTerminalSize() already reports
+  // the margin-adjusted content width, so this is the fixed chrome of the
+  // line only: loader dot 2 + hover ▾ indicator 2 (interactive rows, present
+  // while the pointer dwells) + the settled elapsed chip + the hidden-volume
+  // chip. Calibrated against the renderer (probe-tooltip-truncation): a
+  // truncate-end title whose width exceeds the real chrome is cut on screen
+  // at tooltip time; anything at or under the budget fits fully and must NOT
+  // pop a tooltip.
+  const headerTextBudget = Math.max(0, columns - 2 - (interactive ? 2 : 0)
+    - (!isRunning && elapsedText !== '' ? stringWidth(elapsedText) : 0)
+    - stringWidth(hiddenChipText))
   // The terminal verdict rides OUTSIDE every cap (the footnote's rule): a
   // long output must never fold the non-zero exit code or kill signal away —
   // the settled card keeps the failure readable without the hover tooltip.
@@ -883,6 +859,11 @@ export function AssistantToolUseMessage({
           {!isRunning && (
             <Box flexWrap="nowrap">
               <Text dimColor={!hovered}>{elapsedText}</Text>
+            </Box>
+          )}
+          {hiddenLineCount > 0 && (
+            <Box flexShrink={0}>
+              <Text dimColor>{hiddenChipText}</Text>
             </Box>
           )}
           {hovered && (

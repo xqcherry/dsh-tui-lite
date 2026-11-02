@@ -10,6 +10,7 @@ export const checks = [
   'verify-adapter-composition.ts',
   'verify-module-command-lifecycle.ts',
   'verify-transcript-restoration.ts',
+  'verify-compact-transcript.tsx',
   'verify-workbench-commands.ts',
   'verify-permission-presets.ts',
   'verify-session-color.ts',
