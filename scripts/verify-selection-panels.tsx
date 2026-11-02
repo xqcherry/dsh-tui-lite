@@ -69,6 +69,23 @@ for (const columns of [80, 40, 20, 16]) {
     stdin.write('123')
     assert(await settled(() => screen().includes('123')), screen())
     frame()
+    if (columns === 80) {
+      const jumpTree = () => <AskUserQuestionPanel key="jump" question={{
+        question: '选择一项',
+        options: [
+          { label: '选项甲', description: '甲说明' },
+          { label: '选项乙', description: '乙说明' },
+        ],
+        hideCustomInput: true,
+      }} position={1} total={1} answered={0} onAnswer={() => {}} onCancel={() => {}} />
+      app.rerender(jumpTree())
+      const firstOptionRow = () => screen().split('\n').findIndex(line => line.includes('选项甲'))
+      assert(await settled(() => firstOptionRow() >= 0), screen())
+      const firstOptionRowBeforeMove = firstOptionRow()
+      stdin.write('\x1b[B')
+      assert(await settled(() => screen().split('\n').some(line => line.includes('❯') && line.includes('选项乙'))), screen())
+      assert.equal(firstOptionRow(), firstOptionRowBeforeMove, 'moving focus must not move the first option row')
+    }
     app.rerender(<AskUserQuestionPanel key="text" question={{ question: '输入名称' }} position={1} total={1} answered={0} onAnswer={answer => answers.push(answer)} onCancel={() => {}} />)
     assert(await settled(() => screen().includes('输入名称')), screen())
     stdin.write('中文😀')

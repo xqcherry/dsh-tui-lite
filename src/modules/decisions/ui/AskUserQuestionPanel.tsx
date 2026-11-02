@@ -740,7 +740,6 @@ export function AskUserQuestionPanel({
           <Box
             key={`${absoluteIndex}:${option.label}`}
             flexDirection="row"
-            marginTop={!windowedOptions && focused ? spacing : 0}
             onClick={() => clickOption(absoluteIndex)}
             onMouseEnter={() => setHoverIndex(absoluteIndex)}
             onMouseLeave={() => setHoverIndex(current => (current === absoluteIndex ? -1 : current))}
