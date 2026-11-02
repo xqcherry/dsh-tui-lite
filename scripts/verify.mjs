@@ -31,6 +31,7 @@ export const checks = [
   'verify-host-preset.ts',
   'verify-prompt-submit-guard.mjs',
   'verify-minimal-chat-input.mjs',
+  'verify-fullscreen-composer.mjs',
   'verify-whale-header.mjs',
   'verify-batched-prompt-input.mjs',
   'verify-prompt-right-border.mjs',
@@ -66,7 +67,7 @@ export const checks = [
   'verify-clipboard-image.ts',
   'verify-model-route.mjs',
 ]
-const sourceChecks = new Set(['verify-prompt-submit-guard.mjs', 'verify-minimal-chat-input.mjs'])
+const sourceChecks = new Set(['verify-prompt-submit-guard.mjs', 'verify-minimal-chat-input.mjs', 'verify-fullscreen-composer.mjs'])
 let index = 0
 let failures = 0
 async function worker() {

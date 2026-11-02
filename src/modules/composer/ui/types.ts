@@ -87,6 +87,13 @@ export interface PromptInputProps {
     rawInput: string,
     images: readonly ComposerImageRef[],
   ): boolean | Promise<boolean>
+  /**
+   * Floating command list above the prompt instead of an in-flow list below
+   * it. Fullscreen uses this so opening `/` completion never consumes layout
+   * rows and never moves the composer; inline keeps the historical below-input
+   * placement (short sessions can have no space above the prompt).
+   */
+  suggestionsAbove?: boolean
   /** Message-selection mode (Shift+↑): the input ignores keys while active. */
   selectionActive: boolean
   /**

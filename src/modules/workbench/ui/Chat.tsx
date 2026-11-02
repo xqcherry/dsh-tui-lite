@@ -11,9 +11,11 @@ import { HistorySearchDialog } from '../../composer/index.js'
 import { MessageList } from '../../transcript/index.js'
 import { PromptInput, type PromptController } from '../../composer/index.js'
 import { AskUserQuestionPanel } from '../../decisions/index.js'
-import { Box, Text, useApp, useInput } from '../../../ui/primitives.js'
+import { Box, ScrollBox, Text, useApp, useCopyOnSelect, useInput, type ScrollBoxHandle } from '../../../ui/primitives.js'
+import { useHasSelection } from '../../../ink/hooks/use-selection.js'
 import instances from '../../../ink/instances.js'
 import { abbreviateHomePath } from '../../../shared/platform/paths.js'
+import { t } from '../../../shared/i18n.js'
 import { ProductHeader } from './ProductHeader.js'
 import { ComposerStatusBar } from './ComposerStatusBar.js'
 import { CommandMenu } from './CommandMenu.js'
@@ -25,10 +27,17 @@ export interface ChatProps {
   approvalStore: PermissionPanelSource
   modelConfigured?: () => Promise<boolean>
   initialPrompt?: string
+  /**
+   * Fixed-height alternate-screen layout: the transcript owns a scroll
+   * viewport and the composer stays pinned to the terminal bottom.
+   * Production mounts this through `<AlternateScreen>`; standalone tests and
+   * embedders keep the inline layout.
+   */
+  fullscreen?: boolean
   onExit(): void
 }
 
-export function Chat({ ports, questionStore, approvalStore, modelConfigured, initialPrompt, onExit }: ChatProps): React.ReactNode {
+export function Chat({ ports, questionStore, approvalStore, modelConfigured, initialPrompt, fullscreen = false, onExit }: ChatProps): React.ReactNode {
   const { composer, sessions, settings, transcript, workbench } = ports
   const session = React.useSyncExternalStore(sessions.store.subscribe, sessions.store.getSnapshot)
   const displayCwd = abbreviateHomePath(session.displayCwd || session.cwd)
@@ -63,6 +72,12 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   }
   const controller = React.useRef<PromptController | null>(null)
   const lastExit = React.useRef(0)
+  const [transcriptHandle, setTranscriptHandle] = React.useState<ScrollBoxHandle | null>(null)
+  const hasSelection = useHasSelection()
+  useCopyOnSelect(
+    text => workbench.commands.notify(t('transcript-copied', { count: text.length }), { timeoutMs: 1500 }),
+    () => workbench.commands.notify(t('transcript-copy-refused'), { color: 'warning' }),
+  )
   const generation = session.agentBindingGeneration
   const rowCount = conversation.rows.length
   const firstRow = conversation.rows[0]
@@ -75,10 +90,11 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     // be painted into the live viewport again, without erasing history.
     const cleared = previous.rowCount > 0 && rowCount <= 1 && (previous.rowCount > rowCount || previous.firstRowKey !== firstRowKey)
     if (previous.generation !== generation || cleared) {
-      instances.get(stdout)?.reanchorViewport()
+      if (fullscreen) transcriptHandle?.scrollToBottom()
+      else instances.get(stdout)?.reanchorViewport()
     }
     previousPage.current = { generation, rowCount, firstRowKey }
-  }, [generation, rowCount, firstRowKey, stdout])
+  }, [generation, rowCount, firstRowKey, stdout, fullscreen, transcriptHandle])
   const configurationCheck = React.useMemo(() => createConfigurationCheck({
     read: () => ({
       generation: sessions.store.getSnapshot().agentBindingGeneration,
@@ -153,6 +169,11 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       else if (!key.ctrl && !key.meta && input) { setHistoryQuery(value => (value ?? '') + input); setFocus(0) }
       return
     }
+    if (fullscreen && transcriptHandle !== null && (key.pageUp || key.pageDown)) {
+      const step = Math.max(1, transcriptHandle.getViewportHeight() - 2)
+      transcriptHandle.scrollBy(key.pageUp ? -step : step)
+      return
+    }
     if (key.ctrl && input === 'r') { setHistoryQuery(''); setFocus(0); return }
     if (key.ctrl && input === 'o') { setExpanded(value => !value); return }
     if (key.escape && session.working) {
@@ -171,31 +192,35 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       }
     }
   })
-  return <Box flexDirection="column">
-    <ProductHeader
-      key={`product-${generation}`}
-      model={setting.model}
-      provider={setting.provider}
-      contextWindow={setting.contextWindow}
-      cwd={displayCwd}
-      backendVersion={workbenchState.backendVersion}
-    />
-    <MessageList
-      key={`transcript-${generation}`}
-      rows={conversation.rows}
-      expanded={expanded}
-      expandedRows={expandedRows}
-      expandedDetails={expandedDetails}
-      selectedId={null}
-      onToggleRow={id => setExpandedRows(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
-      onToggleDetail={id => setExpandedDetails(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
-      model={setting.model}
-      showAll={showAll}
-      onToggleAll={() => setShowAll(value => !value)}
-      olderHistory={conversation.olderHistory}
-      onLoadOlder={() => perform(() => transcript.commands.loadOlder())}
-      thinkingVisible={thinking}
-    />
+  const header = <ProductHeader
+    key={`product-${generation}`}
+    model={setting.model}
+    provider={setting.provider}
+    contextWindow={setting.contextWindow}
+    cwd={displayCwd}
+    backendVersion={workbenchState.backendVersion}
+  />
+  const transcriptList = <MessageList
+    key={`transcript-${generation}`}
+    rows={conversation.rows}
+    expanded={expanded}
+    expandedRows={expandedRows}
+    expandedDetails={expandedDetails}
+    selectedId={null}
+    onToggleRow={id => setExpandedRows(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
+    onToggleDetail={id => setExpandedDetails(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
+    model={setting.model}
+    showAll={showAll}
+    onToggleAll={() => setShowAll(value => !value)}
+    olderHistory={conversation.olderHistory}
+    onLoadOlder={() => perform(() => transcript.commands.loadOlder())}
+    thinkingVisible={thinking}
+    scrollHandle={transcriptHandle}
+    fullscreen={fullscreen}
+  />
+  // Bottom chrome never shrinks: the transcript viewport above it absorbs
+  // every height change, so the composer stays at the terminal bottom.
+  const bottomChrome = <Box flexDirection="column" flexShrink={0}>
     {!configured ? <Text color="warning">Configure a model with /provider, /auth or /model to get started.</Text> : null}
     {menu && !question && !approval ? <CommandMenu menu={menu} focus={focus} /> : null}
     {historyQuery !== null && !question && !approval ? <HistorySearchDialog query={historyQuery} cursorOffset={historyQuery.length} matches={history} focusIndex={focus} /> : null}
@@ -219,6 +244,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       onBack={question.canGoBack ? draft => questionStore.backCurrent(draft) : undefined}
       onForward={question.canGoForward ? draft => questionStore.forwardCurrent(draft) : undefined}
     /> : null}
+    {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} /> : null}
     <PromptInput
       key={generation}
       composer={composer}
@@ -230,9 +256,10 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
         cycleMode: sessions.commands.cycleMode,
       }}
       suspended={panelOpen}
+      suggestionsAbove={fullscreen}
       onOpenHelp={openHelp}
       onRunCommand={(name, raw, images) => runCommand(name, raw, images).catch(error => { report(error); return false })}
-      selectionActive={false}
+      selectionActive={hasSelection}
       fillText={fillText}
       onFillConsumed={() => setFillText(null)}
       controllerRef={controller}
@@ -246,6 +273,25 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     <Box paddingLeft={1} height={1} flexShrink={0}>
       <Text dimColor wrap="truncate-end">? for shortcuts</Text>
     </Box>
-    {approval ? <ApprovalPanel key={approval.key} approval={approval} background={approval.agentId !== session.agentId} onDecide={(outcome, decision) => approvalStore.decide(outcome, decision)} /> : null}
+  </Box>
+  if (fullscreen) {
+    return <Box flexDirection="column" height="100%" width="100%" flexShrink={0}>
+      {header}
+      <ScrollBox
+        ref={setTranscriptHandle}
+        flexDirection="column"
+        flexGrow={1}
+        flexShrink={1}
+        stickyScroll
+      >
+        {transcriptList}
+      </ScrollBox>
+      {bottomChrome}
+    </Box>
+  }
+  return <Box flexDirection="column">
+    {header}
+    {transcriptList}
+    {bottomChrome}
   </Box>
 }

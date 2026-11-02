@@ -36,6 +36,8 @@ Currently, this version keeps the basic functionality. Further improvements will
 | Context management | Compact earlier conversation turns to free context space |
 | Approvals and questions | Respond to permission requests and questions during tool execution |
 
+The chat uses the terminal's alternate screen with a fixed-height transcript viewport, so the composer stays pinned to the bottom while the conversation scrolls. Set `DSH_TUI_INLINE=1` to use the previous inline layout instead.
+
 ## Build and install locally
 
 **This project has not been published to npm yet.** Build from source and install locally for now. An npm release is planned once the features and user experience are more complete.

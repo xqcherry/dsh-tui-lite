@@ -5,6 +5,7 @@
  * components can use `color="subtle"`-style semantic theme keys consistently.
  */
 export { Ansi } from '../ink/Ansi.js'
+export { AlternateScreen } from '../ink/components/AlternateScreen.js'
 export { default as Newline, type Props as NewlineProps } from '../ink/components/Newline.js'
 export { NoSelect } from '../ink/components/NoSelect.js'
 export {
