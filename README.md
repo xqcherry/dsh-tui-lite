@@ -120,7 +120,7 @@ Before npm publication, build a local installation package for users to install 
 ```sh
 pnpm build
 npm pack --ignore-scripts
-npm install -g ./dsh-tui-lite-0.13.0.tgz
+npm install -g ./dsh-tui-lite-0.1.0.tgz
 dsl
 ```
 

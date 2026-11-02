@@ -1,6 +1,6 @@
 {
   "name": "dsh-tui-lite",
-  "version": "0.13.0",
+  "version": "0.1.0",
   "description": "A lightweight terminal client for DeepSeek Harness agents, sessions and tools.",
   "keywords": [
     "dsh-tui-lite",
