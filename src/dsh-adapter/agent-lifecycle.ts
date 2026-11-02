@@ -33,7 +33,7 @@ export async function resolveAgent(
     }
     // The launch-time counterpart of the in-session `/resume` claim
     // (`channel/session-resume.ts`), and it has to happen before ANY await:
-    // without it `dsh-tui --resume <id>` mounts the log purely because the user
+    // without it `dsl --resume <id>` mounts the log purely because the user
     // asked for it, so a second terminal doing the same joins the first and
     // both interleave writes into one append-only transcript. The mount
     // publisher cannot cover this — it publishes the set, it never refuses a

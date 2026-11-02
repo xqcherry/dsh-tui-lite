@@ -36,7 +36,7 @@ function ensureDir(): void {
 
 /**
  * Store the session to resume and report the launcher invocation.
- * @param sessionId - Session id for `dsh-tui --resume` on the next launch.
+ * @param sessionId - Session id for `dsl --resume` on the next launch.
  */
 export function writeResumeTarget(sessionId: string): void {
   ensureDir()
@@ -53,7 +53,7 @@ export function clearResumeTarget(): void {
 }
 
 /**
- * The session id requested by `dsh-tui --resume`, if any.
+ * The session id requested by `dsl --resume`, if any.
  * @returns The stored session id, or undefined when none is set.
  */
 export function readResumeTarget(): string | undefined {

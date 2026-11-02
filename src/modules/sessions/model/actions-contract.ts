@@ -24,7 +24,7 @@ export interface SessionActions {
   listSessions(onEnriched?: (summary: SessionSummary) => void, onPartial?: (rows: readonly SessionSummary[]) => void): Promise<readonly SessionSummary[]>
   /** Trailing exchanges of a persisted session, for the browser's preview. */
   previewSession(sessionId: string): Promise<readonly PreviewEntry[]>
-  /** Mark a session for `dsh-tui --resume` on the next launch. */
+  /** Mark a session for `dsl --resume` on the next launch. */
   setResumeTarget(sessionId: string): void
   /** Rename the current session (`/rename`): appends a `session/title`
    *  event, which the status line and the /resume picker both read. */

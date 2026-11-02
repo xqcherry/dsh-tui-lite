@@ -112,7 +112,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       return
     }
     try { writeResumeTarget(channel.sessions.store.getSnapshot().agentId) } catch { /* best effort */ }
-    const notice = `Resume: dsh-tui --resume ${channel.sessions.store.getSnapshot().agentId}`
+    const notice = `Resume: dsl --resume ${channel.sessions.store.getSnapshot().agentId}`
     void finishExit(ctx, instance, false, notice, undefined, () => {
       disposeRootAndExit(ctx, 0)
     })

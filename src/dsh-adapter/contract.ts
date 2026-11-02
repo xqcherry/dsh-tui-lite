@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { gte } from 'semver'
 const require = createRequire(import.meta.url)
-const own = JSON.parse(readFileSync(require.resolve('@deepseek-harness-tui/dsh-tui/package.json'), 'utf8')) as {
+const own = JSON.parse(readFileSync(require.resolve('dsh-tui-lite/package.json'), 'utf8')) as {
   dependencies: Record<string, string>
 }
 export const UPSTREAM_VALIDATED_VERSION = own.dependencies['@deepseek-ai/dsh']!

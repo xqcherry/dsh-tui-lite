@@ -28,7 +28,8 @@ with tempfile.TemporaryDirectory(prefix='dsh-tui-boot-') as temporary:
     def session():
         os.setsid()
         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
-    child = subprocess.Popen([sys.argv[1], str(root / 'bin/dsh-tui.js')], cwd=project, env=env, stdin=slave, stdout=slave, stderr=slave, preexec_fn=session)
+    command = [sys.argv[3]] if len(sys.argv) > 3 else [sys.argv[1], str(root / 'bin/dsh-tui.js')]
+    child = subprocess.Popen(command, cwd=project, env=env, stdin=slave, stdout=slave, stderr=slave, preexec_fn=session)
     output = b''
     ready = False
     help_opened = False
@@ -58,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='dsh-tui-boot-') as temporary:
         assert ready, 'The bundled TUI never rendered its ready/configuration state: ' + text[-3000:]
         assert sent_exit, 'The help command never rendered: ' + text[-3000:]
         assert child.poll() == 0, 'The exit command did not stop cleanly: ' + text[-3000:]
-        assert 'Resume: dsh-tui --resume' in text, 'Exit did not write its resume hint after terminal cleanup'
+        assert 'Resume: dsl --resume' in text, 'Exit did not write its resume hint after terminal cleanup'
         restored = termios.tcgetattr(slave)
         flags = termios.ICANON | termios.ECHO
         assert restored[3] & flags == original[3] & flags, 'Terminal input modes were not restored'

@@ -1,8 +1,9 @@
 {
-  "name": "@deepseek-harness-tui/dsh-tui",
+  "name": "dsh-tui-lite",
   "version": "0.13.0",
-  "description": "Interactive terminal interface for DeepSeek Harness agents, sessions and tools.",
+  "description": "A lightweight terminal client for DeepSeek Harness agents, sessions and tools.",
   "keywords": [
+    "dsh-tui-lite",
     "dsh",
     "dsh-tui",
     "deepseek",
@@ -16,26 +17,14 @@
     "coding-agent"
   ],
   "license": "Apache-2.0",
-  "author": {
-    "name": "chimney",
-    "url": "https://github.com/ccch1mneyyy"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ccch1mneyyy/dsh-TUI.git"
-  },
-  "bugs": {
-    "url": "https://github.com/ccch1mneyyy/dsh-TUI/issues"
-  },
-  "homepage": "https://github.com/ccch1mneyyy/dsh-TUI#readme",
   "packageManager": "pnpm@11.21.0",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "bin": {
-    "dsh-tui": "./bin/dsh-tui.js",
-    "dst": "./bin/dsh-tui.js"
+    "dsl": "./bin/dsh-tui.js",
+    "dsh-tui-lite": "./bin/dsh-tui.js"
   },
   "main": "lib/types/index.js",
   "types": "lib/types/index.d.ts",

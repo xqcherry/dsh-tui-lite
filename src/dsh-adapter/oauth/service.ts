@@ -5,7 +5,7 @@
  * without touching the credential file or the pi-ai flow objects; the `/auth`
  * command in `command.ts` is a thin textual veneer over the same api.
  *
- * @module @deepseek-harness-tui/dsh-tui/oauth/service
+ * @module dsh-tui-lite/oauth/service
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -208,7 +208,7 @@ export function createDshAuthApi(deps: DshAuthApiDeps): DshAuthApi {
       }
       if (ask === undefined) {
         throw new Error(
-          `dsh-auth: signing in to "${target}" needs an interactive surface (run inside dsh-tui or the web client); `
+          `dsh-auth: signing in to "${target}" needs an interactive surface (run inside dsl or the web client); `
           + 'this plugin refuses to assume a browser on this machine',
         )
       }

@@ -17,7 +17,7 @@
  *
  * ```yaml
  * - id: dsh-tui-auth
- *   name: '@deepseek-harness-tui/dsh-tui/oauth'
+ *   name: 'dsh-tui-lite/oauth'
  *   inject: [llm, commands]
  *   config:
  *     # providers: [openai-codex, anthropic, xai]  # optional catalog subset;
@@ -36,7 +36,7 @@
  * (an llm-pi-ai settings profile for the same provider) is refused by the
  * registry — that refusal is logged and the remaining routes still mount.
  *
- * @module @deepseek-harness-tui/dsh-tui/oauth
+ * @module dsh-tui-lite/oauth
  */
 
 import type { Context } from '@deepseek-ai/cordis'

@@ -7,8 +7,8 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const PROFILE = 'dsh-tui'
-const PACKAGE = '@deepseek-harness-tui/dsh-tui'
+const PROFILE = 'dsh-tui-lite'
+const PACKAGE = 'dsh-tui-lite'
 
 function manifest(path: string): Record<string, unknown> {
   const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
@@ -65,7 +65,7 @@ function prepareProfile(home: string, packageRoot: string): void {
   const dir = join(home, 'profiles', PROFILE)
   mkdirSync(dir, { recursive: true })
   const path = join(dir, 'package.json')
-  const value = existsSync(path) ? manifest(path) : { name: 'dsh-profile-dsh-tui', private: true }
+  const value = existsSync(path) ? manifest(path) : { name: 'dsh-profile-dsh-tui-lite', private: true }
   const dsh = record(value.dsh)
   const profile = record(dsh.profile)
   const existing = profile.bundles ?? []
@@ -88,7 +88,7 @@ function prepareProfile(home: string, packageRoot: string): void {
       if (manifest(join(link, 'package.json')).name !== PACKAGE) throw new Error(`Refusing to replace unrelated profile directory: ${link}`)
       const backup = `${link}.previous-${randomUUID()}`
       renameSync(link, backup)
-      process.stderr.write(`dsh-tui: retained previous profile package at ${backup}\n`)
+      process.stderr.write(`dsl: retained previous profile package at ${backup}\n`)
     }
     const temporary = `${link}.next-${randomUUID()}`
     symlinkSync(packageRoot, temporary, process.platform === 'win32' ? 'junction' : 'dir')

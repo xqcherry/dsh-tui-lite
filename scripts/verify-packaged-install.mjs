@@ -25,17 +25,20 @@ try {
   symlinkSync(process.execPath, join(nodeOnly, process.platform === 'win32' ? 'node.exe' : 'node'))
   const home = join(temp, 'home')
   const env = { ...process.env, DSH_HOME: home, HOME: home, USERPROFILE: home, PATH: nodeOnly }
-  const command = join(installed, 'bin', 'dsh-tui.js')
-  const dump = run(process.execPath, [command, '--dump-config'], { env })
+  const command = process.platform === 'win32' ? join(prefix, 'dsl.cmd') : join(prefix, 'bin', 'dsl')
+  const fullCommand = process.platform === 'win32' ? join(prefix, 'dsh-tui-lite.cmd') : join(prefix, 'bin', 'dsh-tui-lite')
+  const commandOptions = { env, shell: process.platform === 'win32' }
+  const dump = run(command, ['--dump-config'], commandOptions)
   assert.match(dump, /dsh-tui-auth/)
   assert.match(dump, /dsh-tui-subagent-model-selection-settings/)
-  assert.equal(realpathSync(join(home, 'profiles', 'dsh-tui', 'node_modules', pkg.name)), realpathSync(installed))
-  run(process.execPath, [command, '--dump-config'], { env })
+  assert.equal(realpathSync(join(home, 'profiles', 'dsh-tui-lite', 'node_modules', pkg.name)), realpathSync(installed))
+  run(fullCommand, ['--dump-config'], commandOptions)
+  run(command, ['--dump-config'], commandOptions)
   if (process.platform !== 'win32') {
     // This boots the installed artifact itself in a real 68-column terminal.
-    console.log(run('python3', ['scripts/verify-runtime-boot.py', process.execPath, installed]).trim())
+    console.log(run('python3', ['scripts/verify-runtime-boot.py', process.execPath, installed, command]).trim())
   }
-  console.log(`Packed npm installation passed: ${pkg.name}@${pkg.version}, local kernel, no global dsh/pnpm, repeat launch`)
+  console.log(`Packed npm installation passed: ${pkg.name}@${pkg.version}, dsl + dsh-tui-lite commands, local kernel, no global dsh/pnpm, repeat launch`)
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

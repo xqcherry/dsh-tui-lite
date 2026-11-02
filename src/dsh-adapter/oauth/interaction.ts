@@ -24,7 +24,7 @@
  * registered at all, `ask` rejects and the login command turns that into a
  * clear refusal.
  *
- * @module @deepseek-harness-tui/dsh-tui/oauth/interaction
+ * @module dsh-tui-lite/oauth/interaction
  */
 
 import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'

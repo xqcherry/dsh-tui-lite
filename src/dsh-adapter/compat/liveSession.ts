@@ -18,7 +18,7 @@
  * Physical JSONL still stores optional `seedLength`. That encoding belongs to
  * `sessionLog` / `sessions/header`, not this module.
  *
- * @module @deepseek-harness-tui/dsh-tui/compat/liveSession
+ * @module dsh-tui-lite/compat/liveSession
  */
 import type { CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
