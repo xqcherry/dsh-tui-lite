@@ -59,7 +59,7 @@ export const LOCAL_COMMANDS: LocalCommand[] = [
   { name: 'auth', description: 'Manage provider authentication' },
   { name: 'thinking', description: 'Toggle extended thinking display' },
   { name: 'mcp', description: 'Show MCP server status' },
-  { name: 'status', description: 'Show session context, token usage and cost' },
+  { name: 'status', description: 'Show context occupancy, cumulative tokens and estimated session cost' },
   { name: 'doctor', description: 'Run environment checks' },
   { name: 'help', description: 'Show shortcuts and commands' },
   { name: 'exit', description: 'Exit dsh-tui' },

@@ -3,12 +3,13 @@ import type { WorkbenchModules } from '../contracts.js'
 import type { ComposerImageRef } from '../../../shared/protocol/composer.js'
 import type { QuestionStore } from '../../decisions/contracts.js'
 import { runOAuthLogin, runProviderWizard } from '../../settings/index.js'
+import { formatStatusLines } from './status-summary.js'
 
 export interface ChatMenuItem { label: string; run?(): void | Promise<unknown> }
 export interface ChatMenu { title: string; items: readonly ChatMenuItem[] }
 
 export interface ChatCommandHost {
-  ports: Pick<WorkbenchModules, 'sessions' | 'settings' | 'transcript' | 'workbench'>
+  ports: Pick<WorkbenchModules, 'activity' | 'sessions' | 'settings' | 'transcript' | 'workbench'>
   ask: QuestionStore['ask']
   openMenu(title: string, items: readonly ChatMenuItem[]): void
   onExit(): void
@@ -20,7 +21,7 @@ export interface ChatCommandHost {
 
 /** Application command routing; menu state and keyboard handling stay in React. */
 export function createChatCommands(deps: ChatCommandHost) {
-  const { sessions, settings, transcript, workbench } = deps.ports
+  const { activity, sessions, settings, transcript, workbench } = deps.ports
   const { openMenu, onExit, refreshConfiguration } = deps
   const showCommandResult = (title: string, lines: readonly string[]): void => {
     transcript.commands.pushLocal(title, lines, { commandResult: true })
@@ -149,7 +150,24 @@ export function createChatCommands(deps: ChatCommandHost) {
       case 'compact': if (deps.configured()) await transcript.commands.compact(); else workbench.commands.notify('Configure a model first: /provider or /auth'); break
       case 'thinking': deps.toggleThinking(); break
       case 'mcp': showCommandResult('/mcp', workbench.commands.mcpStatus()); break
-      case 'status': showCommandResult('/status', [sessions.store.getSnapshot().status, `${settings.store.getSnapshot().provider}/${settings.store.getSnapshot().model}`, sessions.store.getSnapshot().cwd]); break
+      case 'status': {
+        const session = sessions.store.getSnapshot()
+        const settingsState = settings.store.getSnapshot()
+        const transcriptState = transcript.store.getSnapshot()
+        const activityState = activity.store.getSnapshot()
+        showCommandResult('/status', formatStatusLines({
+          status: session.status,
+          provider: settingsState.provider,
+          model: settingsState.model,
+          cwd: session.cwd,
+          contextWindow: settingsState.contextWindow,
+          contextOccupancy: transcriptState.contextOccupancy,
+          tokens: transcriptState.tokens,
+          mainCost: transcriptState.mainCost,
+          subagentCost: activityState.subagentCost,
+        }))
+        break
+      }
       case 'doctor': showCommandResult('/doctor', await workbench.commands.doctorInfo()); break
       default: {
         const outcome = await workbench.commands.runExternalCommandOutcome(name, raw, images)
