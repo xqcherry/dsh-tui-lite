@@ -293,6 +293,9 @@ check('7c: text run + paste chunk in one stdin chunk land in order',
 // would be vacuous — probe the feedback LINE itself.
 const feedbackRow = (): string =>
   screen().split('\n').find(line => line.includes('✎')) ?? ''
+/** The feedback text between the pencil glyph and the panel's right border. */
+const feedbackText = (): string =>
+  feedbackRow().replace(/^.*?✎/u, '').replace(/│\s*$/u, '').trim()
 lastAnswer = undefined
 cancelCount = 0
 await mount(planReviewQuestion)
@@ -301,7 +304,7 @@ stdin.write(CHUNK('1')) // a pasted digit must NOT pick option 1 (批准)
 await sleep(250) // 固定窗:探针 粘贴的数字不得选中选项/提交
 check('8a: pasted digit does NOT approve the plan', lastAnswer === undefined, JSON.stringify(lastAnswer))
 check('8b: pasted digit lands in the feedback row (focused)',
-  await settled(() => feedbackRow().trimEnd().endsWith('1')), feedbackRow())
+  await settled(() => feedbackText().endsWith('1')), feedbackRow())
 stdin.write('\r')
 check('8c: Enter routes it to keep-planning-with-feedback',
   await settled(() => answerSelected().join() === '继续计划' && answerCustom() === '1'),
