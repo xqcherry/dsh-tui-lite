@@ -28,6 +28,7 @@ export const checks = [
   'verify-host-preset.ts',
   'verify-prompt-submit-guard.mjs',
   'verify-minimal-chat-input.mjs',
+  'verify-whale-header.mjs',
   'verify-batched-prompt-input.mjs',
   'verify-prompt-undo.mjs',
   'verify-prompt-history-draft.mjs',

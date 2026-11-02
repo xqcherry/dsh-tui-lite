@@ -11,7 +11,10 @@ import { HistorySearchDialog } from '../../composer/index.js'
 import { MessageList } from '../../transcript/index.js'
 import { PromptInput, type PromptController } from '../../composer/index.js'
 import { AskUserQuestionPanel } from '../../decisions/index.js'
-import { Box, Text, useInput, useTerminalSize } from '../../../ui/primitives.js'
+import { Box, Text, useApp, useInput, useTerminalSize } from '../../../ui/primitives.js'
+import instances from '../../../ink/instances.js'
+import { abbreviateHomePath } from '../../../shared/platform/paths.js'
+import { ProductHeader } from './ProductHeader.js'
 
 export interface ChatProps {
   ports: WorkbenchModules
@@ -25,12 +28,15 @@ export interface ChatProps {
 export function Chat({ ports, questionStore, approvalStore, modelConfigured, initialPrompt, onExit }: ChatProps): React.ReactNode {
   const { composer, sessions, settings, transcript, workbench } = ports
   const session = React.useSyncExternalStore(sessions.store.subscribe, sessions.store.getSnapshot)
+  const displayCwd = abbreviateHomePath(session.displayCwd || session.cwd)
   const setting = React.useSyncExternalStore(settings.store.subscribe, settings.store.getSnapshot)
   const conversation = React.useSyncExternalStore(transcript.store.subscribe, transcript.store.getSnapshot)
+  const workbenchState = React.useSyncExternalStore(workbench.store.subscribe, workbench.store.getSnapshot)
   const composerState = React.useSyncExternalStore(composer.store.subscribe, composer.store.getSnapshot)
   const question = React.useSyncExternalStore(listener => questionStore.subscribe(listener), () => questionStore.getSnapshot())
   const approval = React.useSyncExternalStore(listener => approvalStore.subscribe(listener), () => approvalStore.getSnapshot())
   const { rows: terminalRows } = useTerminalSize()
+  const { stdout } = useApp()
   const [menu, setMenuState] = React.useState<ChatMenu | null>(null)
   const [focus, setFocusState] = React.useState(0)
   const [help, setHelp] = React.useState(false)
@@ -56,6 +62,21 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   const controller = React.useRef<PromptController | null>(null)
   const lastExit = React.useRef(0)
   const generation = session.agentBindingGeneration
+  const rowCount = conversation.rows.length
+  const firstRow = conversation.rows[0]
+  const firstRowKey = firstRow ? `${firstRow.kind}:${firstRow.id}` : undefined
+  const previousPage = React.useRef({ generation, rowCount, firstRowKey })
+  React.useLayoutEffect(() => {
+    const previous = previousPage.current
+    // Inline rendering normally preserves the header's scrollback copy on
+    // shrink. A session switch or clear starts a new page: its header must
+    // be painted into the live viewport again, without erasing history.
+    const cleared = previous.rowCount > 0 && rowCount <= 1 && (previous.rowCount > rowCount || previous.firstRowKey !== firstRowKey)
+    if (previous.generation !== generation || cleared) {
+      instances.get(stdout)?.reanchorViewport()
+    }
+    previousPage.current = { generation, rowCount, firstRowKey }
+  }, [generation, rowCount, firstRowKey, stdout])
   const configurationCheck = React.useMemo(() => createConfigurationCheck({
     read: () => ({
       generation: sessions.store.getSnapshot().agentBindingGeneration,
@@ -143,7 +164,16 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   })
   const start = Math.max(0, focus - Math.max(2, Math.floor((terminalRows - 8) / 2)))
   return <Box flexDirection="column">
+    <ProductHeader
+      key={`product-${generation}`}
+      model={setting.model}
+      provider={setting.provider}
+      contextWindow={setting.contextWindow}
+      cwd={displayCwd}
+      backendVersion={workbenchState.backendVersion}
+    />
     <MessageList
+      key={`transcript-${generation}`}
       rows={conversation.rows}
       expanded={expanded}
       expandedRows={expandedRows}
@@ -161,7 +191,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
       setting.model,
       session.mode?.id,
       conversation.contextOccupancy ? `ctx ${conversation.contextOccupancy.usedTokens}/${setting.contextWindow ?? '?'}` : undefined,
-      session.displayCwd || session.cwd,
+      displayCwd,
     ].filter(Boolean).join(' · ')}</Text>
     {!configured ? <Text color="warning">Configure a model with /provider, /auth or /model to get started.</Text> : null}
     {menu && !question && !approval ? <Box flexDirection="column">
