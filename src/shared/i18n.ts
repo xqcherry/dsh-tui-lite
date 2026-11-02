@@ -36,6 +36,8 @@ const dict = {
   'selection-attached': { one: 'Selected {{lines}} line from {{path}}', other: 'Selected {{lines}} lines from {{path}}' },
   'transcript-image': 'Image',
   'transcript-image-message': { one: '{{count}} image', other: '{{count}} images' },
+  'transcript-copied': { one: 'Copied {{count}} character', other: 'Copied {{count}} characters' },
+  'transcript-copy-refused': 'Content changed while copying; copy cancelled',
   'input-image-token-stale': '{{token}} is no longer staged; no image will attach',
   'input-images-staged': { one: 'Attached {{count}} image', other: 'Attached {{count}} images' },
   'input-images-staged-adapted': { one: 'Attached {{count}} image · {{adapted}} adapted', other: 'Attached {{count}} images · {{adapted}} adapted' },

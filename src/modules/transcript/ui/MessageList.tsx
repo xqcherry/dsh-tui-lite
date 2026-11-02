@@ -28,7 +28,7 @@ import { noteFrameCause, noteListGeometry } from '../../../ink/geometry-trace.js
 import { stripNarration } from '../../../shared/platform/narration.js'
 
 import { useRevealVersion } from '../../../ui/hooks/useRevealVersion.js'
-import { Box, useTerminalSize } from '../../../ui/primitives.js'
+import { Box, useTerminalSize, type ScrollBoxHandle } from '../../../ui/primitives.js'
 
 
 import { getRevealVersion, revealTextOf } from '../../../ui/streaming-reveal.js'
@@ -167,6 +167,8 @@ export function MessageList({
   onWatchJobOutput,
   onOpenFile,
   sessionCwd,
+  scrollHandle = null,
+  fullscreen = false,
 }: {
   rows: readonly ChatRow[]
   expanded: boolean
@@ -228,6 +230,12 @@ export function MessageList({
    *  raw paths. The real fs cwd, NOT displayCwd: remote URI display forms
    *  can't prefix-match selection paths. */
   sessionCwd?: string | undefined
+  /** Fullscreen transcript scroll viewport. When present, the mount window
+   *  follows `scrollTop` instead of the terminal scrollback. */
+  scrollHandle?: ScrollBoxHandle | null
+  /** Alt-screen layout: rows outside the window are remounted on demand
+   *  instead of being preserved in native scrollback. */
+  fullscreen?: boolean
 }) {
   const hiddenCount = rows.length - RENDERED_ROW_CAP
   // The thinking filter runs BEFORE virtualization so window indices line up.
@@ -471,6 +479,13 @@ export function MessageList({
 
   // --- layout virtualization ---------------------------------------------
   const { columns, rows: termRows } = useTerminalSize()
+  // Fullscreen scroll viewport: the ScrollBox mutates scrollTop imperatively,
+  // so subscribe and re-run the window scan when it moves.
+  const [, setScrollTick] = React.useState(0)
+  React.useEffect(() => {
+    if (scrollHandle === null) return
+    return scrollHandle.subscribe(() => setScrollTick(tick => tick + 1))
+  }, [scrollHandle])
   // Smooth-reveal wakeups: the scheduler's tick bumps this hook, re-running
   // MessageList so the revealed `text`/line-count reads below feed fresh
   // values through the same MemoRow-prop pipeline an arriving chunk uses —
@@ -513,6 +528,10 @@ export function MessageList({
    *  scrollback and the diff skips them. */
   const lastStartRef = React.useRef<number>(-1)
   const holdFlushTickRef = React.useRef<number>(-1)
+  /** First mounted row of a manual (non-sticky) scroll, used to keep the
+   *  reading position when rows above it change height or history is
+   *  prepended (load older / show previous). */
+
   /** True when frame-budgeted history painting still has batches left
    *  (main-screen open): the layout effect schedules the next slice. */
   const paintPendingRef = React.useRef(false)
@@ -634,126 +653,124 @@ export function MessageList({
     total += heightOf(visibleRows[i])
   }
 
-  const viewport = termRows
-  const base = baseRef.current ?? DEFAULT_HEADER_LINES
+  // Fullscreen: the ScrollBox owns the viewport (terminal rows minus the
+  // fixed header/bottom chrome). Inline: the terminal itself is the scroller.
+  const viewport = scrollHandle === null ? termRows : Math.max(1, scrollHandle.getViewportHeight())
+  const scrollTop = scrollHandle?.getScrollTop() ?? 0
+  const pending = scrollHandle?.getPendingDelta() ?? 0
+  const sticky = scrollHandle?.isSticky() ?? true
+  // Inline measures its splash/dividers from the first mounted row; the
+  // first frame has no measurement yet. Fullscreen keeps the header outside
+  // the scroll viewport, so its content-space base starts at 0.
+  const base = baseRef.current ?? (fullscreen ? 0 : DEFAULT_HEADER_LINES)
   let start = Math.max(0, visibleRows.length - 1)
-  const end = visibleRows.length
+  let end = visibleRows.length
   if (visibleRows.length > 0) {
-    // Keep a terminal viewport of tail content mounted. Older rows stay
-    // represented by their measured height after they reach scrollback.
-    let covered = Math.min(viewport, termRows) + OVERSCAN_LINES
-    let floor = visibleRows.length - 1
-    while (floor > 0 && covered > 0) {
-      covered -= heightOf(visibleRows[floor])
-      floor--
-    }
-    // The walk exhausted the whole list: every row is within coverage —
-    // floor+1 here would drop row 0 (its content then has no terminal copy
-    // anywhere; preset history lost its head — CI repro-inline-scrollback).
-    start = floor === 0 && covered > 0 ? 0 : floor + 1
-    // Paint-at-least-once: extend the window over any row that has never
-    // been mounted. A row the window skips keeps only its terminal/scrollback
-    // copy — a row that was never painted has NO copy anywhere, so preset
-    // history (session resume, repro-inline-scrollback's #39 family) would
-    // vanish from the user's scrollback. Extending mounts everything above
-    // on the first frame (topPad 0, full paint), then the set fills and the
-    // window tightens to the tail.
-    // FRAME-BUDGETED: mounting the whole window in ONE commit saturated the
-    // main thread for seconds (measured 6s wall with ZERO frames in the
-    // first second on an 800-row inline open — every input queued behind
-    // the React render). Extend in batches of ~2 viewports of measured
-    // height per commit instead; the pending-batch effect schedules the
-    // next slice, so the app paints, drains input, and stays interactive
-    // while history streams in above the fold (opencode-style progressive
-    // transcript hydration; the terminal accepts rows whenever they land).
-    const paintedOnce = paintedOnceRef.current
-    let paintPending = false
-    {
-      // Persistent batch edge: the sticky floor-walk RESETS start to the
-      // tail every frame, so a per-frame budget walk from `start` re-spends
-      // its whole budget on already-painted rows and never reaches deeper
-      // unpainted ones (measured: an infinite 0.3ms/frame batch loop).
-      // Remember how far painting has advanced; each batch extends THAT
-      // edge upward by the budget.
-      if (paintEdgeRef.current < 0) paintEdgeRef.current = start
-      let firstUnpainted = -1
-      for (let i = 0; i < paintEdgeRef.current; i++) {
-        if (!paintedOnce.has(visibleRows[i]!.id)) {
-          firstUnpainted = i
+    if (scrollHandle !== null && !sticky) {
+      // Manual scroll: mount the window around scrollTop. `offsets` are row
+      // coordinates below `base`; scrollTop is content-space from the
+      // ScrollBox origin. Overscan keeps fast wheel bursts from opening a
+      // blank band before React re-renders.
+      const viewTop = Math.max(0, scrollTop + pending - base)
+      const relTop = Math.max(0, viewTop - OVERSCAN_LINES)
+      const relBottom = viewTop + viewport + OVERSCAN_LINES
+      start = 0
+      while (start < visibleRows.length && offsets[start]! + heightOf(visibleRows[start]!) <= relTop) start++
+      // A scrollTop past the estimated content must keep a row mounted so
+      // the next measure can correct the geometry.
+      if (start === visibleRows.length && start > 0) start--
+      end = start
+      while (end < visibleRows.length && offsets[end]! < relBottom) end++
+      if (end <= start) end = Math.min(visibleRows.length, start + 1)
+    } else {
+      // Keep a viewport of tail content mounted. Older rows stay represented
+      // by their measured height after they reach scrollback.
+      let covered = Math.min(viewport, termRows) + OVERSCAN_LINES
+      let floor = visibleRows.length - 1
+      while (floor > 0 && covered > 0) {
+        covered -= heightOf(visibleRows[floor])
+        floor--
+      }
+      // The walk exhausted the whole list: every row is within coverage —
+      // floor+1 here would drop row 0 (its content then has no terminal copy
+      // anywhere; preset history lost its head — CI repro-inline-scrollback).
+      start = floor === 0 && covered > 0 ? 0 : floor + 1
+      // Paint-at-least-once is inline-only: in the alt screen there is no
+      // scrollback copy to preserve, and mounting history eagerly defeats
+      // virtualization. Unknown-height extension still runs in both modes.
+      const paintedOnce = paintedOnceRef.current
+      let paintPending = false
+      if (!fullscreen) {
+        // Persistent batch edge: the sticky floor-walk RESETS start to the
+        // tail every frame, so a per-frame budget walk from `start` re-spends
+        // its whole budget on already-painted rows and never reaches deeper
+        // unpainted ones (measured: an infinite 0.3ms/frame batch loop).
+        // Remember how far painting has advanced; each batch extends THAT
+        // edge upward by the budget.
+        if (paintEdgeRef.current < 0) paintEdgeRef.current = start
+        let firstUnpainted = -1
+        for (let i = 0; i < paintEdgeRef.current; i++) {
+          if (!paintedOnce.has(visibleRows[i]!.id)) {
+            firstUnpainted = i
+            break
+          }
+        }
+        if (firstUnpainted !== -1) {
+          // Budget: extend the paint edge upward by ~half a viewport of
+          // measured content per commit (height estimates; unknown rows fall
+          // back to DEFAULT_ROW_HEIGHT and over-mount slightly — harmless).
+          let budget = Math.min(viewport, termRows) / 2 + OVERSCAN_LINES
+          let j = paintEdgeRef.current
+          while (j > firstUnpainted && budget > 0) {
+            j--
+            budget -= heightOf(visibleRows[j]!)
+          }
+          paintEdgeRef.current = j
+          start = Math.min(start, j)
+          paintPending = j > 0
+        }
+      } else {
+        paintEdgeRef.current = -1
+      }
+      paintPendingRef.current = paintPending
+      // Unknown-height extension (layout signature, see sigRef): a row whose
+      // cached height was just INVALIDATED must remount to re-measure even
+      // when it sits outside the window — its spacer otherwise falls back to
+      // DEFAULT_ROW_HEIGHT until the row scrolls back into view, leaving the
+      // content geometry wrong (blank band after Ctrl+O, unreachable scroll
+      // bottom after a tool result lands).
+      // Guard 1: only rows that have actually MOUNTED here once qualify.
+      // Guard 2: rows actively STREAMING are skipped too.
+      for (let i = 0; i < start; i++) {
+        if (visibleRows[i]!.streaming === true) continue
+        const rowId = visibleRows[i]!.id
+        if (!heightsRef.current.has(rowId) && paintedOnceRef.current.has(rowId)) {
+          start = i
           break
         }
       }
-      if (firstUnpainted !== -1) {
-        // Budget: extend the paint edge upward by ~half a viewport of
-        // measured content per commit (height estimates; unknown rows fall
-        // back to DEFAULT_ROW_HEIGHT and over-mount slightly — harmless).
-        // Measured: larger batches (2 viewports) put 50ms+ of first-wrap
-        // yoga into one frame; half a viewport keeps batches near the
-        // 16ms frame budget while still finishing an 800-row open in
-        // well under two seconds of background batches.
-        let budget = Math.min(viewport, termRows) / 2 + OVERSCAN_LINES
-        let j = paintEdgeRef.current
-        while (j > firstUnpainted && budget > 0) {
-          j--
-          budget -= heightOf(visibleRows[j]!)
-        }
-        paintEdgeRef.current = j
-        start = Math.min(start, j)
-        paintPending = j > 0
+      // Expansion hold — AFTER the extension so it tracks the FINAL window:
+      // never tighten past a widen until a frame with that layout has been
+      // flushed (getTerminalFlushTick advanced since the widen).
+      if (
+        lastStartRef.current >= 0 &&
+        start > lastStartRef.current &&
+        getTerminalFlushTick() === holdFlushTickRef.current
+      ) {
+        start = lastStartRef.current
       }
-    }
-    paintPendingRef.current = paintPending
-    // Unknown-height extension (layout signature, see sigRef): a row whose
-    // cached height was just INVALIDATED must remount to re-measure even
-    // when it sits outside the window — its spacer otherwise falls back to
-    // DEFAULT_ROW_HEIGHT until the row scrolls back into view, leaving the
-    // content geometry wrong for exactly that long (blank band after
-    // Ctrl+O, unreachable scroll bottom after a tool result lands). One
-    // remount per change; the measure tick + hold then tighten again.
-    // Guard 1: only rows that have actually MOUNTED here once qualify
-    // (paintedOnce fills from localRefs post-commit) — a brand-new
-    // streaming row has never been measured, and extending over it would
-    // mount everything below the window every frame while the user reads
-    // scrolled-up (virtualization defeated, per-frame full mount = the
-    // long-session stall). New rows keep the original path: their height
-    // lands once the window reaches them.
-    // Guard 2: rows actively STREAMING are skipped too. A streaming row's
-    // signature invalidates EVERY chunk (text length grows), so a painted
-    // streaming row below/above the window remounted per chunk — full
-    // markdown re-lex + wrap of the whole growing text, invisible to the
-    // user reading history (measured: 3s of streaming while scrolled up
-    // burned 2.5s of yoga and +84MB heap). Its height is in flux anyway;
-    // the final settle invalidates once more and remounts exactly once.
-    for (let i = 0; i < start; i++) {
-      if (visibleRows[i]!.streaming === true) continue
-      const rowId = visibleRows[i]!.id
-      if (!heightsRef.current.has(rowId) && paintedOnceRef.current.has(rowId)) {
-        start = i
-        break
+      if (lastStartRef.current < 0 || start < lastStartRef.current) {
+        holdFlushTickRef.current = getTerminalFlushTick()
       }
+      lastStartRef.current = start
     }
-    // Expansion hold — AFTER the extension so it tracks the FINAL window:
-    // never tighten past a widen until a frame with that layout has been
-    // flushed (getTerminalFlushTick advanced since the widen). A mount
-    // followed by the measure-tick re-render that drops the row paints only
-    // the DROPPED layout, and the row's painted-once mark (set at the first
-    // commit) is a lie; holding until the flush makes the mark real.
-    if (
-      lastStartRef.current >= 0 &&
-      start > lastStartRef.current &&
-      getTerminalFlushTick() === holdFlushTickRef.current
-    ) {
-      start = lastStartRef.current
-    }
-    if (lastStartRef.current < 0 || start < lastStartRef.current) {
-      holdFlushTickRef.current = getTerminalFlushTick()
-    }
-    lastStartRef.current = start
   }
   const topPad = offsets[start] ?? 0
+  const mountedBottom = end < visibleRows.length ? (offsets[end] ?? total) : total
+  const bottomPad = Math.max(0, total - mountedBottom)
   noteListGeometry({
-    start, end, topPad, bottomPad: 0, total, base, sticky: true,
-    pending: 0, viewport, termRows, columns, rowCount: visibleRows.length,
+    start, end, topPad, bottomPad, total, base, sticky,
+    pending, viewport, termRows, columns, rowCount: visibleRows.length,
   })
 
   // Measure mounted rows and continue painting older history in bounded batches.
@@ -784,6 +801,31 @@ export function MessageList({
       if (baseRef.current !== measured) {
         baseRef.current = measured
         changed = true
+      }
+    }
+    // Keep the render-time scroll clamp inside the rows that are actually
+    // mounted, so a wheel burst that outruns React's window re-render shows
+    // the mounted edge instead of a blank spacer.
+    if (scrollHandle !== null) {
+      const mountedTop = top ?? base + topPad
+      const lastMounted = visibleRows[end - 1]
+      const lastYoga = lastMounted ? localRefs.current.get(lastMounted.id)?.yogaNode : undefined
+      const mountedEnd = lastYoga === undefined
+        ? base + mountedBottom
+        : (lastYoga.getComputedTop() ?? 0) + (lastYoga.getComputedHeight() ?? 0)
+      if (sticky || (start === 0 && end >= visibleRows.length)) {
+        // Sticky still needs the MIN clamp: the first wheel-up breaks sticky
+        // several frames before React commits a new mount window.
+        const min = start > 0 ? Math.max(0, mountedTop - viewport) : undefined
+        scrollHandle.setClampBounds(min, undefined)
+      } else {
+        // Keep both edges inside the mounted window while a burst outruns
+        // React; the subscription widens the window on the next commit.
+        const min = start > 0 ? Math.max(0, mountedTop - viewport) : 0
+        scrollHandle.setClampBounds(
+          min,
+          bottomPad <= 0 ? undefined : Math.max(min, mountedEnd - viewport),
+        )
       }
     }
     if (changed && measureTimerRef.current === null) {
@@ -920,6 +962,7 @@ export function MessageList({
             />
           )
         })}
+      {bottomPad > 0 && <Box height={bottomPad} flexShrink={0} />}
     </>
   )
 }

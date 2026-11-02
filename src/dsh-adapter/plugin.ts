@@ -7,7 +7,8 @@ import { resumeTargetFromArgv, writeResumeTarget } from '../modules/sessions/ind
 import { explicitModelRoute, resolveModelRoute } from '../modules/settings/index.js'
 import { registerProcessGuardFatalSink } from '../ink/update-overflow-guard.js'
 import { finishExit } from '../terminal/shutdown.js'
-import { render } from '../terminal/index.js'
+import { AlternateScreen, render } from '../terminal/index.js'
+import { isFullscreenEnabled } from '../shared/platform/fullscreen.js'
 import { createWorkbenchBindings } from './workbench-bindings.js'
 import { Chat } from '../modules/workbench/index.js'
 import { appendCrashLog } from '../shared/platform/crashDetail.js'
@@ -97,6 +98,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     return () => { restore(); stderrReporter.dispose() }
   })
 
+  const fullscreen = isFullscreenEnabled()
   let instance: Awaited<ReturnType<typeof render>> | undefined
   const funnel = createExitFunnel({ onUserExit: error => {
     if (error !== undefined) {
@@ -107,13 +109,13 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         logRestart: logForDebugging,
         logDebug: logForDebugging,
         writeResumeMarkers: () => writeResumeTarget(channel.sessions.store.getSnapshot().agentId),
-        finish: notice => { void finishExit(ctx, instance, false, notice, undefined, () => disposeRootAndExit(ctx, 1)) },
+        finish: notice => { void finishExit(ctx, instance, fullscreen, notice, undefined, () => disposeRootAndExit(ctx, 1)) },
       })
       return
     }
     try { writeResumeTarget(channel.sessions.store.getSnapshot().agentId) } catch { /* best effort */ }
     const notice = `Resume: dsl --resume ${channel.sessions.store.getSnapshot().agentId}`
-    void finishExit(ctx, instance, false, notice, undefined, () => {
+    void finishExit(ctx, instance, fullscreen, notice, undefined, () => {
       disposeRootAndExit(ctx, 0)
     })
   } })
@@ -131,14 +133,16 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }, channel.settings.store.getSnapshot().provider, channel.settings.store.getSnapshot().model)
   const prompt = initialPromptFromCmdlineArgs(args)
   const ready = prompt ? await modelConfigured().catch(() => false) : false
-  const tree = React.createElement(Chat, {
+  const chat = React.createElement(Chat, {
     ports: createWorkbenchBindings(channel),
     questionStore,
     approvalStore: approvals,
     modelConfigured,
     initialPrompt: ready ? undefined : prompt || undefined,
+    fullscreen,
     onExit: () => funnel.handleExit(),
   })
+  const tree = fullscreen === false ? chat : React.createElement(AlternateScreen, null, chat)
   instance = await render(tree, { exitOnCtrlC: false, terminalImages: false })
   void instance.waitUntilExit().then(funnel.handleExit, funnel.handleExit)
   if (prompt && ready) channel.composer.commands.submit(prompt)
@@ -147,7 +151,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 /** Deferred runtime failures must restore the terminal and fail the process. */
 export function handleStartupError(ctx: Context, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
-  void finishExit(ctx, undefined, false, undefined,
+  // Startup may fail before the UI mounted; EXIT_ALT_SCREEN is harmless when
+  // the process never entered it, while skipping it would strand a partially
+  // mounted tree on the alternate buffer.
+  void finishExit(ctx, undefined, isFullscreenEnabled(), undefined,
     `dsh-tui startup failed: ${message}`, () => disposeRootAndExit(ctx, 1))
 }
 

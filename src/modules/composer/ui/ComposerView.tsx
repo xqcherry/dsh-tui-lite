@@ -63,6 +63,7 @@ interface Context {
   readonly hoverLeave: () => void
   readonly toastSuppressed: ((item: NotificationItem) => boolean) | undefined
   readonly suspended: boolean
+  readonly suggestionsAbove: boolean
   readonly lastClickAtRef: React.RefObject<number>
   readonly lastClickColRef: React.RefObject<number>
   readonly lastClickRowRef: React.RefObject<number>
@@ -94,7 +95,7 @@ interface Context {
 }
 
 export function useComposerView(view: Context): React.ReactNode {
-const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
+const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, suggestionsAbove, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
 const suggestionAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : 'promptBorder'
@@ -455,9 +456,13 @@ const { start: dockStart, end: dockEnd } = listWindow(
     dockFocus,
     dockWindowRows,
   )
+const commandOpen = commandSnapshot.items.length > 0 && commandMaxRows > 0
+// Fullscreen floats the list above the prompt (zero layout height); inline
+// keeps it in flow below the input, where short sessions still have room.
+const commandAbove = suggestionsAbove && commandOpen
 const floatersOpen =
     !suspended &&
-    (composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || peekOpen)
+    (composer.store.getSnapshot().pending.length > 0 || fileOverlayOpen || peekOpen || commandAbove)
 const sessionTitle = context.sessions.getSnapshot().sessionTitle ?? ''
 const topRightLabel: InputBorderLabel | undefined =
     context.settings.getSnapshot().promptSessionLabel === true && sessionTitle !== ''
@@ -538,6 +543,15 @@ return (
             )}
             <Text dimColor>Alt+↑ {t('input-pending-actions-hint')}</Text>
           </Box>
+        )}
+        {commandAbove && (
+          <CommandSuggestions
+            snapshot={commandSnapshot}
+            columns={columns}
+            maxRows={commandMaxRows}
+            onPick={acceptCommandSuggestion}
+            onWheelStep={step => moveCommandSuggestion(step, false)}
+          />
         )}
         {fileOverlayOpen && (
           <FileSuggestions
@@ -675,13 +689,13 @@ return (
           </Box>
         </Box>
       </EffortInputBorder>
-      <CommandSuggestions
+      {!suggestionsAbove && <CommandSuggestions
         snapshot={commandSnapshot}
         columns={columns}
         maxRows={commandMaxRows}
         onPick={acceptCommandSuggestion}
         onWheelStep={step => moveCommandSuggestion(step, false)}
-      />
+      />}
     </Box>
   )
 }

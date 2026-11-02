@@ -158,6 +158,7 @@ export function PromptInput({
   onOpenHelp,
   onRunCommand,
   beforeSubmit,
+  suggestionsAbove = false,
   selectionActive,
   fillText,
   onFillConsumed,
@@ -893,7 +894,7 @@ export function PromptInput({
   // （既有调用方的可用列数逐列不变）。用实测常量而不是 stringWidth：该字符
   // 是 U+1F3E0+VS15，stringWidth 按码点算 2（含 VS15 仍是 2），终端只给 1，
   // 见 HOME_BUTTON_COLS 的说明。
-  return useComposerView({ commandMaxRows: commandMaxRows(), commandSnapshot: readCommandSuggestions(), acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
+  return useComposerView({ commandMaxRows: commandMaxRows(), commandSnapshot: readCommandSuggestions(), acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, suggestionsAbove, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered })
 }
 
 /**
