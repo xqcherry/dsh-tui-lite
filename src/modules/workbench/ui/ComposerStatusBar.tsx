@@ -36,6 +36,13 @@ export function ComposerStatusBar({ model, cwd, mode }: ComposerStatusBarProps):
   const gap = Math.max(0, width - stringWidth(left) - stringWidth(right))
 
   return <Box height={1} flexShrink={0} overflow="hidden">
-    <Text dimColor wrap="truncate-end">{` ${left}${' '.repeat(gap)}${right}`}</Text>
+    <Text wrap="truncate-end">
+      {' '}
+      <Text color="accent">{modelText}</Text>
+      {cwdText && modelText ? <Text dimColor>{' · '}</Text> : null}
+      <Text color="planMode">{cwdText}</Text>
+      {' '.repeat(gap)}
+      <Text color="autoAccept">{right}</Text>
+    </Text>
   </Box>
 }
