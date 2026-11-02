@@ -36,17 +36,34 @@
 | 上下文管理 | 压缩较早的对话内容，释放上下文空间 |
 | 交互确认 | 处理工具执行中的权限确认与提问 |
 
-## 快速开始
+## 本地构建与安装
 
-需要 Node.js，版本须满足 `^22.19 || >=24`（建议安装 Node.js 24 LTS）。安装包用户无需安装 pnpm 或下载源码。
+**本项目目前尚未发布到 npm。** 现阶段请从源码构建并在本地安装；后续功能与体验完善后会发包。
 
-**运行前需要安装 DeepSeek Harness（dsh）。** 本项目将所需版本的 Harness 声明为运行依赖，使用 npm 或本地 `.tgz` 安装包安装客户端时会自动安装，无需提前单独安装全局 dsh。
+需要 Node.js（版本满足 `^22.19 || >=24`）和 pnpm（项目使用 `11.21.0`）。
 
-**发布计划：本项目目前尚未发布到 npm。** 现阶段仍在完善功能、使用体验和文档，计划后续完善后再发包。当前请参考[本地开发](#本地开发)从源码启动，或构建本地 `.tgz` 安装包使用。以下 npm 安装和升级命令为后续发布后的使用方式，目前不可用。
+### 1. 获取源码并构建
 
 ```sh
-npm install -g dsh-tui-lite
+git clone https://github.com/xqcherry/dsh-tui-lite.git
+cd dsh-tui-lite
+pnpm install --frozen-lockfile
+pnpm build
 ```
+
+所需版本的 DeepSeek Harness（dsh）会随项目依赖一起安装，无需单独安装全局 dsh。
+
+### 2. 本地安装
+
+在仓库根目录执行：
+
+```sh
+npm install -g .
+```
+
+此命令将本地项目链接为全局命令。请保留源码目录和构建产物，并确保 npm 的全局命令目录已加入 `PATH`。更新源码后，在仓库目录重新安装依赖并执行 `pnpm build` 即可使用新的构建。
+
+### 3. 运行
 
 安装后，在你希望使用的工作目录打开终端，运行：
 
@@ -56,14 +73,7 @@ dsl
 
 `dsh-tui-lite` 是同等功能的完整命令。
 
-升级和卸载（发布后）：
-
-```sh
-npm install -g dsh-tui-lite@latest
-npm uninstall -g dsh-tui-lite
-```
-
-启动器使用独立的 `~/.dsh/profiles/dsh-tui-lite` profile（设置 `DSH_HOME` 时跟随该目录），不会修改上游 `dsh-tui` profile。会话和认证仍由 Harness 管理，卸载 npm 包不会主动删除这些数据。
+启动器使用独立的 `~/.dsh/profiles/dsh-tui-lite` profile（设置 `DSH_HOME` 时跟随该目录）。会话和认证由 Harness 管理。
 
 首次使用：
 
@@ -92,10 +102,9 @@ npm uninstall -g dsh-tui-lite
 
 ## 本地开发
 
-开发者需要 pnpm。在项目目录安装依赖并启动：
+完成上述依赖安装后，可在仓库目录直接构建并启动：
 
 ```sh
-pnpm install --frozen-lockfile
 pnpm dev
 ```
 
@@ -114,17 +123,6 @@ pnpm start
 pnpm build
 pnpm verify
 ```
-
-发布前可以构建本地安装包，交给用户直接安装，无需用户构建源码：
-
-```sh
-pnpm build
-npm pack --ignore-scripts
-npm install -g ./dsh-tui-lite-0.1.0.tgz
-dsl
-```
-
-版本变更后，使用 `npm pack` 输出的实际文件名。打包安装检查运行 `pnpm verify:package`，会在临时目录中安装并验证两个启动命令。
 
 更多说明见 [项目架构](docs/architecture.zh-CN.md) 和 [开发规范](AGENTS.md)。
 

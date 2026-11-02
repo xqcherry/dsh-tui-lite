@@ -36,17 +36,34 @@ Currently, this version keeps the basic functionality. Further improvements will
 | Context management | Compact earlier conversation turns to free context space |
 | Approvals and questions | Respond to permission requests and questions during tool execution |
 
-## Quick start
+## Build and install locally
 
-Requires Node.js matching `^22.19 || >=24` (Node.js 24 LTS is recommended). Users installing a packaged release do not need pnpm or the source repository.
+**This project has not been published to npm yet.** Build from source and install locally for now. An npm release is planned once the features and user experience are more complete.
 
-**DeepSeek Harness (dsh) must be installed before running the client.** Harness is a runtime dependency of this package. Installing the client with npm or a local `.tgz` package automatically installs the required Harness version; no separate global dsh installation is needed beforehand.
+Requires Node.js matching `^22.19 || >=24` and pnpm (the project uses `11.21.0`).
 
-**Publication plans: this project has not been published to npm yet.** Features, usability, and documentation are still being refined; npm publication is planned after these improvements. For now, follow [Local development](#local-development) to run from source or build a local `.tgz` installation package. The npm install and update commands below describe usage after publication and do not work yet.
+### 1. Get the source and build
 
 ```sh
-npm install -g dsh-tui-lite
+git clone https://github.com/xqcherry/dsh-tui-lite.git
+cd dsh-tui-lite
+pnpm install --frozen-lockfile
+pnpm build
 ```
+
+The required DeepSeek Harness (dsh) version is installed with the project dependencies. A separate global dsh installation is not needed.
+
+### 2. Install locally
+
+From the repository root, run:
+
+```sh
+npm install -g .
+```
+
+This links the local project as a global command. Keep the source directory and build output, and ensure npm's global command directory is on your `PATH`. After updating the source, reinstall dependencies and run `pnpm build` in the repository to use the updated build.
+
+### 3. Run
 
 After installation, open a terminal in your working directory and run:
 
@@ -56,14 +73,7 @@ dsl
 
 `dsh-tui-lite` is an equivalent full command.
 
-Update and uninstall (after publication):
-
-```sh
-npm install -g dsh-tui-lite@latest
-npm uninstall -g dsh-tui-lite
-```
-
-The launcher uses a separate `~/.dsh/profiles/dsh-tui-lite` profile (under `DSH_HOME` when set) and leaves the upstream `dsh-tui` profile untouched. Harness still manages sessions and credentials; uninstalling the npm package does not delete that data.
+The launcher uses a separate `~/.dsh/profiles/dsh-tui-lite` profile (under `DSH_HOME` when set). Harness manages sessions and credentials.
 
 On first launch:
 
@@ -92,10 +102,9 @@ Run `/help` to see available commands and keyboard shortcuts.
 
 ## Local development
 
-Developers need pnpm. Install dependencies and launch from the project directory:
+After installing dependencies as described above, build and launch directly from the repository:
 
 ```sh
-pnpm install --frozen-lockfile
 pnpm dev
 ```
 
@@ -114,17 +123,6 @@ Before submitting changes, run:
 pnpm build
 pnpm verify
 ```
-
-Before npm publication, build a local installation package for users to install without compiling the source:
-
-```sh
-pnpm build
-npm pack --ignore-scripts
-npm install -g ./dsh-tui-lite-0.1.0.tgz
-dsl
-```
-
-After a version change, use the actual filename printed by `npm pack`. Run `pnpm verify:package` to install the tarball into a temporary prefix and verify both commands.
 
 See the [architecture guide](docs/architecture.md) for the system design, data flow, and contribution entry points. [Repository rules](AGENTS.md) are available in Chinese.
 
