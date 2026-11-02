@@ -404,6 +404,7 @@ export function createCoreChannel(
         listSessions: () => refuseAsync('resume', []),
         previewSession: () => refuseAsync('resume', []),
         setResumeTarget: () => { unavailable('resume') },
+        setSessionColor: () => { unavailable('color') },
         renameSession: () => { unavailable('rename') },
         deleteSession: () => refuseAsync('resume', false),
         renameSessionTo: () => refuseAsync('rename', false),

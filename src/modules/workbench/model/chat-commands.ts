@@ -1,3 +1,4 @@
+import { SESSION_COLOR_NAMES, isValidSessionColor } from '../../../shared/session-colors.js'
 import type { WorkbenchModules } from '../contracts.js'
 import type { ComposerImageRef } from '../../../shared/protocol/composer.js'
 import type { QuestionStore } from '../../decisions/contracts.js'
@@ -121,6 +122,21 @@ export function createChatCommands(deps: ChatCommandHost) {
         else openMenu('/permission', sessions.commands.permissionPresets().options.map(option => ({
           label: `${option.name} — ${option.description}`, run: () => sessions.commands.runPermissionPreset(option.value),
         })))
+        break
+      }
+      case 'color': {
+        const color = argument.toLowerCase()
+        if (!color) {
+          const current = sessions.store.getSnapshot().sessionColor
+          openMenu('/color', ['default', ...SESSION_COLOR_NAMES].map(name => ({
+            label: `${name}${name === (isValidSessionColor(current) ? current : 'default') ? ' (current)' : ''}`,
+            run: () => sessions.commands.setSessionColor(name === 'default' ? '' : name),
+          })))
+        } else if (color === 'default' || isValidSessionColor(color)) {
+          sessions.commands.setSessionColor(color === 'default' ? '' : color)
+        } else {
+          workbench.commands.notify(`Usage: /color <default|${SESSION_COLOR_NAMES.join('|')}>`)
+        }
         break
       }
       case 'rename': if (argument) await sessions.commands.renameSession(argument); else workbench.commands.notify('Usage: /rename <title>'); break

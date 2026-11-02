@@ -444,6 +444,7 @@ export function configureDshServices(
       listSessions: sessionMetadataActions.listSessions,
       previewSession: sessionMetadataActions.previewSession,
       setResumeTarget: sessionMetadataActions.setResumeTarget,
+      setSessionColor: sessionMetadataActions.setSessionColor,
       renameSession: sessionMetadataActions.renameSession,
       deleteSession: sessionMetadataActions.deleteSession,
       renameSessionTo: sessionMetadataActions.renameSessionTo,

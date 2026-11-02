@@ -8,7 +8,7 @@ const fields = {
   workbench: ['notifications', 'commandList'],
 }
 const commands = {
-  sessions: ['resumeTo', 'newSession', 'cachedSessions', 'listSessions', 'previewSession', 'setResumeTarget', 'renameSession', 'deleteSession', 'renameSessionTo', 'capabilities', 'cycleMode', 'permissionPresets', 'runPermissionPreset'],
+  sessions: ['resumeTo', 'newSession', 'cachedSessions', 'listSessions', 'previewSession', 'setResumeTarget', 'renameSession', 'setSessionColor', 'deleteSession', 'renameSessionTo', 'capabilities', 'cycleMode', 'permissionPresets', 'runPermissionPreset'],
   settings: ['switchModel', 'listEfforts', 'setEffort', 'setDefaultEffort', 'listModels', 'listProviders', 'invalidateModelCompletion', 'describeCredential', 'providerSetup', 'oauthProviderStatuses', 'listSkills'],
   composer: ['stageImage', 'stagedImageGeneration', 'stageComposerImage', 'hasStagedImage', 'discardStagedImage', 'stagedImage', 'stagedImageLimits', 'submit', 'steer', 'removePending', 'cancel', 'interruptAndDeliver', 'interruptAndDock', 'deliverDocked', 'swapDockedForDraft', 'commandCompletions', 'listFileCandidates', 'listFiles'],
   transcript: ['clear', 'loadOlder', 'compact', 'cancelCompact', 'exportSession', 'pushLocal'],

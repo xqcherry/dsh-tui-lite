@@ -29,6 +29,8 @@ export interface SessionActions {
   /** Rename the current session (`/rename`): appends a `session/title`
    *  event, which the status line and the /resume picker both read. */
   renameSession(title: string): void
+  /** Persist a named session color; an empty string restores the default. */
+  setSessionColor(color: string): void
   /** Delete a persisted session (`/resume` picker ctrl+d): removes its log
    *  directory, its last-used entry, and the resume marker when it points
    *  here. False for the live session or a missing/unwritable log. */

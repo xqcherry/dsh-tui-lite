@@ -33,6 +33,7 @@ export function createSessionsModule(launch: ModuleLaunch, publication: Publicat
     listSessions: (...args) => lifetime.call(host => host.listSessions(...args)),
     previewSession: (...args) => lifetime.call(host => host.previewSession(...args)),
     setResumeTarget: (...args) => lifetime.call(host => host.setResumeTarget(...args)),
+    setSessionColor: (...args) => lifetime.call(host => host.setSessionColor(...args)),
     renameSession: (...args) => lifetime.call(host => host.renameSession(...args)),
     deleteSession: (...args) => lifetime.call(host => host.deleteSession(...args)),
     renameSessionTo: (...args) => lifetime.call(host => host.renameSessionTo(...args)),

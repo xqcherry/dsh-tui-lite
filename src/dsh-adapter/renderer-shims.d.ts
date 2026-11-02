@@ -32,6 +32,7 @@ declare module 'react' {
 // `source.kind === 'user'`.
 declare module '@deepseek-ai/dsh-session' {
   interface SessionEventMap {
+    'session/color': { readonly color: string }
     'session/title': {
       readonly title: string
       readonly messageSeqs: number[]

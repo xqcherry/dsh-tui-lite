@@ -33,6 +33,8 @@ export interface SessionsCommands {
   previewSession(sessionId: string): Promise<readonly PreviewEntry[]>
   setResumeTarget(sessionId: string): void
   renameSession(title: string): void
+  /** Persist a named session color; an empty string restores the default. */
+  setSessionColor(color: string): void
   deleteSession(sessionId: string): Promise<boolean>
   renameSessionTo(sessionId: string, title: string): Promise<boolean>
   capabilities(): AgentCapabilities

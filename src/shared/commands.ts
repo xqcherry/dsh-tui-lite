@@ -15,6 +15,7 @@ export type { CommandCompletion, LocalCommand, LocalizedDescriptions } from './p
  */
 
 import { tOr } from './i18n.js'
+import { SESSION_COLOR_NAMES } from './session-colors.js'
 
 /** One child in a slash-command tree contributed by a local feature/plugin. */
 export interface CommandCompletionNode {
@@ -47,6 +48,7 @@ export function isCommandCompletionToken(value: string): boolean {
 export const LOCAL_COMMANDS: LocalCommand[] = [
   { name: 'new', description: 'Start a new conversation' },
   { name: 'resume', description: 'Continue a saved session' },
+  { name: 'color', description: 'Set the current session color' },
   { name: 'rename', description: 'Rename the current session' },
   { name: 'export', description: 'Export the current session' },
   { name: 'compact', description: 'Summarize earlier turns to free context space' },
@@ -88,6 +90,13 @@ export function isHiddenCommandName(input: string): boolean {
 /** Only this hidden command may bypass active-turn steering. */
 export function isImmediateHiddenCommandName(name: string): boolean {
   return false
+}
+
+export const LOCAL_COMMAND_CHILDREN: Readonly<Record<string, readonly CommandCompletionNode[]>> = {
+  color: [
+    { name: 'default', description: 'Restore the default session color' },
+    ...SESSION_COLOR_NAMES.map(name => ({ name, description: 'Session color' })),
+  ],
 }
 
 /** Resolve the English command description, preserving plugin fallback text. */
