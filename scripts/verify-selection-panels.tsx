@@ -36,15 +36,15 @@ for (const columns of [80, 40, 20, 16]) {
     assert.equal(border?.getFgColor(), 0xabc2ec, 'frame uses the permission blue')
   }
   try {
-    assert(await settled(() => screen().includes('❯ 模型0') && screen().includes('╯')), screen())
+    assert(await settled(() => screen().includes('❯ ● 模型0') && screen().includes('○ 模型1') && screen().includes('╯')), screen())
     frame()
     app.rerender(tree(39))
-    assert(await settled(() => screen().includes('❯ 模型39') && screen().includes('40/40')), screen())
+    assert(await settled(() => screen().includes('❯ ● 模型39') && screen().includes('40/40')), screen())
     frame()
     term.resize(columns, 12)
     Object.assign(stdout, { rows: 12 })
     stdout.emit('resize')
-    assert(await settled(() => screen().includes('❯ 模型39') && screen().includes('╭') && screen().includes('╯')), screen())
+    assert(await settled(() => screen().includes('❯ ● 模型39') && screen().includes('╭') && screen().includes('╯')), screen())
     frame()
     term.resize(columns, rows)
     Object.assign(stdout, { rows })

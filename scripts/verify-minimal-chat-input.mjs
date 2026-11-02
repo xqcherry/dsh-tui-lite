@@ -336,7 +336,7 @@ for (const columns of [40, 20]) {
     await flow.key('\r')
     await flow.key('\x1b[B')
     await flow.key('\r')
-    assert(flow.screen().includes('High (current)'))
+    assert(flow.screen().includes('○ High ('), 'unfocused effort option remains visible in a narrow TTY')
     await flow.key('\r')
     assert.equal(flow.channel.reasoningEffort, 'low')
     assert.equal(flow.submitted.length, 0, 'tier confirmation must not submit a prompt')

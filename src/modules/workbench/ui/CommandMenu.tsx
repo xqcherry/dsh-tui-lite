@@ -15,7 +15,7 @@ export function CommandMenu({ menu, focus }: { menu: ChatMenu; focus: number }):
   const hintRows = wrapText(hint, Math.max(1, columns - 4), 'wrap').split('\n').length
   const budget = Math.max(1, rows - 11 - spacing * 3 - hintRows)
   const { start, end } = listWindow(menu.items.map(() => 1), focus, budget)
-  const width = Math.max(0, columns - 6)
+  const width = Math.max(0, columns - 8)
   return <SelectionPanel title={menu.title} footer={<Text dimColor wrap="wrap">
     {hint}
   </Text>}>
@@ -23,7 +23,7 @@ export function CommandMenu({ menu, focus }: { menu: ChatMenu; focus: number }):
       const selected = start + index === focus
       const label = truncateToWidth(item.label.replace(/[\r\n]+/g, ' '), width)
       return <Box key={start + index} height={1} flexShrink={0}>
-        <Text color={selected ? 'suggestion' : undefined} bold={selected} wrap="truncate-end">{`${selected ? '❯' : ' '} ${label}`}</Text>
+        <Text color={selected ? 'suggestion' : undefined} bold={selected} wrap="truncate-end">{`${selected ? '❯' : ' '} ${selected ? '●' : '○'} ${label}`}</Text>
       </Box>
     })}
   </SelectionPanel>
