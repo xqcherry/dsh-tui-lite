@@ -95,7 +95,7 @@ export async function runProviderWizard(
   let action: 'add' | 'edit' = 'add'
   try {
     const actionAnswer = await ask({
-      questions: [optionQuestion('action', t('provider-q-action'), [
+      questions: [optionQuestion('action', '', [
         { label: t('provider-opt-action-add'), description: t('provider-opt-action-add-desc') },
         { label: t('provider-opt-action-edit'), description: t('provider-opt-action-edit-desc') },
       ], { hideCustomInput: true })],
