@@ -1,3 +1,4 @@
+import { isValidSessionColor } from '../../shared/session-colors.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
@@ -116,6 +117,13 @@ export function createSessionMetadataActions(ctx: Context, deps: {
     deps.setSessionTitle(title)
     deps.emit()
   }
+  const setSessionColor = (color: string): void => {
+    const capture = deps.binding.capture()
+    if (!current(capture)) return
+    if (color !== '' && !isValidSessionColor(color)) throw new Error(`Invalid session color: ${color}`)
+    // The session event feed owns live projection, just as replay does.
+    capture.agent.session.append('session/color', { color })
+  }
   const deleteSession = async (sessionId: string): Promise<boolean> => {
     const capture = deps.binding.capture()
     if (sessionId === capture.agent.session.id || !current(capture)) return false
@@ -136,6 +144,6 @@ export function createSessionMetadataActions(ctx: Context, deps: {
   return {
     cachedSessions, listSessions, previewSession: preview, listSkills, describeCredential,
     setResumeTarget: writeResumeTarget,
-    renameSession, deleteSession, renameSessionTo,
+    renameSession, setSessionColor, deleteSession, renameSessionTo,
   }
 }
