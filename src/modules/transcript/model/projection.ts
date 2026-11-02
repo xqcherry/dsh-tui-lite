@@ -342,21 +342,35 @@ export function createChannelProjection(state: ProjectionState, context: Transcr
    * Project one answered question-presented result into the transcript.
    *
    * The row shape reuses what `pushLocal` emits (`local` title + one
-   * `local-output` per line), so rendering, preview clipping and the local
-   * rows' fold exemption all keep their existing behavior. A failed ask
-   * renders the log's own error text — never a fabricated answer (the ask
-   * was cancelled/aborted, so no human ever chose anything).
+   * `local-output` per line), including its `commandResult` framing: the
+   * answered record is a settled result block, not a `!` shell echo. Answer
+   * lines carry `emphasis` so they stay readable while questions stay dim.
+   * Preview clipping and the local rows' fold exemption keep their existing
+   * behavior. A failed ask renders the log's own error text — never a
+   * fabricated answer (the ask was cancelled/aborted, so no human ever chose
+   * anything).
    */
   const projectAskResult = (event: AgentEventOf<'tool.result'>, rawArguments: string): void => {
-    const append = (record: { title: string; lines: readonly string[] }): void => {
-      appendRow({ id: deps.rowIds.value, kind: 'local', text: record.title, seq: event.seq })
+    const append = (record: { title: string; lines: readonly { text: string; emphasis?: boolean }[] }): void => {
+      const count = record.lines.length + 1
+      const position = (index: number): 'start' | 'middle' | 'end' | 'only' =>
+        count === 1 ? 'only' : index === 0 ? 'start' : index === count - 1 ? 'end' : 'middle'
+      appendRow({
+        id: deps.rowIds.value,
+        kind: 'local',
+        text: record.title,
+        seq: event.seq,
+        commandResult: position(0),
+      })
       deps.rowIds.value += 1
-      for (const line of record.lines) {
+      for (const [index, line] of record.lines.entries()) {
         appendRow({
           id: deps.rowIds.value,
           kind: 'local-output',
-          text: preview(line, LOCAL_OUTPUT_LIMIT),
+          text: preview(line.text, LOCAL_OUTPUT_LIMIT),
           seq: event.seq,
+          commandResult: position(index + 1),
+          ...(line.emphasis === true ? { emphasis: true } : {}),
         })
         deps.rowIds.value += 1
       }

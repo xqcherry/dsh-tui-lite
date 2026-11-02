@@ -97,29 +97,49 @@
     {
       "id": 6,
       "kind": "local",
-      "text": "📋 Questionnaire answered · 2 questions",
-      "seq": 20
+      "text": "Questionnaire · 2 answered",
+      "seq": 20,
+      "commandResult": "start"
     },
     {
       "id": 7,
       "kind": "local-output",
-      "text": "· Which palette? → Cool",
-      "seq": 20
+      "text": "Q: Which palette?",
+      "seq": 20,
+      "commandResult": "middle"
     },
     {
       "id": 8,
       "kind": "local-output",
-      "text": "· Any notes? → Keep it short",
-      "seq": 20
+      "text": "A: Cool",
+      "seq": 20,
+      "commandResult": "middle",
+      "emphasis": true
     },
     {
       "id": 9,
-      "kind": "local",
-      "text": "UserQuestionError: CANCELLED — The user dismissed the question.",
-      "seq": 22
+      "kind": "local-output",
+      "text": "Q: Any notes?",
+      "seq": 20,
+      "commandResult": "middle"
     },
     {
       "id": 10,
+      "kind": "local-output",
+      "text": "A: Keep it short",
+      "seq": 20,
+      "commandResult": "end",
+      "emphasis": true
+    },
+    {
+      "id": 11,
+      "kind": "local",
+      "text": "UserQuestionError: CANCELLED — The user dismissed the question.",
+      "seq": 22,
+      "commandResult": "only"
+    },
+    {
+      "id": 12,
       "kind": "tool",
       "text": "",
       "seq": 26,
@@ -137,7 +157,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 13,
       "kind": "tool",
       "text": "",
       "seq": 27,
@@ -155,7 +175,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 14,
       "kind": "tool",
       "text": "",
       "seq": 28,
@@ -186,7 +206,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 15,
       "kind": "tool",
       "text": "",
       "seq": 29,
@@ -217,7 +237,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 16,
       "kind": "tool",
       "text": "",
       "seq": 30,
@@ -232,7 +252,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 17,
       "kind": "turn-summary",
       "text": "",
       "turnUsage": {
@@ -247,7 +267,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 18,
       "kind": "user",
       "text": "Continue after reconnect.",
       "seq": 38
@@ -318,7 +338,7 @@
       }
     }
   },
-  "nextRowId": 18,
+  "nextRowId": 20,
   "inputConvergence": {
     "cancelInFlight": false
   },
@@ -431,29 +451,49 @@
     {
       "id": 6,
       "kind": "local",
-      "text": "📋 Questionnaire answered · 2 questions",
-      "seq": 20
+      "text": "Questionnaire · 2 answered",
+      "seq": 20,
+      "commandResult": "start"
     },
     {
       "id": 7,
       "kind": "local-output",
-      "text": "· Which palette? → Cool",
-      "seq": 20
+      "text": "Q: Which palette?",
+      "seq": 20,
+      "commandResult": "middle"
     },
     {
       "id": 8,
       "kind": "local-output",
-      "text": "· Any notes? → Keep it short",
-      "seq": 20
+      "text": "A: Cool",
+      "seq": 20,
+      "commandResult": "middle",
+      "emphasis": true
     },
     {
       "id": 9,
-      "kind": "local",
-      "text": "UserQuestionError: CANCELLED — The user dismissed the question.",
-      "seq": 22
+      "kind": "local-output",
+      "text": "Q: Any notes?",
+      "seq": 20,
+      "commandResult": "middle"
     },
     {
       "id": 10,
+      "kind": "local-output",
+      "text": "A: Keep it short",
+      "seq": 20,
+      "commandResult": "end",
+      "emphasis": true
+    },
+    {
+      "id": 11,
+      "kind": "local",
+      "text": "UserQuestionError: CANCELLED — The user dismissed the question.",
+      "seq": 22,
+      "commandResult": "only"
+    },
+    {
+      "id": 12,
       "kind": "tool",
       "text": "",
       "seq": 26,
@@ -471,7 +511,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 13,
       "kind": "tool",
       "text": "",
       "seq": 27,
@@ -489,7 +529,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 14,
       "kind": "tool",
       "text": "",
       "seq": 28,
@@ -520,7 +560,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 15,
       "kind": "tool",
       "text": "",
       "seq": 29,
@@ -551,7 +591,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 16,
       "kind": "tool",
       "text": "",
       "seq": 30,
@@ -566,7 +606,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 17,
       "kind": "turn-summary",
       "text": "",
       "turnUsage": {
@@ -581,7 +621,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 18,
       "kind": "user",
       "text": "Continue after reconnect.",
       "seq": 38
@@ -631,14 +671,6 @@
       "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
     },
     {
-      "path": "rows[10].fresh",
-      "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
-    },
-    {
-      "path": "rows[11].fresh",
-      "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
-    },
-    {
       "path": "rows[12].fresh",
       "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
     },
@@ -648,6 +680,14 @@
     },
     {
       "path": "rows[14].fresh",
+      "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
+    },
+    {
+      "path": "rows[15].fresh",
+      "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
+    },
+    {
+      "path": "rows[16].fresh",
       "reason": "smooth-reveal flag: live tool cards and live-settled assistant text are fresh, replay paints settled history"
     }
   ],
@@ -672,29 +712,29 @@
     "#17 tool/call | rows=6 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
     "#18 tool/call | rows=6 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
     "#19 tool/call | rows=6 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#20 tool/result | rows=9 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#21 tool/result | rows=9 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#22 tool/result | rows=10 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#23 step/end | rows=10 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#24 step/start | rows=10 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#25 assistant/message | rows=10 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#26 tool/call | rows=11 streaming=[] spin=tool-use working=1 tools=1 chars=0 goal=- todos=0 compaction=-",
-    "#27 tool/call | rows=12 streaming=[] spin=tool-use working=1 tools=2 chars=0 goal=- todos=0 compaction=-",
-    "#28 tool/call | rows=13 streaming=[] spin=tool-use working=1 tools=3 chars=0 goal=- todos=0 compaction=-",
-    "#29 tool/call | rows=14 streaming=[] spin=tool-use working=1 tools=4 chars=0 goal=- todos=0 compaction=-",
-    "#30 tool/call | rows=15 streaming=[] spin=tool-use working=1 tools=5 chars=0 goal=- todos=0 compaction=-",
-    "#31 tool/result | rows=15 streaming=[] spin=tool-use working=1 tools=4 chars=0 goal=- todos=0 compaction=-",
-    "#32 tool/result | rows=15 streaming=[] spin=tool-use working=1 tools=3 chars=0 goal=- todos=0 compaction=-",
-    "#33 tool/result | rows=15 streaming=[] spin=tool-use working=1 tools=2 chars=0 goal=- todos=0 compaction=-",
-    "#34 tool/result | rows=15 streaming=[] spin=tool-use working=1 tools=1 chars=0 goal=- todos=0 compaction=-",
-    "#35 step/end | rows=15 streaming=[] spin=tool-use working=1 tools=1 chars=0 goal=- todos=0 compaction=-",
-    "#36 turn/end | rows=16 streaming=[] spin=tool-use working=0 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#37 turn/start | rows=16 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#38 user/message | rows=17 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "#39 step/start | rows=17 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "frame r1 chunk attempt-reattach | rows=17 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "frame r2 chunk attempt-reattach | rows=18 streaming=[17] spin=responding working=1 tools=0 chars=18 goal=- todos=0 compaction=-",
-    "frame r3 end attempt-reattach | rows=17 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
-    "settleStreaming | rows=17 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-"
+    "#20 tool/result | rows=11 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#21 tool/result | rows=11 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#22 tool/result | rows=12 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#23 step/end | rows=12 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#24 step/start | rows=12 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#25 assistant/message | rows=12 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#26 tool/call | rows=13 streaming=[] spin=tool-use working=1 tools=1 chars=0 goal=- todos=0 compaction=-",
+    "#27 tool/call | rows=14 streaming=[] spin=tool-use working=1 tools=2 chars=0 goal=- todos=0 compaction=-",
+    "#28 tool/call | rows=15 streaming=[] spin=tool-use working=1 tools=3 chars=0 goal=- todos=0 compaction=-",
+    "#29 tool/call | rows=16 streaming=[] spin=tool-use working=1 tools=4 chars=0 goal=- todos=0 compaction=-",
+    "#30 tool/call | rows=17 streaming=[] spin=tool-use working=1 tools=5 chars=0 goal=- todos=0 compaction=-",
+    "#31 tool/result | rows=17 streaming=[] spin=tool-use working=1 tools=4 chars=0 goal=- todos=0 compaction=-",
+    "#32 tool/result | rows=17 streaming=[] spin=tool-use working=1 tools=3 chars=0 goal=- todos=0 compaction=-",
+    "#33 tool/result | rows=17 streaming=[] spin=tool-use working=1 tools=2 chars=0 goal=- todos=0 compaction=-",
+    "#34 tool/result | rows=17 streaming=[] spin=tool-use working=1 tools=1 chars=0 goal=- todos=0 compaction=-",
+    "#35 step/end | rows=17 streaming=[] spin=tool-use working=1 tools=1 chars=0 goal=- todos=0 compaction=-",
+    "#36 turn/end | rows=18 streaming=[] spin=tool-use working=0 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#37 turn/start | rows=18 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#38 user/message | rows=19 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "#39 step/start | rows=19 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "frame r1 chunk attempt-reattach | rows=19 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "frame r2 chunk attempt-reattach | rows=20 streaming=[19] spin=responding working=1 tools=0 chars=18 goal=- todos=0 compaction=-",
+    "frame r3 end attempt-reattach | rows=19 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-",
+    "settleStreaming | rows=19 streaming=[] spin=requesting working=1 tools=0 chars=0 goal=- todos=0 compaction=-"
   ]
 }

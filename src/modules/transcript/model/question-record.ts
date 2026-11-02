@@ -33,12 +33,20 @@ export interface QuestionRecordAnswer {
   readonly custom?: string
 }
 
+/** One `Q`/`A` line of an answered questionnaire. */
+export interface QuestionRecordLine {
+  /** Prefixed text (`Q: ...` / `A: ...`). */
+  readonly text: string
+  /** Answer lines render at normal brightness; question lines stay dim. */
+  readonly emphasis?: boolean
+}
+
 /** One answered questionnaire as the transcript renders it. */
 export interface QuestionRecord {
   /** Local-row title (dictionary text, never hand-written here). */
   readonly title: string
-  /** One `· question → answer` line per answered question. */
-  readonly lines: readonly string[]
+  /** Two lines per answered question (`Q` then `A`), in request order. */
+  readonly lines: readonly QuestionRecordLine[]
 }
 
 /** Truncate a long answer line for the transcript summary. */
@@ -61,7 +69,7 @@ function clip(text: string, max = 140): string {
  * @param options - `redact` masks answer text (local wizards collecting
  *   secrets such as API keys must never leak into the transcript or an
  *   `/export` dump); the model-side ask never sets it.
- * @returns The title line plus its `· question → choice` body lines.
+ * @returns The title line plus its `Q`/`A` body lines.
  */
 export function buildQuestionRecord(
   questions: readonly (QuestionRecordQuestion | undefined)[] | undefined,
@@ -86,7 +94,10 @@ export function buildQuestionRecord(
             ? labels === '' ? custom : `${labels}：${custom}`
             : labels
         })()
-    return `· ${prompt} → ${clip(text)}`
+    return [
+      { text: `Q: ${clip(prompt === '' ? '—' : prompt)}` },
+      { text: `A: ${clip(text === '' ? '—' : text)}`, emphasis: true },
+    ]
   })
   return {
     title: t('questionnaire-answered', { total: list.length }),

@@ -82,9 +82,14 @@ assert.deepEqual(settledAnswers, {
 // 最终作答记录由持久化 tool/result 载荷里的 answers 折叠而来（#1009）：
 // 同一批问题 + 同一份 answers 必须得到与旧 store 摘要相同的记录。
 const record = buildQuestionRecord(questions, settledAnswers.answers)
-assert.ok(record.lines.some(line => line.includes('第一题') && line.includes('C')))
-assert.ok(record.lines.some(line => line.includes('第二题') && line.includes('D')))
-assert.ok(!record.lines.some(line => line.includes('A') || line.includes('partial draft')))
+assert.equal(record.title, 'Questionnaire · 2 answered')
+assert.deepEqual(record.lines.map(line => line.text), [
+  'Q: 第一题',
+  'A: C',
+  'Q: 第二题',
+  'A: D',
+])
+assert.deepEqual(record.lines.map(line => line.emphasis === true), [false, true, false, true])
 
 // Peeking ahead and submitting the last question must not drop the gap.
 const gapPromise = store.ask({

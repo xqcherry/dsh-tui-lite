@@ -135,7 +135,7 @@ const dict = {
   'capability-gap-pruner': 'The active agent preset does not prune tool results: oversized tool output stays in the context in full',
   'capability-gap-compaction-pruner': 'The active agent preset has neither compaction nor tool-result pruning: a long session can hit the context limit, and oversized tool output stays in the context in full',
   'turn-failed': 'Turn error{{detail}}',
-  'questionnaire-answered': '📋 Questionnaire answered · {{total}} questions',
+  'questionnaire-answered': 'Questionnaire · {{total}} answered',
   'skill-unavailable': 'Skill {{name}} is gone or not user-invocable',
   'permission-preset-readonly': 'Read-only',
   'permission-preset-readonly-desc': 'Read-only session: no file writes, no commands',

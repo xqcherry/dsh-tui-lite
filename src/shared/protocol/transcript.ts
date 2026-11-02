@@ -16,6 +16,9 @@ export interface ChatRow {
   executionTarget?: string
   /** Ephemeral grouping for a command result shown in the transcript. */
   commandResult?: 'start' | 'middle' | 'end' | 'only'
+  /** Render a `local-output` line at normal brightness (answered questionnaire
+   *  answers); question lines and ordinary command output stay dim. */
+  emphasis?: boolean
   text: string
   /** Durable session image blocks, loaded lazily through the attachment store. */
   images?: readonly TranscriptImage[]
