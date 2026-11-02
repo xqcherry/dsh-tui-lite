@@ -435,11 +435,15 @@ export function PromptInput({
       controllerRef.current = null
     }
   })
-  // ctrl+r history fill: replace the input when a new fill arrives, then
+  // History/help fill: replace the input when a new fill arrives, then
   // tell the caller to clear it.
   const lastFill = React.useRef<string | null>(null)
   React.useLayoutEffect(() => {
-    if (fillText && fillText !== lastFill.current) {
+    if (!fillText) {
+      lastFill.current = null
+      return
+    }
+    if (fillText !== lastFill.current) {
       lastFill.current = fillText
       syncImageGeneration()
       discardDraftImages()
