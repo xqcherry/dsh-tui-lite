@@ -724,7 +724,7 @@ export function AskUserQuestionPanel({
       {options.slice(optionWindow.start, optionWindow.end).map((option, index) => {
         const absoluteIndex = optionWindow.start + index
         const focused = absoluteIndex === focusIndex
-        const selected = multiSelect && checked.has(absoluteIndex)
+        const selected = multiSelect ? checked.has(absoluteIndex) : focused
         const pointer = focused
           ? POINTER
           : absoluteIndex === optionWindow.start && optionWindow.start > 0
@@ -751,9 +751,11 @@ export function AskUserQuestionPanel({
                 {pointer}
               </Text>
             </Box>
-            {multiSelect ? <Box width={1} flexShrink={0}>
-              <Text color={selected ? 'success' : undefined} bold={selected}>{selected ? CHECKED : UNCHECKED}</Text>
-            </Box> : null}
+            <Box width={1} flexShrink={0}>
+              <Text color={selected ? (multiSelect ? 'success' : 'accent') : undefined} bold={selected}>
+                {multiSelect ? (selected ? CHECKED : UNCHECKED) : selected ? '●' : UNCHECKED}
+              </Text>
+            </Box>
             <Box flexDirection="column" marginLeft={1} flexGrow={1} minWidth={0}>
               <Text
                 bold={focused || selected}

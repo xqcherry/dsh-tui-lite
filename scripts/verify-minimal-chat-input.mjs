@@ -250,7 +250,7 @@ try {
   auth.channel.providerSetup = () => ({ oauth: { providers: async () => [{ provider: 'openai-codex', label: 'Codex' }] } })
   await auth.key('/auth login')
   await auth.key('\r')
-  assert(auth.screen().includes('Account login'))
+  assert(auth.screen().includes('/auth'))
   assert(auth.screen().includes('Codex'))
   console.log('PASS: auth verbs delegate to the host, bare login opens a picker, and startup tasks survive setup')
 } finally { await auth.close() }
@@ -342,7 +342,7 @@ for (const columns of [40, 20]) {
     assert.equal(flow.submitted.length, 0, 'tier confirmation must not submit a prompt')
     await flow.key('/model deepseek/other')
     await flow.key('\r')
-    assert(flow.screen().includes('Reasoning effort'))
+    assert(flow.screen().includes('/model'))
     await flow.key('\x1b')
     assert.equal(flow.channel.model, 'other', 'Escape keeps the switched model')
     assert.equal(flow.channel.reasoningEffort, 'low', 'Escape keeps the applied tier')
