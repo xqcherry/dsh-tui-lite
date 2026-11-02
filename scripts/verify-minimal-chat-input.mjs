@@ -282,6 +282,37 @@ try {
   console.log('PASS: batched questionnaire navigation preserves the active question batch')
 } finally { questions.questionStore.rejectAll(); await questions.close() }
 
+// Plan review in the real Chat layout: the decision card must render on the
+// same closed board as the command menu, with its controls still visible above
+// the composer in narrow TTYs.
+for (const columns of [100, 40, 20]) {
+  const plan = await fixture({ columns })
+  try {
+    const answer = plan.questionStore.ask({ questions: [{
+      id: 'plan',
+      question: 'Proceed with the plan?',
+      detail: `## Plan\n\n- one\n- two\n\n${'detail '.repeat(80)}`,
+      options: [{ label: 'Approve' }, { label: 'Revise' }],
+      intent: { kind: 'plan-review', approve: 'Approve' },
+    }] }).catch(() => null)
+    await sleep(110)
+    assert(await settled(() => {
+      const lines = plan.screen().split('\n')
+      const top = lines.findIndex(line => line.startsWith('╭'))
+      const bottom = lines.findIndex(line => line.startsWith('╰'))
+      if (top < 0 || bottom <= top) return false
+      const option = lines.findIndex(line => line.includes('Approve'))
+      const revise = lines.findIndex(line => line.includes('Revise'))
+      return option > top && option < bottom && revise > top && revise < bottom
+        && lines.some(line => line.includes('Enter'))
+        && lines.some(line => line.includes('? for shortcuts'))
+    }), `plan review must stay inside a closed panel with visible controls at ${columns} columns:\n${plan.screen()}`)
+    plan.questionStore.cancelCurrent()
+    await answer
+    console.log(`PASS: plan review uses the closed command-panel board at ${columns} TTY columns`)
+  } finally { plan.questionStore.rejectAll(); await plan.close() }
+}
+
 // Exercise the complete Chat layout in a headless TTY, including live updates.
 for (const columns of [100, 40, 20]) {
   const status = await fixture({ columns, initialPrompt: 'footer anchor' })

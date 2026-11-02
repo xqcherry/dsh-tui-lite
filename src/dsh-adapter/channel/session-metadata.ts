@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import type { ChannelOwner } from '../../shared/lifecycle/owner.js'
-import { clearResumeTarget, forgetSession, readResumeTarget, touchSession, writeResumeTarget } from '../../modules/sessions/index.js'
+import { clearResumeTarget, forgetSession, readResumeTarget, touchSession, writeResumeTarget, writeSessionColorPref } from '../../modules/sessions/index.js'
 import { appendSessionTitle, deleteSessionLog, userTitleData } from '../compat/index.js'
 import { listSummaries, locateSession, previewSession, type SessionSource, type SessionSummary } from '../sessions/index.js'
 import { readListingSnapshot } from '../sessions/snapshot.js'
@@ -121,6 +121,9 @@ export function createSessionMetadataActions(ctx: Context, deps: {
     const capture = deps.binding.capture()
     if (!current(capture)) return
     if (color !== '' && !isValidSessionColor(color)) throw new Error(`Invalid session color: ${color}`)
+    // New sessions inherit the last choice; the event below keeps THIS session
+    // self-contained for resume (an explicit empty color restores the theme).
+    writeSessionColorPref(color)
     // The session event feed owns live projection, just as replay does.
     capture.agent.session.append('session/color', { color })
   }

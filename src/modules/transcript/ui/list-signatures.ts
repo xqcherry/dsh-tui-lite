@@ -84,11 +84,11 @@ export function signatureParts(
   columns: number,
   expanded: boolean,
   expandedRows: ReadonlySet<number>,
+  expandedDetails: ReadonlySet<number>,
   streamViewToggledRows: ReadonlySet<number>,
   thinkingVisible: boolean,
   thinkingFold: string,
   diffLayout: string,
-  foldTerminalCommand: boolean,
   model: string,
   failureHintRowId: number | null | undefined,
   failureHint: string | undefined,
@@ -120,14 +120,14 @@ export function signatureParts(
       break
     case 'tool': {
       const tool = row.tool
+      const group = row.toolGroup
       signatureScratch.push(
         expanded,
+        // expandedRows folds an open tool group; expandedDetails opens the
+        // individual card body (the compact card is one header line at rest).
         expandedRows.has(row.id),
+        expandedDetails.has(row.id),
         diffLayout,
-        // Terminal header folding changes the header's height the same way
-        // diffLayout changes the body's — without it, a /settings toggle
-        // leaves already-mounted tool cards at their stale cached height.
-        foldTerminalCommand,
         tool?.status ?? '',
         tool?.resultText?.length ?? 0,
         tool?.resultFull?.length ?? 0,
@@ -138,6 +138,12 @@ export function signatureParts(
         row.folded === true,
         tool?.resultView?.card ?? '',
         row.id === failureHintRowId ? failureHint ?? '' : '',
+        // A group head swaps its card for the summary line when folded.
+        group !== undefined,
+        group?.head === true,
+        group?.folded === true,
+        group?.count ?? 0,
+        group?.failed ?? 0,
       )
       break
     }
@@ -159,6 +165,7 @@ export function signatureParts(
       signatureScratch.push(
         expanded,
         expandedRows.has(row.id),
+        expandedDetails.has(row.id),
         row.job?.status ?? '',
         // Script text, including blank-line changes, determines expanded height.
         row.job?.label ?? '',

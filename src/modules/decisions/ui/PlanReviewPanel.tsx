@@ -26,6 +26,12 @@
  * one stdin chunk is one React batch, and the clipboard read resolves
  * asynchronously — with the caret counting code points so an emoji can
  * never be split by ←/→/⌫/Del (same contract as the plugin InputDialog).
+ *
+ * Presentation: this card lives inside the shared SelectionPanel frame —
+ * the same closed blue board as the command menu and the generic
+ * questionnaire — instead of floating bare in the transcript. The plan
+ * markdown keeps a height-bounded ScrollBox so a long plan can never push
+ * the decision rows off-screen.
  */
 
 import React from 'react'
@@ -38,10 +44,18 @@ import { actionMatches, comboDisplay, primaryComboString } from '../../../shared
 import { isPlainReturnInput } from '../../../shared/platform/modifiers.js'
 import { Box, ScrollBox, Text, useInput, useTerminalSize, type ScrollBoxHandle } from '../../../ui/primitives.js'
 import { POINTER } from '../../../ui/text/figures.js'
-import { Divider } from '../../../ui/design-system/Divider.js'
+import { SelectionPanel } from '../../../ui/SelectionPanel.js'
 import { Markdown } from '../../../ui/Markdown.js'
+import wrapText from '../../../ink/wrap-text.js'
 
 const PENCIL = '✎'
+
+/**
+ * Rows the chat keeps below the panel: composer (border + input row), status
+ * bar and the shortcut footer. The panel is flexShrink={0}, so without this
+ * reserve a long question body would push the composer off-screen.
+ */
+const CHAT_CHROME_ROWS = 6
 
 /**
  * Paste cap for the feedback field, in code points — twin constant of
@@ -108,18 +122,42 @@ export function PlanReviewPanel({
   /** True while a clipboard read is in flight (ignore repeat Ctrl+V). */
   const pasteBusyRef = React.useRef(false)
   const clipboardReader = readClipboardOverride ?? readClipboard
-  const { rows: terminalRows } = useTerminalSize()
-  // Chat chrome (status line) + panel scaffolding (divider, question,
-  // spacings, hint) consume twelve rows before the plan body — same
-  // constant as AskUserQuestionPanel. Option/feedback/error rows are
-  // charged on top so a long markdown detail cannot push them off-screen.
+  const { columns, rows: terminalRows } = useTerminalSize()
+  const inputFocused = focusIndex === options.length
+  // The framed panel is taller than the old divider card. Keep breathing
+  // rows only when the terminal can afford them and still leave plan-body
+  // rows; short TTYs get a compact panel instead of an overflowing one.
+  const spacing = terminalRows < 22 ? 0 : 1
+  const contentWidth = Math.max(1, columns - 4)
+  const wrappedRows = (text: string, width = contentWidth): number =>
+    wrapText(text, Math.max(1, width), 'wrap').split('\n').length
+  const hintText = columns < 40 || terminalRows < 18
+    ? '↑↓ · Enter · Esc'
+    : t('plan-review-hint', { paste: comboDisplay(primaryComboString('paste')) })
+  const optionTextWidth = Math.max(1, contentWidth - 2)
+  const feedbackTextWidth = Math.max(1, contentWidth - 3)
+  // The empty placeholder is a one-line hint (truncated on narrow TTYs);
+  // typed feedback keeps wrapping because it is the user's own text.
+  const feedbackRows = feedback !== '' ? wrappedRows(feedback, feedbackTextWidth) : 1
+  const optionRows = options.reduce(
+    (sum, option) => sum
+      + wrappedRows(option.label, optionTextWidth)
+      + (option.description === undefined ? 0 : wrappedRows(option.description, optionTextWidth)),
+    0,
+  ) + feedbackRows
+  const questionRows = question.question === '' ? 0 : wrappedRows(question.question)
+  // Everything except the plan body: chat chrome + the SelectionPanel frame
+  // (top/bottom border, title, footer and its three spacing rows), the
+  // question, the detail's spacing, the options block and the inline error.
   // A definite `height` (not just maxHeight) is required: otherwise the
   // ScrollBox grows with the markdown and scrollBy is a no-op.
-  const optionRows = options.reduce(
-    (sum, option) => sum + (option.description === undefined ? 1 : 2),
-    0,
-  ) + 1 /* extra gap on the focused option */ + 1 /* feedback row */
-  const reservedRows = 12 + optionRows + (error === null ? 0 : 2)
+  const reservedRows = CHAT_CHROME_ROWS
+    + 3 + spacing * 3 + wrappedRows(hintText)
+    + questionRows
+    + (question.detail === undefined ? 0 : spacing)
+    + spacing
+    + optionRows
+    + (error === null ? 0 : spacing + wrappedRows(error))
   // Floor at zero, not four: on a short terminal the decision rows fill the
   // budget and no plan-body rows remain. Forcing four here would re-inflate
   // the panel past the viewport and push the controls off-screen again — the
@@ -128,8 +166,6 @@ export function PlanReviewPanel({
   // readable nor a useful wheel target).
   const detailMax = Math.max(0, terminalRows - reservedRows)
   const detailScrollRef = React.useRef<ScrollBoxHandle | null>(null)
-
-  const inputFocused = focusIndex === options.length
 
   // Park the native terminal cursor on the feedback caret so IME preedit
   // (pinyin) renders inline at the input instead of the screen's bottom row
@@ -387,24 +423,25 @@ export function PlanReviewPanel({
   }
 
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={2} paddingRight={2} width="100%">
-      <Divider
-        color="permission"
-        title={` ${question.header ?? t('plan-review-fallback-header')} `}
-      />
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold wrap="wrap">
-          {question.question}
-        </Text>
+    <SelectionPanel
+      title={question.header ?? t('plan-review-fallback-header')}
+      footer={<Text dimColor wrap="wrap">{hintText}</Text>}
+    >
+      <Box flexDirection="column">
+        {question.question !== '' && (
+          <Text bold wrap="wrap">
+            {question.question}
+          </Text>
+        )}
         {question.detail !== undefined && detailMax > 0 && (
-          <Box flexDirection="column" marginTop={1} height={detailMax} flexShrink={0}>
+          <Box flexDirection="column" marginTop={spacing} height={detailMax} flexShrink={0}>
             <ScrollBox ref={detailScrollRef} flexDirection="column" flexGrow={1} height={detailMax}>
               <Markdown>{question.detail}</Markdown>
             </ScrollBox>
           </Box>
         )}
       </Box>
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column" marginTop={spacing}>
         {options.map((option, index) => {
           const focused = index === focusIndex
           const isApprove = approves(option.label)
@@ -412,7 +449,6 @@ export function PlanReviewPanel({
             <Box
               key={option.label}
               flexDirection="row"
-              marginTop={focused ? 1 : 0}
               onClick={() => clickOption(index)}
               onMouseEnter={() => setHoverIndex(index)}
               onMouseLeave={() => setHoverIndex(current => (current === index ? -1 : current))}
@@ -442,7 +478,7 @@ export function PlanReviewPanel({
         })}
         <Box
           flexDirection="row"
-          marginTop={inputFocused ? 1 : 0}
+          marginTop={inputFocused ? spacing : 0}
           onClick={focusFeedbackRow}
           onMouseEnter={() => setHoverIndex(options.length)}
           onMouseLeave={() => setHoverIndex(current => (current === options.length ? -1 : current))}
@@ -466,7 +502,7 @@ export function PlanReviewPanel({
               // panel; this panel shares the input contract).
               <>
                 <Text ref={caretRef}>{' '}</Text>
-                <Text dimColor>{t('plan-review-feedback-placeholder')}</Text>
+                <Text dimColor wrap="truncate">{t('plan-review-feedback-placeholder')}</Text>
               </>
             ) : (
               <>
@@ -481,13 +517,10 @@ export function PlanReviewPanel({
         </Box>
       </Box>
       {error !== null && (
-        <Box marginTop={1}>
-          <Text color="error">{error}</Text>
+        <Box marginTop={spacing}>
+          <Text color="error" wrap="wrap">{error}</Text>
         </Box>
       )}
-      <Box marginTop={1}>
-        <Text dimColor>{t('plan-review-hint', { paste: comboDisplay(primaryComboString('paste')) })}</Text>
-      </Box>
-    </Box>
+    </SelectionPanel>
   )
 }

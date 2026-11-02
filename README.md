@@ -143,7 +143,7 @@ New features should serve terminal interaction needs, reuse existing dsh capabil
 
 Bug reports, suggestions, and pull requests are welcome.
 
-Read the [contribution guide](CONTRIBUTING.md) (currently in Chinese) before submitting. There are two core requirements:
+Read the [contribution guide](CONTRIBUTING.md) before submitting. There are two core requirements:
 
 1. **Use the issue templates.** Describe the problem or practical need clearly and concisely.
 2. **Own your code and treat production with care.** AI-generated code is welcome only when you understand, review, and verify your changes. Careless AI-generated submissions are not welcome.

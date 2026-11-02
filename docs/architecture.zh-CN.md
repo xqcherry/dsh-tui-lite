@@ -153,4 +153,4 @@ channel 的两个装配入口各有职责：[`core/compose.ts`](../src/dsh-adapt
 
 这些脚本位于 `scripts/`。支持的完整检查集合与单项检查所需的 loader 见 [`scripts/verify.mjs`](../scripts/verify.mjs)。
 
-代码修改需执行 `pnpm build`、相关专项检查和 `pnpm verify`；终端 UI 修改还需窄 TTY 验证；打包修改另用 `pnpm verify:package`。纯文档修改检查 diff 和链接即可。贡献要求见[贡献指南](../CONTRIBUTING.md)和[仓库开发规范](../AGENTS.md)。
+代码修改需执行 `pnpm build`、相关专项检查和 `pnpm verify`；终端 UI 修改还需窄 TTY 验证；打包修改另用 `pnpm verify:package`。纯文档修改检查 diff 和链接即可。贡献要求见[贡献指南](../CONTRIBUTING.zh-CN.md)和[仓库开发规范](../AGENTS.md)。

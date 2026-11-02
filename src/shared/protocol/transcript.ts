@@ -3,6 +3,33 @@ import type { JobGroupRow, JobRow } from './jobs.js'
 import type { SubagentRow } from './subagents.js'
 
 /**
+ * Group decoration for a run of consecutive shell/job tool calls.
+ *
+ * Settled runs of ≥3 of the same tool render as one summary line instead of
+ * N header rows. Clicking the summary (or Ctrl+O) expands the run; a failure
+ * count stays visible in the error color while folded. Derived state: it
+ * rides shallow copies in the transcript pre-pass, never the shared rows.
+ */
+export interface ToolGroupRow {
+  /** Group header row: the only member rendering the summary line. */
+  head: boolean
+  /** Last member of the run. */
+  last: boolean
+  /** Members in the run (≥3 — shorter pairs stay card by card). */
+  count: number
+  /** Whole group folded into the summary line (meaningful on the head). */
+  folded: boolean
+  /** Failed members; painted in the error color while folded. */
+  failed: number
+  /** Tool name as the card resolves it (`bash`, `job_output`, …). */
+  name: string
+  /** Earliest member start. */
+  startedAt: number
+  /** Latest member finish. */
+  endedAt: number
+}
+
+/**
  * One rendered transcript row. The DSH session log is the source of truth:
  * rows are derived from `session/event` records (and the initial
  * `agent.session.events` replay), never from optimistic local state.
@@ -16,6 +43,9 @@ export interface ChatRow {
   executionTarget?: string
   /** Ephemeral grouping for a command result shown in the transcript. */
   commandResult?: 'start' | 'middle' | 'end' | 'only'
+  /** Render a `local-output` line at normal brightness (answered questionnaire
+   *  answers); question lines and ordinary command output stay dim. */
+  emphasis?: boolean
   text: string
   /** Durable session image blocks, loaded lazily through the attachment store. */
   images?: readonly TranscriptImage[]
@@ -37,6 +67,10 @@ export interface ChatRow {
    *  (rows may arrive frozen from the session projection), never by the
    *  projection and never on the shared row objects. */
   jobGroup?: JobGroupRow
+  /** Present on `tool` rows that share a settled run of ≥3 calls of the same
+   *  shell/job tool: the compact summary decoration. Same derived-state
+   *  contract as {@link jobGroup}. */
+  toolGroup?: ToolGroupRow
   /** Event wall-clock time (transcript-mode metadata, assistant rows). */
   time?: number
   /** Present on `reasoning` rows once settled: thinking wall-clock duration. */

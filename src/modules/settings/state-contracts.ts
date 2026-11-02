@@ -1,4 +1,3 @@
-import type { JobGroupFoldMode } from '../../shared/protocol/display.js'
 import type { ToolBackground } from '../../shared/protocol/display.js'
 import type { SkillInfo } from '../../shared/protocol/models.js'
 import type { OAuthProviderStatus } from '../../shared/protocol/provider-settings.js'
@@ -20,7 +19,6 @@ export interface SettingsSnapshot {
   readonly effortLevels: readonly string[] | undefined
   readonly diffLayout: 'auto' | 'split' | 'unified'
   readonly thinkingFold: 'preview' | 'full'
-  readonly jobGroupFold: JobGroupFoldMode
   readonly toolBackground: ToolBackground
   readonly promptSessionLabel: boolean
   readonly expandEditor: boolean
