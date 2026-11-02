@@ -74,4 +74,30 @@ try {
   assert.equal(await late, false)
   assert.equal(runtime.settings.store.getSnapshot().contextWindow, 100)
 } finally { runtime.dispose() }
+
+const defaultRuntime = createRuntimeModulesFixture()
+let defaultInfo: ((info: SettingsModelInfo) => void) | undefined
+let defaultPin: { provider: string; model: string; effort?: string } | undefined
+const defaultModel = createSettingsModelActions(defaultRuntime.settings.ingress, {
+  current: () => true,
+  capture: () => 0,
+  bindingCurrent: capture => capture === 0,
+  models: {
+    resolveModelInfo: () => new Promise<SettingsModelInfo>(resolve => { defaultInfo = resolve }),
+    listProviders: () => [],
+    listModels: async () => [],
+  },
+  pinnedEffort: () => defaultPin?.effort,
+  pin: value => { defaultPin = value },
+  notify: () => () => undefined,
+  publish: () => undefined,
+  checkContextWarning: () => undefined,
+})
+try {
+  const applyingDefault = defaultModel.applyPreferredEffort()
+  defaultInfo!({ reasoning: { efforts: [{ id: 'low', name: 'Low' }, { id: 'medium', name: 'Medium' }], defaultEffort: 'medium' } })
+  await applyingDefault
+  assert.equal(defaultRuntime.settings.store.getSnapshot().reasoningEffort, 'medium', 'the model default is shown when no user preference exists')
+  assert.equal(defaultPin, undefined, 'the displayed model default is not pinned as a user choice')
+} finally { defaultRuntime.dispose() }
 console.log('Settings actions passed: binding fences, route metadata, fallback, cache and disposal')

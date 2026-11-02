@@ -123,9 +123,15 @@ export function createSettingsModelActions<Capture>(settings: SettingsModelState
     const resolved = await resolveEfforts(capture)
     if (resolved === 'unavailable' || resolved === 'error' || resolved === 'stale' || !effortCurrent(capture)) return
     // This same binding-time lookup is the route's initial tier refresh even
-    // without a stored preference. Do not make a separate competing refresh
-    // operation that could invalidate the selected preference completion.
-    if (preferredEffort === undefined) return
+    // without a stored preference. Reflect the adapter default for the status
+    // readout, but leave the router unpinned so the model continues to choose.
+    if (preferredEffort === undefined) {
+      if (settings.read().reasoningEffort !== resolved.defaultEffort) {
+        settings.setReasoningEffort(resolved.defaultEffort)
+        host.publish()
+      }
+      return
+    }
     const available = resolved.efforts.map(effort => effort.id)
     // Exact hit applies silently; a miss falls back to the nearest LOWER tier
     // the route offers (never up), and both miss paths notify exactly once
