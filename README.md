@@ -38,11 +38,11 @@ Currently, this version keeps the basic functionality. Further improvements will
 
 ## Quick start
 
-Requires Node.js matching `^22.19 || >=24` (Node.js 24 LTS is recommended). End users do not need pnpm or the source repository.
+Requires Node.js matching `^22.19 || >=24` (Node.js 24 LTS is recommended). Users installing a packaged release do not need pnpm or the source repository.
 
 **DeepSeek Harness (dsh) must be installed before running the client.** Harness is a runtime dependency of this package. Installing the client with npm or a local `.tgz` package automatically installs the required Harness version; no separate global dsh installation is needed beforehand.
 
-**Publication status: this project is not on npm yet.** The npm install and update commands below will work after `dsh-tui-lite` is published. The upstream package is a different project.
+**Publication plans: this project has not been published to npm yet.** Features, usability, and documentation are still being refined; npm publication is planned after these improvements. For now, follow [Local development](#local-development) to run from source or build a local `.tgz` installation package. The npm install and update commands below describe usage after publication and do not work yet.
 
 ```sh
 npm install -g dsh-tui-lite
