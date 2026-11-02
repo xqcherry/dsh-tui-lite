@@ -47,7 +47,6 @@ export function isCommandCompletionToken(value: string): boolean {
 export const LOCAL_COMMANDS: LocalCommand[] = [
   { name: 'new', description: 'Start a new conversation' },
   { name: 'resume', description: 'Continue a saved session' },
-  { name: 'session', description: 'List saved sessions' },
   { name: 'rename', description: 'Rename the current session' },
   { name: 'export', description: 'Export the current session' },
   { name: 'compact', description: 'Summarize earlier turns to free context space' },
@@ -89,21 +88,6 @@ export function isHiddenCommandName(input: string): boolean {
 /** Only this hidden command may bypass active-turn steering. */
 export function isImmediateHiddenCommandName(name: string): boolean {
   return false
-}
-
-export const LOCAL_COMMAND_CHILDREN: Readonly<Record<string, readonly CommandCompletionNode[]>> = {
-  session: [{ name: 'list', description: 'List saved sessions' }],
-}
-
-/** The session command is a short alias for the saved-session list. */
-export function resolveLocalCommandPath(
-  name: string,
-  rawInput: string,
-): { name: string; rawInput: string } | { usage: 'session' } {
-  if (name !== 'session') return { name, rawInput }
-  return rawInput.trim() === '' || rawInput.trim() === 'list'
-    ? { name: 'resume', rawInput: '' }
-    : { usage: 'session' }
 }
 
 /** Resolve the English command description, preserving plugin fallback text. */

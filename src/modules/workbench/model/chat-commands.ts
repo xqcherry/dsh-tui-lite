@@ -66,7 +66,7 @@ export function createChatCommands(deps: ChatCommandHost) {
   }
   const openSessions = async (): Promise<void> => {
     const savedSessions = await sessions.commands.listSessions()
-    openMenu('/session', savedSessions.filter(saved => saved.cwd === sessions.store.getSnapshot().cwd && saved.id !== sessions.store.getSnapshot().agentId).map(session => ({
+    openMenu('/resume', savedSessions.filter(saved => saved.cwd === sessions.store.getSnapshot().cwd && saved.id !== sessions.store.getSnapshot().agentId).map(session => ({
       label: session.title.text || session.id,
       run: () => sessions.commands.resumeTo(session.id),
     })))
@@ -78,7 +78,6 @@ export function createChatCommands(deps: ChatCommandHost) {
       case 'help': deps.toggleHelp(); break
       case 'new': await sessions.commands.newSession(); break
       case 'resume':
-      case 'session':
         if (argument && argument !== 'list') await sessions.commands.resumeTo(argument)
         else await openSessions()
         break

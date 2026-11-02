@@ -60,7 +60,7 @@ const commands = createChatCommands({
 try {
   await commands.runCommand('resume', '', [])
   assert.deepEqual(menuItems.map(item => item.label), ['Readable session name', 'empty-title-hash'])
-  await commands.runCommand('session', 'list', [])
+  await commands.runCommand('resume', 'list', [])
   assert.deepEqual(menuItems.map(item => item.label), ['Readable session name', 'empty-title-hash'])
 
   assert.equal(await commands.runCommand('model', ' provider/model/variant ', []), true)
