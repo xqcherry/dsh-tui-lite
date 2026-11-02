@@ -17,6 +17,7 @@ export const checks = [
   'verify-new-session-planner.ts',
   'verify-session-adoption.ts',
   'verify-module-store.ts',
+  'verify-display-paths.mjs',
   'verify-activity-owners.ts',
   'verify-activity-presentation.ts',
   'verify-feature-ports.ts',
