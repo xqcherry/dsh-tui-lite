@@ -86,6 +86,7 @@ async function fixture(historyRows, cols = 40, rows = 16, alternate = false) {
 }
 
 const skillCommand = { name: 'brandkit', description: 'Brand design', skill: true }
+assert.equal(LOCAL_COMMANDS.some(command => command.name === 'session'), false, '/session is not exposed as a local command')
 const allCommands = [...LOCAL_COMMANDS, { name: 'plan', description: 'Plan mode', external: true }, skillCommand]
 assert.deepEqual(completeTuiCommands('/', allCommands).map(item => item.commandLine), allCommands.map(item => `/${item.name}`), 'bare slash includes every local, plugin and skill command in catalog order')
 const [skillCompletion] = completeCommands('/bra', [skillCommand])
