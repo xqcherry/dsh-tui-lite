@@ -4,7 +4,7 @@ import { MAX_VISIBLE_LINES, wrapToWidth } from './geometry.js'
 /** Reserve prompt borders, margin, status/setup lines and the cursor park. */
 export function commandSuggestionRows(input: string, columns: number, terminalRows: number, homeButtonCols: number): number {
   if (columns < 4 || !input.startsWith('/') || /[\r\n]/.test(input)) return 0
-  const inputRows = Math.min(MAX_VISIBLE_LINES, wrapToWidth(input, Math.max(1, columns - 3 - homeButtonCols)).length)
+  const inputRows = Math.min(MAX_VISIBLE_LINES, wrapToWidth(input, Math.max(1, columns - 4 - homeButtonCols)).length)
   return Math.max(0, Math.min(6, terminalRows - inputRows - 6))
 }
 

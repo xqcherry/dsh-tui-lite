@@ -104,7 +104,8 @@ const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSug
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
 const promptAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
-const inputWidth = Math.max(1, columns - 3 - homeButtonCols)
+// Reserve the prefix, a cursor cell at the wrap boundary, and the right rail.
+const inputWidth = Math.max(1, columns - 4 - homeButtonCols)
 const block = foldBlock
 const foldText = block ? value.slice(block.start, block.end) : value
 const head = block ? value.slice(0, block.start) : ''
@@ -694,12 +695,12 @@ return (
                 {/* 三幕点焰第二幕：空输入行居中短暂浮现档名大写（纯文
                     本流自带偏移空格——不引入嵌套 Box，行数恒定；有文字
                     时不显示）。3 = 行内 `❯ `（2 列）+ 空输入块光标（1
-                    列）；行首 ⌂ 入口渲染时徽标之前还要多占它的列数。 */}
+                    列）；另留 1 列右边框，行首 ⌂ 入口也计入宽度预算。 */}
                 <EffortTierBadge
                   effort={context.settings.getSnapshot().reasoningEffort}
                   levels={context.settings.getSnapshot().effortLevels}
                   columns={columns}
-                  leadingColumns={3 + homeButtonCols}
+                  leadingColumns={4 + homeButtonCols}
                 />
               </>
             ) : (

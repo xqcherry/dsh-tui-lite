@@ -30,6 +30,7 @@ export const checks = [
   'verify-minimal-chat-input.mjs',
   'verify-whale-header.mjs',
   'verify-batched-prompt-input.mjs',
+  'verify-prompt-right-border.mjs',
   'verify-prompt-undo.mjs',
   'verify-prompt-history-draft.mjs',
   'verify-prompt-history-persist.mjs',

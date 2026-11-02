@@ -91,7 +91,17 @@ export function EffortInputBorder({
       flexShrink={0}
     >
       <BorderRow left="╭" right="╮" runs={runs} idleColor={idleColor} label={topRightLabel} />
-      <Box flexShrink={0}>{children}</Box>
+      <Box
+        width="100%"
+        flexShrink={0}
+        borderStyle="single"
+        borderTop={false}
+        borderBottom={false}
+        borderLeft={false}
+        borderColor={idleColor}
+      >
+        {children}
+      </Box>
       <BorderRow left="╰" right="╯" runs={runs} idleColor={idleColor} />
     </Box>
   )
