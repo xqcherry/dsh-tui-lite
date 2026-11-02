@@ -9,7 +9,7 @@ import { Box, Text, render } from '../lib/types/ui/primitives.js'
 import { PromptInput } from '../lib/types/modules/composer/ui/PromptInput.js'
 import { createComposerModule } from '../lib/types/modules/composer/model/module.js'
 import { createPublication } from '../lib/types/shared/state/module-store.js'
-import { completeCommands } from '../lib/types/shared/commands.js'
+import { completeCommands, completeTuiCommands, LOCAL_COMMANDS } from '../lib/types/shared/commands.js'
 import { composerFixture } from './lib/module-fixtures.mjs'
 import instances from '../lib/types/ink/instances.js'
 import { settled, viewportLines } from './lib/term-test.mjs'
@@ -46,7 +46,7 @@ async function fixture(historyRows, cols = 40, rows = 16, alternate = false) {
     notifications: [], pending: [], working: false,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
     cycleMode() { throw new Error('Backtab must belong to candidates') },
-    commandCompletions(input) { return completeCommands(input, channel.commandList, path => path[0] === 'model' ? models : []) },
+    commandCompletions(input) { return completeTuiCommands(input, channel.commandList, path => path[0] === 'model' ? models : []) },
     submit(text) { submitted.push(text) }, steer(text) { submitted.push(text) },
     removePending() { return false }, listFileCandidates: async () => [], listFiles: async () => [],
     notify() {},
@@ -84,6 +84,27 @@ async function fixture(historyRows, cols = 40, rows = 16, alternate = false) {
     async close() { await app.unmount(); composerOwner.dispose(); term.dispose() },
   }
 }
+
+const skillCommand = { name: 'brandkit', description: 'Brand design', skill: true }
+const allCommands = [...LOCAL_COMMANDS, { name: 'plan', description: 'Plan mode', external: true }, skillCommand]
+assert.deepEqual(completeTuiCommands('/', allCommands).map(item => item.commandLine), allCommands.map(item => `/${item.name}`), 'bare slash includes every local, plugin and skill command in catalog order')
+const [skillCompletion] = completeCommands('/bra', [skillCommand])
+assert.equal(skillCompletion.skill, true, 'completion preserves the skill marker')
+assert.equal(skillCompletion.commandLine, '/brandkit')
+assert.equal(skillCompletion.replacement, '/brandkit ')
+
+const skillFixture = await fixture(0, 80, 16, true)
+skillFixture.channel.commandList = [skillCommand, { name: 'brandkit-with-a-very-long-name', description: 'Long skill', skill: true }]
+skillFixture.publish()
+await skillFixture.send('/', () => skillFixture.has('→ skill: brandkit'), 'bare slash includes and labels skills')
+assert(skillFixture.has('Brand design'), 'skill description remains visible when wide')
+skillFixture.resize(40, 10)
+assert(await settled(() => skillFixture.has('→ skill: brandkit') && !skillFixture.has('Brand design')), 'narrow terminal retains skill prefix')
+await skillFixture.send(DOWN, () => skillFixture.has('→ skill: brandkit-with-'), 'long skill name is truncated after prefix')
+assert(!skillFixture.has('brandkit-with-a-very-long-name'), 'long skill name stays within the name column')
+await skillFixture.send(UP + '\t', () => skillFixture.controller.current.text() === '/brandkit ', 'skill completion inserts original invocation')
+assert.equal(skillFixture.commands.length, 0, 'skill completion does not execute a command')
+await skillFixture.close()
 
 const f = await fixture(3, 80, 16, true)
 await f.send('/', () => f.has('→ alpha') && f.has('(1/8)'), 'root candidates')

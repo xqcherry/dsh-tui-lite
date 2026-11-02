@@ -19,6 +19,8 @@ import { tOr } from './i18n.js'
 /** One child in a slash-command tree contributed by a local feature/plugin. */
 export interface CommandCompletionNode {
   name: string
+  /** Identify skill entries in completion presentation. */
+  skill?: boolean
   aliases?: readonly string[]
   description: string
   descriptions?: LocalizedDescriptions
@@ -61,19 +63,6 @@ export const LOCAL_COMMANDS: LocalCommand[] = [
   { name: 'help', description: 'Show shortcuts and commands' },
   { name: 'exit', description: 'Exit dsh-tui' },
 ]
-
-/** The short list shown before a command name is typed. */
-const DEFAULT_SLASH_COMMAND_NAMES = [
-  'new', 'resume', 'session', 'model', 'effort', 'permission', 'provider', 'auth', 'help', 'exit',
-] as const
-
-/** Keep the active backend's command descriptors and omit unavailable names. */
-function defaultSlashCommands(commands: readonly LocalCommand[]): LocalCommand[] {
-  return DEFAULT_SLASH_COMMAND_NAMES.flatMap(name => {
-    const command = commands.find(candidate => candidate.name === name)
-    return command === undefined ? [] : [command]
-  })
-}
 
 /**
  * Hidden slash commands: intentionally not exposed in the `/` suggestion
@@ -195,6 +184,7 @@ export function completeCommands(
     return [{
       name: path.join(' '),
       description: candidate.description,
+      ...(candidate.skill === undefined ? {} : { skill: candidate.skill }),
       ...(candidate.descriptions === undefined ? {} : { descriptions: candidate.descriptions }),
       ...(candidate.descriptionKey === undefined ? {} : { descriptionKey: candidate.descriptionKey }),
       ...(candidate.tag === undefined && candidate.aliases?.length
@@ -206,13 +196,13 @@ export function completeCommands(
   })
 }
 
-/** Apply the compact bare-slash menu without changing generic completion. */
+/** Complete all commands exposed by the active runtime. */
 export function completeTuiCommands(
   input: string,
   roots: readonly LocalCommand[],
   children?: CommandChildren,
 ): CommandCompletion[] {
-  return completeCommands(input, input === '/' ? defaultSlashCommands(roots) : roots, children)
+  return completeCommands(input, roots, children)
 }
 
 function resolveCompletionNode(

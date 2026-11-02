@@ -34,7 +34,8 @@ export function CommandSuggestions({ snapshot, columns, maxRows, onPick, onWheel
         const index = start + offset
         const selected = index === selectedIndex
         const nameWidth = Math.max(0, Math.min(primaryWidth - DESCRIPTION_GAP, width - 2))
-        const name = truncateToWidth(item.name.replace(/[\r\n]+/g, ' '), nameWidth)
+        const displayName = `${item.skill ? 'skill: ' : ''}${item.name.replace(/[\r\n]+/g, ' ')}`
+        const name = truncateToWidth(displayName, nameWidth)
         const gap = ' '.repeat(Math.max(DESCRIPTION_GAP, primaryWidth - stringWidth(name)))
         const remaining = width - 2 - stringWidth(name) - gap.length
         const description = columns > 40 && remaining > 10
