@@ -2,6 +2,8 @@
 
 export { isPeakHour } from './model/pricing.js'
 
+export { estimateSessionCostSnapshotCny } from './model/pricing.js'
+
 export type { ChannelProjection } from './model/projection.js'
 
 export type { ChannelProjectionDeps } from './model/projection.js'

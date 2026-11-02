@@ -20,7 +20,9 @@ for (const [columns, rows] of [[100, 32], [80, 24], [40, 24], [40, 12], [20, 12]
   const submitted: string[] = []
   let newSessions = 0
   let modeChanges = 0
-  const runtime = createRuntimeModulesFixture({ commands: {
+  let nextTranscriptRowId = 0
+  let runtime: ReturnType<typeof createRuntimeModulesFixture>
+  runtime = createRuntimeModulesFixture({ commands: {
     composer: {
       commandCompletions: () => [], stagedImageGeneration: () => 0,
       hasStagedImage: () => false, discardStagedImage() {},
@@ -29,6 +31,24 @@ for (const [columns, rows] of [[100, 32], [80, 24], [40, 24], [40, 12], [20, 12]
     sessions: {
       newSession: async () => { newSessions++; return true },
       cycleMode: async () => { modeChanges++ },
+    },
+    transcript: {
+      pushLocal: (title, lines, options) => {
+        const commandResult = options?.commandResult === true
+        const rows = [title, ...lines]
+        for (const [index, text] of rows.entries()) {
+          const position = !commandResult ? undefined
+            : rows.length === 1 ? 'only'
+              : index === 0 ? 'start'
+                : index === rows.length - 1 ? 'end' : 'middle'
+          runtime.transcript.ingress.appendLocalRow({
+            id: nextTranscriptRowId++,
+            kind: index === 0 ? 'local' : 'local-output',
+            text,
+            ...(position === undefined ? {} : { commandResult: position }),
+          })
+        }
+      },
     },
     workbench: { notify: () => () => {} },
   } })
@@ -116,6 +136,27 @@ for (const [columns, rows] of [[100, 32], [80, 24], [40, 24], [40, 12], [20, 12]
     await key('\x03')
     assert(await settled(() => !screen().includes('Esc cancel')), screen())
     assert.equal(newSessions, 0)
+    if (columns === 40 && rows === 24) {
+      runtime.transcript.ingress.setContextOccupancy({ usedTokens: 50, contextWindow: 100, source: 'projection' })
+      runtime.activity.ingress.setSubagentSnapshot([], [{
+        provider: 'deepseek-official',
+        model: 'deepseek-flash',
+        buckets: {
+          peak: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          idle: { input: 0, output: 1_000_000, cacheRead: 0, cacheWrite: 0 },
+        },
+      }])
+      await key('/status')
+      await key('\r')
+      assert(await settled(() => {
+        const output = screen()
+        return output.includes('Context: 50 tokens / 100 tokens')
+          && output.includes('(50%)')
+          && output.includes('Tokens: input 0')
+          && output.includes('cache write 0')
+          && output.includes('Estimated session cost: ¥4.0000')
+      }), `The /status command renders its session metrics in the 40-column TTY:\n${screen()}`)
+    }
     console.log(`PASS: unified help categories, command fill, shortcuts, key ownership and resize at ${columns}x${rows}`)
   } finally {
     questions.rejectAll()

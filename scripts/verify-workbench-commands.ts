@@ -131,6 +131,18 @@ try {
   await commands.runCommand('help', '', [])
   await commands.runCommand('thinking', '', [])
   assert.deepEqual(calls.splice(0), [['resume', 'other'], 'help', 'thinking'])
+  await commands.runCommand('status', '', [])
+  const statusCall = calls.find(value => Array.isArray(value) && value[0] === '/status')
+  assert.ok(Array.isArray(statusCall))
+  assert.deepEqual(statusCall[1], [
+    'starting',
+    'fixture/fixture-model',
+    '/fixture',
+    'Context: unavailable',
+    'Tokens: input 0 · output 0 · cache read 0 · cache write 0',
+    'Estimated session cost: unavailable (no usage recorded)',
+  ])
+  calls.splice(0)
   await commands.runCommand('auth', 'login', [])
   assert.equal(menuItems.length, 1)
   await menuItems[0]!.run()

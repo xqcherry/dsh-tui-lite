@@ -12,6 +12,7 @@ export const checks = [
   'verify-transcript-restoration.ts',
   'verify-compact-transcript.tsx',
   'verify-workbench-commands.ts',
+  'verify-status-summary.ts',
   'verify-permission-presets.ts',
   'verify-session-color.ts',
   'verify-composer-delivery.ts',
