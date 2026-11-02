@@ -26,7 +26,7 @@ const BLINK_MS = 500
 
 export type QuestionMinimizedBarProps = {
   /** Progress title, same text as the expanded panel's Divider header
-   *  (e.g. ` 📋 提问 · 第 2/5 题 · 还剩 3 题 `). */
+   *  (e.g. `Questionnaire · 2/5 · 3 left`). */
   readonly progress: string
   /** First line of the question body, truncated by the layout. */
   readonly questionText: string

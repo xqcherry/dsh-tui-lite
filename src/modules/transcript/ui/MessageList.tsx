@@ -886,6 +886,7 @@ export function MessageList({
               textFull={row.kind === 'reasoning' ? row.text : undefined}
               executionTarget={row.executionTarget}
               commandResult={row.commandResult}
+              emphasis={row.emphasis === true}
               selectionAttached={row.selectionAttached}
               streaming={displayStreaming}
               thinkingOpen={row.thinkingOpen === true}

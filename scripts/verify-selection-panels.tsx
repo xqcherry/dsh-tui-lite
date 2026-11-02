@@ -94,7 +94,36 @@ for (const columns of [80, 40, 20, 16]) {
     stdin.write('\r')
     assert(await settled(() => answers.length === 2), screen())
     assert.deepEqual(answers[1], { selected: [], custom: '中文😀' })
-    console.log(`PASS: blue closed menu/question/editor frames, CJK, focus, empty state and resize at ${columns} columns`)
+
+    // Plan review: the exit_plan_mode decision card must use the same closed
+    // SelectionPanel board as the command menu/questionnaire — never a bare
+    // divider card in the transcript — and its plan body must stay bounded.
+    const planAnswers: unknown[] = []
+    app.rerender(<AskUserQuestionPanel key="plan" question={{
+      header: '计划确认',
+      question: '按计划执行？',
+      detail: `## 计划\n\n- 修改 src/a.ts\n- 修改 src/b.ts\n\n${'长计划内容。'.repeat(20)}`,
+      options: [
+        { label: '批准', description: '按计划开始实现' },
+        { label: '继续计划', description: '带着反馈继续编辑' },
+      ],
+      intent: { kind: 'plan-review', approve: '批准' },
+    }} position={1} total={1} answered={0} onAnswer={answer => planAnswers.push(answer)} onCancel={() => {}} />)
+    assert(await settled(() => screen().includes('计划确认') && screen().includes('按计划执行？') && screen().includes('╯')), screen())
+    frame()
+    const frameTop = lines().findIndex(line => line.startsWith('╭'))
+    const frameBottom = lines().findIndex(line => line.startsWith('╰'))
+    const planOptionRow = lines().findIndex(line => line.includes('1. 批准'))
+    assert(planOptionRow > frameTop && planOptionRow < frameBottom, 'plan options render inside the panel frame')
+    const firstPlanOptionRow = (): number => screen().split('\n').findIndex(line => line.includes('1. 批准'))
+    const firstPlanOptionBeforeMove = firstPlanOptionRow()
+    stdin.write('\x1b[B')
+    assert(await settled(() => screen().split('\n').some(line => line.includes('❯') && line.includes('2.'))), screen())
+    assert.equal(firstPlanOptionRow(), firstPlanOptionBeforeMove, 'moving focus must not move the first plan option row')
+    stdin.write('\r')
+    assert(await settled(() => planAnswers.length === 1), screen())
+    assert.deepEqual(planAnswers[0], { selected: ['继续计划'] })
+    console.log(`PASS: blue closed menu/question/editor/plan-review frames, CJK, focus, empty state and resize at ${columns} columns`)
   } finally {
     await app.unmount()
     term.dispose()

@@ -18,6 +18,8 @@ export { stablePermissionRosterOrder } from './model/modes.js'
 
 export { touchSession } from './model/sessionHistory.js'
 
+export { readSessionColorPref, writeSessionColorPref } from './model/sessionColorPrefs.js'
+
 export { reserveNewSession } from './model/sessionMounts.js'
 
 export { resolveSessionModes } from './model/modes.js'

@@ -5,6 +5,7 @@ import type { SessionsSnapshot, SessionsCommands } from '../state-contracts.js'
 import type { ModuleLaunch } from '../../../shared/protocol/module-launch.js'
 import type { SessionEventIngress } from '../contracts.js'
 import type { AgentEvent } from '../../../shared/protocol/events.js'
+import { readSessionColorPref } from './sessionColorPrefs.js'
 
 /** This module is the sole owner of these fields. Writers never reach the UI. */
 export function createSessionsModule(launch: ModuleLaunch, publication: Publication) {
@@ -13,7 +14,7 @@ export function createSessionsModule(launch: ModuleLaunch, publication: Publicat
   const owned = createModuleStore<MutableSnapshot<SessionsSnapshot>>({
     status: 'starting',
     sessionTitle: '',
-    sessionColor: '',
+    sessionColor: readSessionColorPref() ?? '',
     agentId: input.agentId,
     sessionId: input.sessionId,
     agentBindingGeneration: 0,
@@ -61,7 +62,10 @@ export function createSessionsModule(launch: ModuleLaunch, publication: Publicat
       setWorking(working: boolean): void { owned.patch({ working }) },
       setCompaction(compaction: SessionsSnapshot['compaction']): void { owned.patch({ compaction }) },
       resetSessionState(): void {
-        owned.patch({ sessionTitle: '', sessionColor: '', working: false, compaction: undefined })
+        // A freshly adopted session has no replay yet: start from the last
+        // `/color` default; a session's own `session/color` event overrides it
+        // during replay.
+        owned.patch({ sessionTitle: '', sessionColor: readSessionColorPref() ?? '', working: false, compaction: undefined })
       },
       metadata(event: Extract<AgentEvent, { type: 'session.title' | 'session.color' }>): void {
         switch (event.type) {

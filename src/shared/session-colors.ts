@@ -3,8 +3,9 @@
  * named palette that overrides the prompt-input border (and its session
  * label) for ONE session, so side-by-side sessions can be told apart
  * at a glance. The name is persisted per session via a `session/color`
- * log event; these hex values are what the name resolves to
- * at render time.
+ * log event, and the last choice is also saved as the default for new
+ * sessions (`~/.dsh-tui/session-color.json`); these hex values are what
+ * the name resolves to at render time.
  *
  * Values are mid-tone hues from the Radix accent family,
  * chosen to stay readable as a border/accent

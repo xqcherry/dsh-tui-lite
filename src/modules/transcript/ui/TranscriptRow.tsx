@@ -44,6 +44,8 @@ export type MemoRowProps = {
   textFull?: string
   executionTarget: string | undefined
   commandResult: ChatRow['commandResult']
+  /** Local-output answer lines render at normal brightness instead of dim. */
+  emphasis: boolean
   /** IDE selection indicator (user rows): rendered above the prompt bubble. */
   selectionAttached: ChatRow['selectionAttached']
   /** Session cwd for the indicator's display-path relativization (T-FIX-01). */
@@ -140,6 +142,7 @@ export function TranscriptRow({
   textFull,
   executionTarget,
   commandResult,
+  emphasis,
   selectionAttached,
   sessionCwd,
   streaming,
@@ -467,12 +470,12 @@ export function TranscriptRow({
           borderRight
           ref={ref}
         >
-          <Text dimColor wrap="wrap">{displayText}</Text>
+          <Text dimColor={!emphasis} wrap="wrap">{displayText}</Text>
         </Box>
       }
       return (
         <Box paddingLeft={2} backgroundColor={background} ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
-          <Text dimColor>{displayText}</Text>
+          <Text dimColor={!emphasis}>{displayText}</Text>
         </Box>
       )
     case 'compact':

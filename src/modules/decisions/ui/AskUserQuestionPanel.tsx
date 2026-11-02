@@ -624,7 +624,7 @@ export function AskUserQuestionPanel({
   const genericProgress = ` ${t('question-header-progress', { position, total, remaining: remaining > 1 ? t('question-remaining-more', { n: remaining }) : '' })} `
   const panelTitle = question.header !== undefined
     ? `${question.header}${total > 1 ? ` · ${position}/${total}` : ''}`
-    : total > 1 ? genericProgress.trim() : 'Question'
+    : total > 1 ? genericProgress.trim() : 'Questionnaire'
   /** First line of the question body for the minimized bar (whitespace
    *  flattened the same way windowedOptions flattens labels). */
   const questionText = question.question.split('\n')[0]?.replace(/\s+/gu, ' ').trim() ?? ''
