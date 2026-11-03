@@ -152,6 +152,34 @@ try {
   await f.push(12)
   assert.equal(f.promptTop(), 19, 'prompt stays pinned after messages arrive')
 
+  // A live tool row updates in place: args first, then the settled result.
+  const toolRow = {
+    kind: 'tool',
+    id: 13,
+    text: '',
+    tool: {
+      callId: 'live-tool',
+      name: 'bash',
+      argsText: '{"command":"echo tool"}',
+      status: 'running',
+      startedAt: Date.now(),
+    },
+  }
+  f.channel.rows.push(toolRow)
+  f.channel.emit()
+  await sleep(150)
+  assert(f.viewportText().includes('echo tool'), 'running tool renders its command')
+  Object.assign(toolRow.tool, {
+    status: 'ok',
+    durationMs: 1200,
+    resultText: 'tool output line',
+    resultView: { card: 'terminal', output: 'tool output line', exitCode: 0 },
+  })
+  f.channel.emit()
+  await sleep(150)
+  assert(f.viewportText().includes('tool output line'), 'settled tool renders its result body')
+  assert.equal(f.promptTop(), 19, 'prompt stays pinned through in-place tool updates')
+
   await f.mutate(11, { streaming: true, text: 'streaming\nwith\nmore\nlines' })
   assert.equal(f.promptTop(), 19, 'prompt stays pinned while a row streams')
 
@@ -163,6 +191,32 @@ try {
 
   await f.push(78)
   assert.equal(f.promptTop(), 19, 'prompt stays pinned in a long transcript')
+
+  // Tail window + backfill: only the newest rows mount initially, scrolling
+  // to the top pulls older rows in without blank bands or moving the prompt.
+  const tailText = f.viewportText()
+  for (let index = 0; index < 30; index++) f.stdin.write('\x1b[<64;10;10M')
+  await sleep(300)
+  for (let index = 0; index < 40; index++) f.stdin.write('\x1b[<64;10;10M')
+  await sleep(400)
+  for (let index = 0; index < 8; index++) f.stdin.write('\x1b[5~')
+  await sleep(400)
+  assert.equal(f.promptTop(), 19, 'prompt stays pinned while backfilling older rows')
+  assert.notEqual(f.viewportText(), tailText, 'wheel-up reaches older rows')
+  assert(!f.viewportText().includes('message 89'), 'backfill leaves the tail')
+  assert(f.viewportText().includes('message 0') || f.viewportText().includes('message 1'), 'oldest rows mount')
+
+  // Appends while the reader is away must not move the viewport.
+  const awayText = f.viewportText()
+  await f.push(5, index => `late message ${index}`)
+  assert.equal(f.viewportText(), awayText, 'appends do not move a reader who is away from the bottom')
+  assert.equal(f.promptTop(), 19, 'prompt stays pinned while away from the bottom')
+
+  // Returning to the bottom re-enters the tail window and shows new rows.
+  for (let index = 0; index < 80; index++) f.stdin.write('\x1b[<65;10;10M')
+  await sleep(400)
+  assert(f.viewportText().includes('late message 94') || f.viewportText().includes('message 94'), 'newest rows are reachable')
+  assert.equal(f.promptTop(), 19, 'prompt stays pinned after returning to the bottom')
 
   // Manual scroll: wheel up over the transcript, then back down. The prompt
   // is outside the ScrollBox and must not move.

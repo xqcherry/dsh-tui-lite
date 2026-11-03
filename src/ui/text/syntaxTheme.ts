@@ -2,10 +2,9 @@ import chalk from 'chalk'
 import type { Theme } from '../theme.js'
 
 // --- syntax highlighting theme bridge ----------------------------------------
-// Shared by SplitDiffView (diff panes) and the markdown renderer (fenced
-// code blocks). Both feed cli-highlight's `theme` option so code colors come
-// from the active dsh-tui theme instead of cli-highlight's own sparse
-// default palette.
+// Used by the markdown renderer (fenced code blocks). It feeds
+// cli-highlight's `theme` option so code colors come from the active
+// dsh-tui theme instead of cli-highlight's own sparse default palette.
 
 /** highlight.js token classes -> theme syntax tokens. `default` catches
  *  every unmapped class so cli-highlight's own yellow never leaks through

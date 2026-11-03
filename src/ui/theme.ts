@@ -134,77 +134,77 @@ type ContextBarRamp = Pick<
  * the ignition pair differs between them.
  */
 const MIST_BAR_RAMP: ContextBarRamp = {
-  contextBarSystem: rgb('#22305F'), // deep navy
-  contextBarPrompt: rgb('#2B3D78'), // navy
-  contextBarAssistant: rgb('#344A92'), // indigo
-  contextBarThinking: rgb('#4D6BFE'), // DeepSeek brand blue
-  contextBarTools: rgb('#5A7CFF'), // lighter blue
+  contextBarSystem: rgb('#1E3A8A'), // deep blue
+  contextBarPrompt: rgb('#1D4ED8'), // vivid blue
+  contextBarAssistant: rgb('#2563EB'), // bright blue
+  contextBarThinking: rgb('#3B82F6'), // accent blue
+  contextBarTools: rgb('#60A5FA'), // sky blue
 }
 
 /**
  * Gentle Mist Blue dark adaptation. The blues come straight from the card
- * (#27478C–#ABC2EC); neutrals are warm (derived from #F6F3ED/#343945) so
- * the palette reads calm rather than cyber-hard on a dark terminal.
+ * The palette keeps the OpenCode contrast idea: near-white text, one vivid
+ * blue accent family, and saturated semantic accents for tool status.
  */
 const darkTheme: Theme = {
-  autoAccept: rgb('#B3A0D4'), // Soft violet
-  bashBorder: rgb('#D194AE'), // Mist rose
-  accent: rgb('#7DA1DE'), // Accent Soft — mist brand blue
-  toolNameMutate: rgb('#E5C07B'), // soft gold — Edit/Write (warm accent)
-  toolNameExec: rgb('#56B6C2'), // mist cyan — Bash/exec tools
-  accentShimmer: rgb('#ABC2EC'), // Border Blue for shimmer effect
-  activity: rgb('#7DA1DE'),
-  activityShimmer: rgb('#ABC2EC'),
-  permission: rgb('#ABC2EC'), // Border Blue — pane/dialog accent
-  permissionShimmer: rgb('#C9D7F2'),
-  planMode: rgb('#7FAE99'), // Muted sage green
-  ide: rgb('#5E88CC'), // Accent Blue
-  promptBorder: rgb('#55606F'), // Muted blue-gray
-  promptBorderShimmer: rgb('#7DA1DE'),
-  text: rgb('#E8E6E0'), // Warm off-white (from #F6F3ED)
-  inverseText: rgb('#22262E'), // Deep warm charcoal (from #343945)
-  inactive: rgb('#8D95A6'), // Mist gray-blue — feeds dimColor
-  inactiveShimmer: rgb('#AAB2C2'),
-  subtle: rgb('#5E6673'), // Dimmer blue-gray
-  suggestion: rgb('#ABC2EC'), // Border Blue — focus/selection
-  remember: rgb('#ABC2EC'),
-  background: rgb('#5E88CC'), // Accent Blue — badge fill
-  success: rgb('#82B89D'), // Mist green (from #4E9675)
-  error: rgb('#DA8A93'), // Soft rose
-  warning: rgb('#D8B270'), // Soft amber
-  merged: rgb('#B3A0D4'), // Soft violet (matches autoAccept)
-  warningShimmer: rgb('#E4C78E'),
-  diffAdded: rgb('#27392C'),
-  diffRemoved: rgb('#3E2A2C'),
-  diffAddedDimmed: rgb('#2B352C'),
-  diffRemovedDimmed: rgb('#362B2C'),
-  diffAddedWord: rgb('#57956B'),
-  diffRemovedWord: rgb('#B26671'),
-  toolCardBackground: rgb('#242B3A'), // lighter blue-grey card surface
-  toolCardBackgroundDim: rgb('#1C2330'), // deeper blue substrate
-  toolDotExec: rgb('#7FAE99'), // sage green — bash/pwsh
-  toolDotRead: rgb('#82B8C7'), // cyan blue — read/grep/glob
-  toolDotWrite: rgb('#B3A0D4'), // soft violet — edit/write
-  toolDotWeb: rgb('#7DA1DE'), // mist blue — web search/fetch
-  toolDotTask: rgb('#D194AE'), // mist rose — subagent/jobs
-  syntaxKeyword: rgb('#78A0D6'), // muted anchor blue
-  syntaxString: rgb('#79AD91'), // mist green, distinct without neon saturation
-  syntaxComment: rgb('#74808D'), // neutral blue-grey
-  syntaxNumber: rgb('#C89B70'), // softened warm amber
-  syntaxFunction: rgb('#6FAEB5'), // muted cyan
-  syntaxType: rgb('#A98FBF'), // softened violet
-  syntaxVariable: rgb('#C9D1D9'), // near-text
-  syntaxOperator: rgb('#93A1B0'), // blue grey
-  syntaxPunctuation: rgb('#7A8694'), // dim blue grey
-  syntaxConstant: rgb('#C98291'), // softened rose
-  professionalBlue: rgb('#7DA1DE'),
-  chromeYellow: rgb('#D8B270'),
+  autoAccept: rgb('#C084FC'), // Soft violet
+  bashBorder: rgb('#FB7185'), // Mist rose
+  accent: rgb('#4D9EFF'), // Accent Soft — mist brand blue
+  toolNameMutate: rgb('#FB923C'), // soft gold — Edit/Write (warm accent)
+  toolNameExec: rgb('#34D399'), // mist cyan — Bash/exec tools
+  accentShimmer: rgb('#8CC8FF'), // Border Blue for shimmer effect
+  activity: rgb('#4D9EFF'),
+  activityShimmer: rgb('#9BD1FF'),
+  permission: rgb('#6FB4FF'), // Border Blue — pane/dialog accent
+  permissionShimmer: rgb('#A5D2FF'),
+  planMode: rgb('#4ADE80'), // Muted sage green
+  ide: rgb('#5EB1FF'), // Accent Blue
+  promptBorder: rgb('#4C6FA8'), // Muted blue-gray
+  promptBorderShimmer: rgb('#4D9EFF'),
+  text: rgb('#FFFFFF'), // Warm off-white (from #F6F3ED)
+  inverseText: rgb('#111827'), // Deep warm charcoal (from #343945)
+  inactive: rgb('#A7B2C4'), // Mist gray-blue — feeds dimColor
+  inactiveShimmer: rgb('#C9D3E3'),
+  subtle: rgb('#7F8A9E'), // Dimmer blue-gray
+  suggestion: rgb('#8CC8FF'), // Border Blue — focus/selection
+  remember: rgb('#8CC8FF'),
+  background: rgb('#2563EB'), // Accent Blue — badge fill
+  success: rgb('#4ADE80'), // Mist green (from #4E9675)
+  error: rgb('#FF6B81'), // Soft rose
+  warning: rgb('#FFC857'), // Soft amber
+  merged: rgb('#C084FC'), // Soft violet (matches autoAccept)
+  warningShimmer: rgb('#FFD98A'),
+  diffAdded: rgb('#15351F'),
+  diffRemoved: rgb('#3A1D24'),
+  diffAddedDimmed: rgb('#1A2E22'),
+  diffRemovedDimmed: rgb('#2E1E24'),
+  diffAddedWord: rgb('#4ADE80'),
+  diffRemovedWord: rgb('#FF7A90'),
+  toolCardBackground: rgb('#1E293B'), // lighter blue-grey card surface
+  toolCardBackgroundDim: rgb('#151D2B'), // deeper blue substrate
+  toolDotExec: rgb('#34D399'), // sage green — bash/pwsh
+  toolDotRead: rgb('#60A5FA'), // cyan blue — read/grep/glob
+  toolDotWrite: rgb('#C084FC'), // soft violet — edit/write
+  toolDotWeb: rgb('#FB923C'), // mist blue — web search/fetch
+  toolDotTask: rgb('#F472B6'), // mist rose — subagent/jobs
+  syntaxKeyword: rgb('#7DD3FC'), // muted anchor blue
+  syntaxString: rgb('#86EFAC'), // mist green, distinct without neon saturation
+  syntaxComment: rgb('#94A3B8'), // neutral blue-grey
+  syntaxNumber: rgb('#FDBA74'), // softened warm amber
+  syntaxFunction: rgb('#60A5FA'), // muted cyan
+  syntaxType: rgb('#C4B5FD'), // softened violet
+  syntaxVariable: rgb('#E2E8F0'), // near-text
+  syntaxOperator: rgb('#CBD5E1'), // blue grey
+  syntaxPunctuation: rgb('#94A3B8'), // dim blue grey
+  syntaxConstant: rgb('#F9A8D4'), // softened rose
+  professionalBlue: rgb('#4D9EFF'),
+  chromeYellow: rgb('#FFC857'),
   // Pre-theme values, now overridable: the mist family's bar ramp (shared with
   // `light`) and the ignition pair — bright blue over the terminal's own dark
   // substrate.
   ...MIST_BAR_RAMP,
-  ignition: rgb('#82B9FF'),
-  ignitionDim: rgb('#1B1E28'),
+  ignition: rgb('#7DD3FC'),
+  ignitionDim: rgb('#1B2233'),
   // Every built-in leaves the caret empty on purpose: empty keeps the
   // inverse-video block the palette always had, and a theme opts into a
   // coloured block by naming a fill.
@@ -212,24 +212,24 @@ const darkTheme: Theme = {
   mascotBody: rgb('#D98A63'), // Warm mascot orange
   inputBackground: rgb('#000000'),
   userMessageBackground: '', // user turn: no fill, gold bold text only (Kimi style)
-  userMessageBackgroundHover: rgb('#3B5BDB'), // hover/expand: blue block with gold text
-  messageActionsBackground: rgb('#2E333D'),
-  selectionBg: rgb('#3B4A66'), // Mist-blue tint on dark
-  bashMessageBackgroundColor: rgb('#2C3038'),
-  memoryBackgroundColor: rgb('#30353D'),
-  rate_limit_fill: rgb('#7DA1DE'),
-  rate_limit_empty: rgb('#3C414B'),
-  fastMode: rgb('#E09A58'),
-  fastModeShimmer: rgb('#EAB478'),
+  userMessageBackgroundHover: rgb('#1E3A8A'), // hover/expand: blue block with gold text
+  messageActionsBackground: rgb('#263449'),
+  selectionBg: rgb('#254A7A'), // Mist-blue tint on dark
+  bashMessageBackgroundColor: rgb('#1A2332'),
+  memoryBackgroundColor: rgb('#1E293B'),
+  rate_limit_fill: rgb('#4D9EFF'),
+  rate_limit_empty: rgb('#334155'),
+  fastMode: rgb('#FB923C'),
+  fastModeShimmer: rgb('#FDBA74'),
   userPromptLabel: rgb('#FFDF80'),
-  subagentBullet: rgb('#D194AE'),
-  subagentDescription: rgb('#E8E6E0'),
-  subagentModel: rgb('#8D95A6'),
-  subagentElapsed: rgb('#8D95A6'),
-  subagentToolName: rgb('#7DA1DE'),
-  subagentStatusRunning: rgb('#7DA1DE'),
-  subagentStatusCompleted: rgb('#82B89D'),
-  subagentStatusFailed: rgb('#DA8A93'),
+  subagentBullet: rgb('#F472B6'),
+  subagentDescription: rgb('#F4F7FF'),
+  subagentModel: rgb('#AAB4C8'),
+  subagentElapsed: rgb('#AAB4C8'),
+  subagentToolName: rgb('#4D9EFF'),
+  subagentStatusRunning: rgb('#4D9EFF'),
+  subagentStatusCompleted: rgb('#4ADE80'),
+  subagentStatusFailed: rgb('#FF6B81'),
 }
 
 export function getTheme(_name: ThemeName = 'dark'): Theme {

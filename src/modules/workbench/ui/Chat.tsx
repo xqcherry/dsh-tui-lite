@@ -54,8 +54,6 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   const [expanded, setExpanded] = React.useState(false)
   const [thinking, setThinking] = React.useState(true)
   const [expandedRows, setExpandedRows] = React.useState<ReadonlySet<number>>(new Set())
-  const [expandedDetails, setExpandedDetails] = React.useState<ReadonlySet<number>>(new Set())
-  const [showAll, setShowAll] = React.useState(false)
   const [historyQuery, setHistoryQueryState] = React.useState<string | null>(null)
   const [fillText, setFillText] = React.useState<string | null>(initialPrompt ?? null)
   const [configured, setConfigured] = React.useState(modelConfigured === undefined)
@@ -108,7 +106,7 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
   const refreshConfiguration = React.useCallback(() => configurationCheck.refresh(), [configurationCheck])
   React.useEffect(() => () => configurationCheck.dispose(), [configurationCheck])
   React.useEffect(() => { void refreshConfiguration() }, [refreshConfiguration, generation, setting.model, setting.provider])
-  React.useEffect(() => { setExpandedRows(new Set()); setExpandedDetails(new Set()); setShowAll(false) }, [generation])
+  React.useEffect(() => { setExpandedRows(new Set()) }, [generation])
   const report = (error: unknown): void => {
     workbench.commands.notify(error instanceof Error ? error.message : String(error), { color: 'error' })
   }
@@ -218,16 +216,13 @@ export function Chat({ ports, questionStore, approvalStore, modelConfigured, ini
     rows={conversation.rows}
     expanded={expanded}
     expandedRows={expandedRows}
-    expandedDetails={expandedDetails}
     selectedId={null}
     onToggleRow={id => setExpandedRows(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
-    onToggleDetail={id => setExpandedDetails(previous => { const next = new Set(previous); if (!next.delete(id)) next.add(id); return next })}
     model={setting.model}
-    showAll={showAll}
-    onToggleAll={() => setShowAll(value => !value)}
     olderHistory={conversation.olderHistory}
     onLoadOlder={() => perform(() => transcript.commands.loadOlder())}
     thinkingVisible={thinking}
+    sessionCwd={session.cwd}
     scrollHandle={transcriptHandle}
     fullscreen={fullscreen}
   />

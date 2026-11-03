@@ -342,7 +342,7 @@ export function parseComboDraft(text: string): { combos: string[] } | undefined 
 export const FIXED_RESERVED_COMBOS: readonly string[] = [
   'ctrl+c', // interrupt / clear
   'ctrl+d', // exit on empty input
-  'ctrl+e', // editor line end (also the showAll action's default)
+  'ctrl+e', // editor line end
   'ctrl+a', // editor line start (also the dashboard action's default)
   'ctrl+u', // kill line
   'ctrl+k', // kill to end

@@ -19,9 +19,7 @@ export function createSettingsModule(launch: ModuleLaunch, publication: Publicat
     contextWindow: undefined,
     reasoningEffort: options.effort,
     effortLevels: undefined,
-    diffLayout: 'auto',
     thinkingFold: 'preview',
-    toolBackground: 'none',
     promptSessionLabel: false,
     expandEditor: false,
   }, publication)

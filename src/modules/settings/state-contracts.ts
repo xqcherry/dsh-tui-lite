@@ -1,4 +1,3 @@
-import type { ToolBackground } from '../../shared/protocol/display.js'
 import type { SkillInfo } from '../../shared/protocol/models.js'
 import type { OAuthProviderStatus } from '../../shared/protocol/provider-settings.js'
 import type { ProviderSetupHost } from '../../shared/protocol/provider-settings.js'
@@ -17,9 +16,7 @@ export interface SettingsSnapshot {
   readonly contextWindow: number | undefined
   readonly reasoningEffort: string | undefined
   readonly effortLevels: readonly string[] | undefined
-  readonly diffLayout: 'auto' | 'split' | 'unified'
   readonly thinkingFold: 'preview' | 'full'
-  readonly toolBackground: ToolBackground
   readonly promptSessionLabel: boolean
   readonly expandEditor: boolean
 }

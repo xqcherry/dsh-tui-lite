@@ -56,8 +56,6 @@ for (const columns of [80, 40, 20]) {
     selectedId={null}
     onToggleRow={() => {}}
     model="deepseek-chat"
-    showAll
-    onToggleAll={() => {}}
   />, { stdin, stdout, stderr, exitOnCtrlC: false, patchConsole: false })
   try {
     assert(await settled(() => screen().includes('Questionnaire')), screen())

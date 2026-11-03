@@ -1529,6 +1529,7 @@ function renderNodeToOutput(
         // → firstVisible wrong. Also: SCROLL_MIN_PER_FRAME=4 with snap-at-1
         // ping-ponged forever at delta=2. Smooth needs drain-end notify
         // plumbing; shipping instant first. stickyScroll overrides.
+        const anchored = node.scrollAnchor !== undefined
         if (node.scrollAnchor) {
           const anchorTop = node.scrollAnchor.el.yogaNode?.getComputedTop()
           if (anchorTop != null) {
@@ -1576,9 +1577,10 @@ function renderNodeToOutput(
         // user scrolls home — otherwise sticky stays broken until the next
         // content growth, and an idle stream leaves the pill stuck.
         const atBottom =
-          sticky ||
-          (scrollTopBeforeFollow >= prevMaxScroll &&
-            (grew || scrollTopBeforeFollow >= maxScroll))
+          !anchored &&
+          (sticky ||
+            (scrollTopBeforeFollow >= prevMaxScroll &&
+              (grew || scrollTopBeforeFollow >= maxScroll)))
         if (atBottom && (node.pendingScrollDelta ?? 0) >= 0 && !shrunk) {
           node.scrollTop = maxScroll
           node.pendingScrollDelta = undefined
