@@ -40,7 +40,7 @@ export interface KernelJobLifecycleEvent {
   type: 'registered' | 'progress' | 'stopping' | 'settled' | 'removed'
   job: BackgroundJobSnapshot
   /** Settlement extras (`settled` only): who ended it, whether a waiter
-   *  had already collected it (the UI skips duplicate toasts then). */
+   *  had already collected it. */
   cause?: 'producer' | 'kill' | 'teardown'
   awaited?: boolean
 }
@@ -62,10 +62,8 @@ export interface KernelJobOutputRead {
   lossy?: boolean
 }
 
-/** Store event hooks the channel injects (toast on settle, emit on change). */
+/** Store event hooks the channel injects (emit on change). */
 export interface BackgroundJobEvents {
-  /** A job the store knew live just settled (or vanished mid-flight). */
-  onSettled?(job: BackgroundJobState): void
   /** The visible set changed; the channel syncs rows and emits. */
   onChanged?(): void
 }
@@ -124,8 +122,8 @@ export class BackgroundJobStore {
   constructor(private readonly events: BackgroundJobEvents = {}) {}
 
   /**
-   * Diff a fresh `list()` against the tracked set: register new jobs, fold
-   * status/detail transitions, and fire `onSettled` for live→terminal moves.
+   * Diff a fresh `list()` against the tracked set: register new jobs and fold
+   * status/detail transitions.
    * Jobs that vanish while live were teardown-cancelled (session swap /
    * owner disposal) and are frozen as `killed` and KEPT as recent history —
    * their transcript rows freeze at a sensible terminal state instead of
@@ -172,9 +170,8 @@ export class BackgroundJobStore {
         prev.progress === snap.progress &&
         prev.finishedAt === snap.finishedAt
       ) continue
-      const wasLive = !isTerminal(prev.status)
-      // Captured before the write below: the lifecycle-event gate compares
-      // against the previous status, which the assignment overwrites.
+      // Captured before the write below: the timeline transition check
+      // compares against the previous status, which the assignment overwrites.
       const prevStatus = prev.status
       prev.status = snap.status
       prev.label = snap.label
@@ -207,14 +204,12 @@ export class BackgroundJobStore {
         this.seedKernelRead(snap.id, snap.output.earliest)
       }
       changed = true
-      if (wasLive && isTerminal(snap.status)) this.events.onSettled?.(prev)
     }
     for (const job of this.jobs.values()) {
       if (seen.has(job.id) || isTerminal(job.status)) continue
       job.status = 'killed'
       job.finishedAt = Date.now()
       recordTimeline(job, { kind: 'settled', at: job.finishedAt })
-      this.events.onSettled?.(job)
       changed = true
     }
     if (this.jobs.size > JOBS_MAX_TRACKED) {

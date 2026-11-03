@@ -105,7 +105,7 @@ export function configureDshServices(
   // Job projection owns registry callbacks and transcript rows. The optional
   // service attachment has no authority after its injected lifetime ends.
   const jobProjection = createJobProjection(state.activity, state.transcript, {
-    owner, notify: (...args) => notify(...args), emit: () => publishRuntime(state), agent: () => binding.agent, steer: text => state.composer.commands.steer(text),
+    owner, emit: () => publishRuntime(state), agent: () => binding.agent, steer: text => state.composer.commands.steer(text),
   })
 
   // The DSH slash-command registry (optional service): /plan, /goal and
