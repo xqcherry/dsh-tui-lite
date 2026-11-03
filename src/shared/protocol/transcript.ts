@@ -1,33 +1,6 @@
 import type { SelectionAttachment, TranscriptImage } from './composer.js'
-import type { JobGroupRow, JobRow } from './jobs.js'
+import type { JobRow } from './jobs.js'
 import type { SubagentRow } from './subagents.js'
-
-/**
- * Group decoration for a run of consecutive shell/job tool calls.
- *
- * Settled runs of ≥3 of the same tool render as one summary line instead of
- * N header rows. Clicking the summary (or Ctrl+O) expands the run; a failure
- * count stays visible in the error color while folded. Derived state: it
- * rides shallow copies in the transcript pre-pass, never the shared rows.
- */
-export interface ToolGroupRow {
-  /** Group header row: the only member rendering the summary line. */
-  head: boolean
-  /** Last member of the run. */
-  last: boolean
-  /** Members in the run (≥3 — shorter pairs stay card by card). */
-  count: number
-  /** Whole group folded into the summary line (meaningful on the head). */
-  folded: boolean
-  /** Failed members; painted in the error color while folded. */
-  failed: number
-  /** Tool name as the card resolves it (`bash`, `job_output`, …). */
-  name: string
-  /** Earliest member start. */
-  startedAt: number
-  /** Latest member finish. */
-  endedAt: number
-}
 
 /**
  * One rendered transcript row. The DSH session log is the source of truth:
@@ -61,16 +34,6 @@ export interface ChatRow {
   subagent?: SubagentRow
   /** Present on `job` rows; the background-job state snapshot. */
   job?: JobRow
-  /** Present on `job` rows that share a run of ≥2 consecutive cards: the
-   *  group decoration (chain rail + fold summary). Render-derived state:
-   *  written only onto shallow copies in the transcript's row pre-pass
-   *  (rows may arrive frozen from the session projection), never by the
-   *  projection and never on the shared row objects. */
-  jobGroup?: JobGroupRow
-  /** Present on `tool` rows that share a settled run of ≥3 calls of the same
-   *  shell/job tool: the compact summary decoration. Same derived-state
-   *  contract as {@link jobGroup}. */
-  toolGroup?: ToolGroupRow
   /** Event wall-clock time (transcript-mode metadata, assistant rows). */
   time?: number
   /** Present on `reasoning` rows once settled: thinking wall-clock duration. */
@@ -96,9 +59,8 @@ export interface ChatRow {
    *  exempt from the next fold pass so a restore is not instantly undone. */
   restored?: boolean
   /** True on rows created by LIVE event handling (not replay/resume/fold
-   *  restore) — the smooth-streaming reveal animates freshly-arrived
-   *  content only; replayed history must paint complete. Set once at
-   *  creation; never mutated afterwards. */
+   *  restore). Retained as a projection fact; presentation no longer
+   *  animates arrival (the tail window repaints on the next commit). */
   fresh?: boolean
   /** Present on user rows whose submit consumed a live IDE selection: the
    *  transcript renders the "Selected N lines" indicator above the bubble. */

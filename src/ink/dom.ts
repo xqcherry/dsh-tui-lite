@@ -130,7 +130,7 @@ export type DOMElement = {
   // reach it by walking parentNode, like browser getRootNode().
   focusManager?: FocusManager
   // React component stack captured at createInstance time (reconciler.ts),
-  // e.g. ['JobCard', 'MessageList', 'Chat']. Only populated when
+  // e.g. ['ToolEntryView', 'MessageList', 'Chat']. Only populated when
   // DSH_TUI_DEBUG_REPAINTS is set. Used by findOwnerChainAtRow to
   // attribute scrollback-diff full-resets to the component that caused them.
   debugOwnerChain?: string[]

@@ -29,42 +29,6 @@ export interface JobRow {
 }
 
 /**
- * Group decoration for a run of consecutive background-job cards.
- *
- * A batch of `run_in_background` calls lands as N adjacent cards (the job
- * projection pushes the whole roster in one sync) and each one pays a blank
- * separator line — a pile of near-identical rows for work nobody reads card
- * by card. The transcript therefore reads ≥2 adjacent job rows as ONE group:
- * members drop the blank line between them, share a chain rail on the left,
- * and the group header summarizes the run; once every member settled the
- * whole group folds into that header line alone (click / Ctrl+O expands).
- *
- * Derived state: it rides a per-pass shallow COPY of the row (the shared
- * rows may arrive frozen from the session projection) so BOTH the renderer
- * and the height signature can read it, and it is recomputed from scratch
- * whenever the visible-row window rebuilds.
- */
-export interface JobGroupRow {
-  /** Group header row: the only member rendering the title/fold line. */
-  head: boolean
-  /** Last member: closes the rounded rail with a `╰` cap line. */
-  last: boolean
-  /** Members in the run (≥2 — a lone job card stays ungrouped). */
-  count: number
-  /** Whole group folded into the header line (meaningful on the head). */
-  folded: boolean
-  /** Members still live (running + stopping). */
-  running: number
-  completed: number
-  failed: number
-  killed: number
-  /** Earliest member start. */
-  startedAt: number
-  /** Latest member finish; absent while any member is still live. */
-  endedAt?: number
-}
-
-/**
  * Background-job projection for the UI (`/jobs` panel, transcript cards,
  * status-line chip, completion toasts).
  *
