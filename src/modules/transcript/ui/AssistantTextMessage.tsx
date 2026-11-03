@@ -1,54 +1,40 @@
 import React from 'react'
-import { Box, NoSelect, Text } from '../../../ui/primitives.js'
-import { BLACK_CIRCLE } from '../../../ui/text/figures.js'
+import { Box } from '../../../ui/primitives.js'
 import { Markdown } from '../../../ui/Markdown.js'
+import { StreamingMarkdown } from '../../../ui/StreamingMarkdown.js'
 
 type Props = {
   text: string
-  /** Adds the top margin between messages. */
+  /** Adds the top margin between turns. */
   marginTopOnTurn: boolean
-  /** Message-selection mode highlight. */
+  /** True while the provider is still delivering chunks. */
+  streaming?: boolean
   isSelected?: boolean
-  /** Row expanded on its own (persistent hover-grey background). */
-  isExpanded?: boolean
 }
 
 /**
- * Assistant text message: bullet + markdown body.
- *
- * Deliberately not clickable: the transcript is reading material and the
- * mouse's job there is text selection (user feedback — row hover tints and
- * fold toggling were noise, not affordance).
+ * Assistant text: markdown with the OpenCode-style three-column transcript
+ * indent. The old `●` bullet is gone — activity is carried by the tool rows
+ * and the working line, not by a marker on every answer.
  */
 export function AssistantTextMessage({
   text,
   marginTopOnTurn,
+  streaming = false,
   isSelected = false,
-  isExpanded = false,
 }: Props): React.ReactNode {
+  if (text === '') return null
   return (
     <Box
-      alignItems="flex-start"
-      flexDirection="row"
-      justifyContent="space-between"
+      flexDirection="column"
       marginTop={marginTopOnTurn ? 1 : 0}
+      paddingLeft={3}
       width="100%"
-      backgroundColor={
-        isSelected
-          ? 'messageActionsBackground'
-          : isExpanded
-            ? 'userMessageBackgroundHover'
-            : undefined
-      }
+      backgroundColor={isSelected ? 'messageActionsBackground' : undefined}
     >
-      <Box flexDirection="row">
-        <NoSelect fromLeftEdge minWidth={2}>
-          <Text color={isSelected ? 'suggestion' : 'text'}>{BLACK_CIRCLE}</Text>
-        </NoSelect>
-        <Box flexDirection="column">
-          <Markdown>{text}</Markdown>
-        </Box>
-      </Box>
+      {streaming
+        ? <StreamingMarkdown>{text}</StreamingMarkdown>
+        : <Markdown>{text}</Markdown>}
     </Box>
   )
 }

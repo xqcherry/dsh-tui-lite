@@ -1,558 +1,264 @@
-import React, { useState } from 'react'
-import type { TranscriptImage } from '../../../shared/protocol/composer.js'
-import type { JobGroupRow, JobRow } from '../../../shared/protocol/jobs.js'
-import type { SubagentRow } from '../../../shared/protocol/subagents.js'
-import type { ChatRow, ToolCallView, ToolGroupRow, ToolResultView, ToolRow } from '../../../shared/protocol/transcript.js'
-import { t } from '../../../shared/i18n.js'
-import type { ToolBackground } from '../../../shared/platform/display-preferences.js'
-
-import type { DOMElement } from '../../../ink/dom.js'
+import React from 'react'
 import type { ClickEvent } from '../../../ink/events/click-event.js'
-
-
-import { truncateToWidth } from '../../../ink/truncateToWidth.js'
-import { foldLongLines } from '../../../ui/text/fold-long-lines.js'
-import { primaryComboString } from '../../../shared/platform/keymap.js'
+import type { DOMElement } from '../../../ink/dom.js'
+import type { ChatRow } from '../../../shared/protocol/transcript.js'
+import { t } from '../../../shared/i18n.js'
 import { stripNarration } from '../../../shared/platform/narration.js'
 import { stringWidth } from '../../../shared/platform/stringWidth.js'
-
+import { truncateToWidth } from '../../../ink/truncateToWidth.js'
 import { Box, Text } from '../../../ui/primitives.js'
-import { JobCard } from '../../activity/index.js'
-import { JobGroupHeader } from '../../activity/index.js'
-import { SubagentMessage } from '../../activity/index.js'
-import { StreamingMarkdown } from '../../../ui/StreamingMarkdown.js'
-import { TurnInterruptedRow } from './TurnInterruptedRow.js'
 import { Divider } from '../../../ui/design-system/Divider.js'
 import { MessageMetadata } from './MessageMetadata.js'
+import { TurnInterruptedRow } from './TurnInterruptedRow.js'
 import { TranscriptImages } from './TranscriptImages.js'
-import { AssistantTextLeafRow, ThinkingLeafRow, ToolLeafRow } from './TranscriptLeaves.js'
-import { ToolGroupHeader } from './ToolGroupHeader.js'
+import { AssistantTextMessage } from './AssistantTextMessage.js'
+import { AssistantThinkingMessage } from './AssistantThinkingMessage.js'
 import { UserPromptMessage } from './UserPromptMessage.js'
+import { ToolEntryView } from './ToolEntryView.js'
+import { displaySelectionPath } from './display-path.js'
+import { subagentEntryOf, toolEntryOf } from '../model/tool-entry.js'
 
-
-import { displaySelectionPath } from './list-signatures.js'
-
-
-export type MemoRowProps = {
-  rowId: number
-  kind: ChatRow['kind']
+/**
+ * One transcript row. Rows are intentionally flat: generated content uses
+ * the OpenCode-style activity language (left indent, one-line tools, block
+ * bodies only where output matters), while notices and local command output
+ * keep their compact framed presentation.
+ */
+export type TranscriptRowProps = {
+  row: ChatRow
+  /** Primitive text snapshot so in-place streaming appends invalidate memo. */
   text: string
-  images: readonly TranscriptImage[] | undefined
-  /** Reasoning rows: the FULL un-revealed text — the live three-line preview
-   *  ticker follows the newest arrived content (never the reveal), while the
-   *  expanded body shows the revealed slice in `text`. */
-  textFull?: string
-  executionTarget: string | undefined
-  commandResult: ChatRow['commandResult']
-  /** Local-output answer lines render at normal brightness instead of dim. */
-  emphasis: boolean
-  /** IDE selection indicator (user rows): rendered above the prompt bubble. */
-  selectionAttached: ChatRow['selectionAttached']
-  /** Session cwd for the indicator's display-path relativization (T-FIX-01). */
-  sessionCwd: string | undefined
-  streaming: boolean
-  thinkingOpen: boolean
-  durationMs: number | undefined
-  /** Estimated thinking tokens of a count-only reasoning row. */
-  reasoningTokens: number | undefined
-  time: number | undefined
-  marginTopOnTurn: boolean
-  isSelected: boolean
-  isExpanded: boolean
-  /** Per-card body expansion (click); separate from group folds. */
-  isDetailExpanded: boolean
+  /** Primitive revision for mutable tool/job/subagent objects. */
+  revision: string
   expanded: boolean
+  isRowExpanded: boolean
+  isSelected: boolean
+  marginTop: boolean
   model: string
-  /** Edit/Write diff presentation preference (forwarded to tool cards). */
-  diffLayout: 'auto' | 'split' | 'unified'
-  /** Smooth streaming reveal (forwarded to thinking/tool renderers). */
-  smoothStreaming: boolean
-  /** Live-arrived row flag (drives tool-card reveal participation). */
-  fresh: boolean
-  /** Version tick for active tool reveal; 0 keeps settled rows memoized. */
-  revealVersion: number
-  thinkingFold: 'preview' | 'full'
-  toolBackground: ToolBackground
-  /** Working-activity preset name; drives the subagent card's running glyph. */
-  background: 'messageActionsBackground' | undefined
-  // ToolRow, flattened: the channel writes status/result fields in place,
-  // so passing the object itself would make mutations invisible to memo.
-  toolCallId: string | undefined
-  toolName: string | undefined
-  toolArgsText: string | undefined
-  toolArgsFull: string | undefined
-  toolStatus: ToolRow['status'] | undefined
-  toolResultText: string | undefined
-  toolResultFull: string | undefined
-  toolErrorText: string | undefined
-  /** Trajectory footnote, present on at most one row (the newest failure). */
-  toolFootnote: string | undefined
-  /** Presentation views are set-once stable refs (creation / settle), so a
-   *  plain ref compare stays correct under the in-place mutation model. */
-  toolCallView: ToolCallView | undefined
-  toolResultView: ToolResultView | undefined
-  toolStartedAt: number | undefined
-  toolDurationMs: number | undefined
-  /** Row-level source fold (window cap dropped full payloads): the expanded
-   *  card discloses preview-only instead of passing it off as full text. */
-  toolSourceFolded: boolean
-  // SubagentRow, stable ref (subagent lifecycle events update the store, not
-  // the row ref itself, so a plain ref compare stays correct).
-  subagent: SubagentRow | undefined
-  // JobRow, same update contract as SubagentRow (replaced per job commit).
-  job: JobRow | undefined
-  /** Group decoration for a run of consecutive job cards (see JobGroupRow). */
-  jobGroup: JobGroupRow | undefined
-  /** Group decoration for a settled run of shell/job tool calls. */
-  toolGroup: ToolGroupRow | undefined
-  onToggleRow: (rowId: number) => void
-  onToggleDetail: (rowId: number) => void
-  /** 流式 reasoning 行在三行预览/全文间切换；落定行用 onToggleRow。 */
-  onToggleStreamView: (rowId: number) => void
-  /** 是否反转该流式行的 thinkingFold 默认视图。 */
-  streamViewToggled: boolean
-  onOpenSubagent: ((agentId: string) => void) | undefined
-  onOpenSubagentView: ((agentId: string, rowId: number) => void) | undefined
-  onOpenJobs: ((focusId?: string) => void) | undefined
-  onWatchJobOutput: ((id: string) => () => void) | undefined
-  onOpenFile: ((path: string) => void) | undefined
-  setRowRef: (rowId: number, el: DOMElement | null) => void
+  sessionCwd?: string
+  onToggleRow(rowId: number): void
+  setRowRef(rowId: number, el: DOMElement | null): void
 }
 
-export function ClickableDivider({ title, onClick }: { title: string; onClick?: () => void }): React.ReactNode {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <Box
-      marginTop={1}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      backgroundColor={hovered ? 'userMessageBackgroundHover' : undefined}
-    >
-      <Divider title={title} />
-    </Box>
-  )
+function compactPreview(text: string, limit = 64): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return stringWidth(flat) <= limit ? flat : `${truncateToWidth(flat, limit - 1)}…`
 }
 
+function useRowRef(rowId: number, setRowRef: (rowId: number, el: DOMElement | null) => void): (el: DOMElement | null) => void {
+  return React.useCallback((el: DOMElement | null) => {
+    setRowRef(rowId, el)
+  }, [rowId, setRowRef])
+}
+
+function toggleOnClick(onToggle: () => void): (event: ClickEvent) => void {
+  return (event: ClickEvent) => {
+    if (event.cellIsBlank) return
+    onToggle()
+  }
+}
+
+/**
+ * Memoized row. `revision` is deliberately part of the prop set: the
+ * channel mutates tool/job/subagent objects in place, so object identity
+ * alone cannot tell React that a running row advanced.
+ */
 export function TranscriptRow({
-  rowId,
-  kind,
+  row,
   text,
-  images,
-  textFull,
-  executionTarget,
-  commandResult,
-  emphasis,
-  selectionAttached,
-  sessionCwd,
-  streaming,
-  thinkingOpen,
-  durationMs,
-  reasoningTokens,
-  time,
-  marginTopOnTurn,
-  isSelected,
-  isExpanded,
-  isDetailExpanded,
+  revision,
   expanded,
+  isRowExpanded,
+  isSelected,
+  marginTop,
   model,
-  diffLayout,
-  smoothStreaming,
-  fresh,
-  revealVersion,
-  thinkingFold,
-  toolBackground,
-  background,
-  toolCallId,
-  toolName,
-  toolArgsText,
-  toolArgsFull,
-  toolStatus,
-  toolResultText,
-  toolResultFull,
-  toolErrorText,
-  toolFootnote,
-  toolCallView,
-  toolResultView,
-  toolStartedAt,
-  toolDurationMs,
-  toolSourceFolded,
-  subagent,
-  job,
-  jobGroup,
-  toolGroup,
+  sessionCwd,
   onToggleRow,
-  onToggleDetail,
-  onToggleStreamView,
-  streamViewToggled,
-  onOpenSubagent,
-  onOpenSubagentView,
-  onOpenJobs,
-  onWatchJobOutput,
-  onOpenFile,
   setRowRef,
-}: MemoRowProps): React.ReactNode {
-  const ref = React.useCallback(
-    (el: DOMElement | null): void => {
-      setRowRef(rowId, el)
-    },
-    [setRowRef, rowId],
-  )
-  // 可折叠行（工具卡/思考/compact 摘要）共用：点击切换展开，全宽行右侧
-  // 空白（屏幕缓冲未写入单元格）不触发——点击空白想选字/拖拽时不再误触
-  // 展开/收起（审计 C-03/cellIsBlank 零消费）。纯文本行（user/assistant）
-  // 平时不可点：转录是阅读区（用户反馈），折叠语义留给带视觉指示的行——
-  // 唯一例外是**被折叠的超长单行**：那时整行就是展开开关（见 foldClickable）。
-  const foldOnClick = React.useCallback((event: ClickEvent): void => {
-    if (event.cellIsBlank) return
-    onToggleRow(rowId)
-  }, [onToggleRow, rowId])
-  // 当前回合仍展开的 reasoning 行：点击在三行预览/全文间切换。它反转
-  // thinkingFold 的默认值，回合落定后语义自动回到 foldOnClick。
-  const streamViewOnClick = React.useCallback((event: ClickEvent): void => {
-    if (event.cellIsBlank) return
-    onToggleStreamView(rowId)
-  }, [onToggleStreamView, rowId])
-  // 任务/工具组：点击组头行折叠/展开整组（与工具卡的折叠同一套手势：
-  // 行点击 = expandedRows 切换，Ctrl+O 展开全部）。
-  const toggleGroup = React.useCallback((): void => {
-    onToggleRow(rowId)
-  }, [onToggleRow, rowId])
-  // 卡片正文展开与组折叠分开：组内点击卡片只看自己的输出，不会收起整组。
-  const toggleDetail = React.useCallback((): void => {
-    onToggleDetail(rowId)
-  }, [onToggleDetail, rowId])
-  const detailOnClick = React.useCallback((event: ClickEvent): void => {
-    if (event.cellIsBlank) return
-    onToggleDetail(rowId)
-  }, [onToggleDetail, rowId])
-  // 子代理卡：点击打开详情场景（不是折叠）。
-  const openSubagent = React.useCallback(() => {
-    if (subagent !== undefined) onOpenSubagent?.(subagent.agentId)
-  }, [onOpenSubagent, subagent])
-  // compact 摘要折叠行 hover 轻指示（∴ 提亮，不刷背景）。
-  const [compactHovered, setCompactHovered] = useState(false)
+}: TranscriptRowProps): React.ReactNode {
+  void revision
+  const ref = useRowRef(row.id, setRowRef)
+  const open = expanded || isRowExpanded || row.thinkingOpen === true
+  const toggle = React.useCallback(() => onToggleRow(row.id), [onToggleRow, row.id])
+  const onClick = toggleOnClick(toggle)
+  const marginTopOnTurn = marginTop
 
-  // Long single lines are clipped before layout (utils/fold-long-lines.ts):
-  // one 300k-char paste or minified-JS line otherwise wraps into thousands of
-  // visual rows and that per-frame wrap — not the row count — dominates the
-  // frame. Ctrl+O (global) AND a row click (per-row, the same `expandedRows`
-  // gesture message-selection mode uses) both paint the raw text again.
-  // Reasoning rows are deliberately excluded: their preview is already a fixed
-  // three-row ticker. Tool cards fold inside their own header/body
-  // (AssistantToolUseMessage), whose text never rides this prop.
-  const foldable = kind !== 'reasoning' && kind !== 'tool'
-  const folded = React.useMemo(
-    () => (foldable ? foldLongLines(text) : { text, hiddenChars: 0, foldedLines: 0 }),
-    [foldable, text],
-  )
-  const displayText = expanded || isExpanded ? text : folded.text
-  // Mouse toggle: only a row that ACTUALLY hides something is clickable (an
-  // ordinary message stays inert so plain clicks and drag-selection keep
-  // working there). A streaming row is clickable too — the same contract the
-  // tool card has while running: the click paints the full ARRIVED text, and
-  // the reveal keeps growing it.
-  const foldClickable = foldable && folded.hiddenChars > 0
-
-  switch (kind) {
+  switch (row.kind) {
     case 'user':
       return (
-        <Box flexDirection="column" ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
-          {selectionAttached && (
-            <Text dimColor>
-              {'⧉ '}{t('selection-attached', {
-                lines: selectionAttached.lines,
-                count: selectionAttached.lines,
-                path: displaySelectionPath(selectionAttached.path, sessionCwd),
-              })}
-            </Text>
+        <Box flexDirection="column" ref={ref} width="100%">
+          {row.selectionAttached !== undefined && (
+            <Box paddingLeft={3}>
+              <Text dimColor>
+                {'⧉ '}{t('selection-attached', {
+                  lines: row.selectionAttached.lines,
+                  count: row.selectionAttached.lines,
+                  path: displaySelectionPath(row.selectionAttached.path, sessionCwd),
+                })}
+              </Text>
+            </Box>
           )}
-          {text !== '' && (
-            <UserPromptMessage
-              text={displayText}
-              marginTopOnTurn={marginTopOnTurn}
-              isSelected={isSelected}
-            />
-          )}
-          {images !== undefined && (
-            <Box marginTop={text === '' && marginTopOnTurn ? 1 : 0}>
-              <TranscriptImages images={images} />
+          <UserPromptMessage
+            text={text}
+            marginTopOnTurn={marginTopOnTurn}
+            isSelected={isSelected}
+          />
+          {row.images !== undefined && (
+            <Box paddingLeft={3}>
+              <TranscriptImages images={row.images} />
             </Box>
           )}
         </Box>
       )
     case 'assistant':
-      return streaming ? (
-        <Box
-          alignItems="flex-start"
-          flexDirection="row"
-          marginTop={marginTopOnTurn ? 1 : 0}
-          width="100%"
-          backgroundColor={background}
-          ref={ref}
-          onClick={foldClickable ? foldOnClick : undefined}
-        >
-          <Box minWidth={2}>
-            <Text color="text">●</Text>
-          </Box>
-          <Box flexDirection="column">
-            {/* The ⏵ self-narration line (working-activity narrate contract)
-              is stripped here: the live working line on the status bar
-              already shows it. */}
-            <StreamingMarkdown>{stripNarration(displayText)}</StreamingMarkdown>
-            {images !== undefined && <TranscriptImages images={images} indent={0} />}
-          </Box>
-        </Box>
-      ) : (
-        <Box
-          width="100%"
-          flexDirection="column"
-          backgroundColor={background}
-          ref={ref}
-          onClick={foldClickable ? foldOnClick : undefined}
-        >
-          {expanded && (
-            <Box
-              flexDirection="row"
-              justifyContent="flex-end"
-              gap={1}
-              marginTop={1}
-            >
-              <MessageMetadata timestamp={time} model={model} />
+      return (
+        <Box flexDirection="column" ref={ref} width="100%">
+          <AssistantTextMessage
+            text={stripNarration(text)}
+            marginTopOnTurn={marginTopOnTurn}
+            streaming={row.streaming === true}
+            isSelected={isSelected}
+          />
+          {row.images !== undefined && (
+            <Box paddingLeft={3}>
+              <TranscriptImages images={row.images} />
             </Box>
           )}
-          <AssistantTextLeafRow
-            text={stripNarration(displayText)}
-            marginTopOnTurn={marginTopOnTurn}
-            isSelected={isSelected}
-            isExpanded={isExpanded}
-          />
-          {images !== undefined && <TranscriptImages images={images} />}
+          {open && row.time !== undefined && (
+            <Box paddingLeft={3} marginTop={1}>
+              <MessageMetadata timestamp={row.time} model={model} />
+            </Box>
+          )}
         </Box>
       )
-    case 'reasoning': {
-      // The setting chooses the live default; a row click reverses it. Global
-      // or per-row transcript expansion always wins and shows the full text.
-      const turnOpen = streaming || thinkingOpen
-      const streamPreview = turnOpen && !expanded && !isExpanded &&
-        (streamViewToggled ? thinkingFold === 'full' : thinkingFold === 'preview')
+    case 'reasoning':
       return (
-        <Box flexDirection="column" ref={ref}>
-          <ThinkingLeafRow
+        <Box ref={ref} width="100%">
+          <AssistantThinkingMessage
             thinking={text}
-            textFull={textFull}
+            streaming={row.streaming === true}
+            expanded={open}
             marginTopOnTurn={marginTopOnTurn}
-            streaming={streaming}
-            preview={streamPreview}
-            // Settled rows keep the fold-on-settle default and expand via
-            // expandedRows/Ctrl+O; a current-turn row is preview or full.
-            verbose={isExpanded || expanded || (turnOpen && !streamPreview)}
-            durationMs={durationMs}
-            reasoningTokens={reasoningTokens}
+            durationMs={row.durationMs}
+            reasoningTokens={row.reasoningTokens}
             isSelected={isSelected}
-            onClick={turnOpen ? streamViewOnClick : foldOnClick}
+            onClick={onClick}
+          />
+        </Box>
+      )
+    case 'tool': {
+      if (row.tool === undefined) return null
+      const entry = toolEntryOf(row.tool, { expanded: open })
+      return (
+        <Box ref={ref} width="100%">
+          <ToolEntryView
+            entry={entry}
+            expanded={open}
+            marginTop={marginTopOnTurn}
+            onToggle={toggle}
           />
         </Box>
       )
     }
-    case 'tool': {
-      if (
-        toolCallId === undefined ||
-        toolName === undefined ||
-        toolArgsText === undefined ||
-        toolStatus === undefined ||
-        toolStartedAt === undefined
-      ) {
-        return null
-      }
-      // Rebuilt per render from the flattened props — cheap object literal,
-      // and AssistantToolUseMessage is only reached when memo let us through.
-      const tool: ToolRow = {
-        callId: toolCallId,
-        name: toolName,
-        argsText: toolArgsText,
-        argsFull: toolArgsFull,
-        status: toolStatus,
-        resultText: toolResultText,
-        resultFull: toolResultFull,
-        errorText: toolErrorText,
-        callView: toolCallView,
-        resultView: toolResultView,
-        startedAt: toolStartedAt,
-        durationMs: toolDurationMs,
-      }
-      const groupHead = toolGroup !== undefined && toolGroup.head
-      const onToolCardClick = toolGroup === undefined ? foldOnClick : detailOnClick
+    case 'subagent': {
+      if (row.subagent === undefined) return null
+      const entry = subagentEntryOf(row.subagent)
       return (
-        <Box
-          flexDirection="column"
-          marginTop={groupHead && marginTopOnTurn ? 1 : 0}
-          ref={ref}
-        >
-          {toolGroup !== undefined && toolGroup.head && (
-            <ToolGroupHeader group={toolGroup} onToggle={toggleGroup} />
-          )}
-          {!(toolGroup !== undefined && toolGroup.folded) && (
-            <ToolLeafRow
-              tool={tool}
-              marginTopOnTurn={toolGroup === undefined ? marginTopOnTurn : false}
-              verbose={expanded || isDetailExpanded}
-              isSelected={isSelected}
-              isExpanded={isDetailExpanded}
-              footnote={toolFootnote}
-              diffLayout={diffLayout}
-              toolBackground={toolBackground}
-              smoothReveal={smoothStreaming}
-              fresh={fresh}
-              revealVersion={revealVersion}
-              onClick={onToolCardClick}
-              onOpenFile={onOpenFile}
-              images={images}
-              sourceFolded={toolSourceFolded}
-            />
-          )}
+        <Box ref={ref} width="100%">
+          <ToolEntryView
+            entry={entry}
+            expanded={open}
+            marginTop={marginTopOnTurn}
+            onToggle={toggle}
+          />
         </Box>
       )
     }
     case 'notice':
       return (
-        <Box marginTop={1} ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
-          <Divider title={` ${displayText} `} />
+        <Box ref={ref} marginTop={1} width="100%">
+          <Divider title={` ${text} `} />
         </Box>
       )
     case 'interrupt':
       return (
-        <Box marginTop={1} ref={ref}>
+        <Box ref={ref} marginTop={1} width="100%">
           <TurnInterruptedRow />
         </Box>
       )
     case 'turn-summary':
       return null
-    case 'local':
-      if (commandResult !== undefined) {
-        const starts = commandResult === 'start' || commandResult === 'only'
-        const ends = commandResult === 'end' || commandResult === 'only'
-        return <Box
-          flexDirection="column"
-          width="100%"
-          flexShrink={0}
-          marginTop={starts ? 1 : 0}
-          paddingX={1}
-          borderStyle="single"
-          borderColor="permission"
-          borderTop={starts}
-          borderBottom={ends}
-          borderLeft
-          borderRight
-          ref={ref}
-        >
-          <Text color="permission" bold wrap="truncate-end">{displayText}</Text>
-        </Box>
-      }
-      // `!` mode command echo.
+    case 'compact':
       return (
-        <Box marginTop={1} backgroundColor={background} ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
-          <Text color="bashBorder">!{executionTarget ? ` [${executionTarget}]` : ''} {displayText}</Text>
+        <Box
+          ref={ref}
+          marginTop={marginTopOnTurn ? 1 : 0}
+          paddingLeft={3}
+          width="100%"
+          backgroundColor={isSelected ? 'messageActionsBackground' : undefined}
+          onClick={onClick}
+        >
+          {open
+            ? <Text dimColor wrap="wrap">{text}</Text>
+            : <Text dimColor italic wrap="truncate-end">
+                {'∴ '}{t('compact-summary-folded')} · {compactPreview(text)}
+              </Text>}
+        </Box>
+      )
+    case 'local':
+      if (row.commandResult !== undefined) {
+        const starts = row.commandResult === 'start' || row.commandResult === 'only'
+        const ends = row.commandResult === 'end' || row.commandResult === 'only'
+        return (
+          <Box
+            ref={ref}
+            flexDirection="column"
+            width="100%"
+            flexShrink={0}
+            marginTop={starts ? 1 : 0}
+            paddingX={1}
+            borderStyle="single"
+            borderColor="permission"
+            borderTop={starts}
+            borderBottom={ends}
+            borderLeft
+            borderRight
+          >
+            <Text color="permission" bold wrap="truncate-end">{text}</Text>
+          </Box>
+        )
+      }
+      return (
+        <Box ref={ref} marginTop={1} paddingLeft={2} backgroundColor={isSelected ? 'messageActionsBackground' : undefined} onClick={onClick}>
+          <Text color="bashBorder">{'! '}{row.executionTarget === undefined ? '' : `[${row.executionTarget}] `}{text}</Text>
         </Box>
       )
     case 'local-output':
-      if (commandResult !== undefined) {
-        const ends = commandResult === 'end' || commandResult === 'only'
-        return <Box
-          width="100%"
-          flexShrink={0}
-          paddingX={1}
-          borderStyle="single"
-          borderColor="permission"
-          borderTop={false}
-          borderBottom={ends}
-          borderLeft
-          borderRight
-          ref={ref}
-        >
-          <Text dimColor={!emphasis} wrap="wrap">{displayText}</Text>
-        </Box>
+      if (row.commandResult !== undefined) {
+        const ends = row.commandResult === 'end' || row.commandResult === 'only'
+        return (
+          <Box
+            ref={ref}
+            width="100%"
+            flexShrink={0}
+            paddingX={1}
+            borderStyle="single"
+            borderColor="permission"
+            borderTop={false}
+            borderBottom={ends}
+            borderLeft
+            borderRight
+          >
+            <Text dimColor={row.emphasis !== true} wrap="wrap">{text}</Text>
+          </Box>
+        )
       }
       return (
-        <Box paddingLeft={2} backgroundColor={background} ref={ref} onClick={foldClickable ? foldOnClick : undefined}>
-          <Text dimColor={!emphasis}>{displayText}</Text>
+        <Box ref={ref} paddingLeft={3} onClick={onClick}>
+          <Text dimColor={row.emphasis !== true} wrap="wrap">{text}</Text>
         </Box>
       )
-    case 'compact':
-      // The post-compaction summary defaults to a folded one-liner with a
-      // text preview; Ctrl+O (global), message-selection Enter, or a click
-      // reveals the full summary.
-      return (
-        <Box
-          marginTop={marginTopOnTurn ? 1 : 0}
-          paddingLeft={2}
-          backgroundColor={background}
-          ref={ref}
-          onClick={foldOnClick}
-          onMouseEnter={() => setCompactHovered(true)}
-          onMouseLeave={() => setCompactHovered(false)}
-        >
-          {expanded || isExpanded ? (
-            <Text dimColor>{text}</Text>
-          ) : (
-            <Text dimColor italic color={compactHovered ? 'text' : undefined}>
-              <Text color={compactHovered ? 'text' : undefined}>∴</Text>
-              {' '}{t('compact-summary-folded')} · {compactPreview(displayText)}{' '}
-              {t('hint-expand-ctrl-o', { key: primaryComboString('transcript') })}
-            </Text>
-          )}
-        </Box>
-      )
-    case 'subagent':
-      if (!subagent) return null
-      return (
-        <Box flexDirection="column" ref={ref}>
-          <SubagentMessage
-            subagent={subagent}
-            marginTopOnTurn={marginTopOnTurn}
-            isExpanded={isExpanded}
-            onClick={openSubagent}
-            onOpenView={onOpenSubagentView === undefined ? undefined : () => onOpenSubagentView(subagent.agentId, rowId)}
-          />
-        </Box>
-      )
-    case 'job': {
-      if (!job) return null
-      // A grouped run renders as ONE block: the head row carries the summary
-      // line, members hang off the shared rail, and a FOLDED run keeps only
-      // that summary (its members were dropped from the window upstream).
-      const groupHead = jobGroup !== undefined && jobGroup.head
-      const onJobCardToggle = jobGroup === undefined ? toggleGroup : toggleDetail
-      return (
-        <Box
-          flexDirection="column"
-          // The head's block margin moves UP to the group (the summary line
-          // is what separates the run from what precedes it); the card under
-          // it must not add a second blank line.
-          marginTop={groupHead && marginTopOnTurn ? 1 : 0}
-          ref={ref}
-        >
-          {groupHead && <JobGroupHeader group={jobGroup} onToggle={toggleGroup} />}
-          {groupHead && jobGroup.folded ? null : (
-            <JobCard
-              job={job}
-              expanded={expanded || isDetailExpanded}
-              onToggle={onJobCardToggle}
-              marginTopOnTurn={groupHead ? false : marginTopOnTurn}
-              // Clicking a card opens the panel focused on THAT job, not the roster head.
-              onClick={onOpenJobs === undefined ? undefined : () => onOpenJobs(job.id)}
-              onWatchOutput={onWatchJobOutput}
-            />
-          )}
-        </Box>
-      )
-    }
   }
-}
-
-export function compactPreview(text: string, limit = 60): string {
-  const flat = text.replace(/\s+/g, ' ').trim()
-  return stringWidth(flat) <= limit ? flat : `${truncateToWidth(flat, limit - 1)}…`
 }
 
 export const MemoRow = React.memo(TranscriptRow)
