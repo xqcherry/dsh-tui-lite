@@ -33,7 +33,7 @@ for (const columns of [80, 40, 20, 16]) {
       assert(line.startsWith('│') && line.endsWith('│'), `continuous side borders: ${line}`)
     }
     const border = term.buffer.active.getLine(term.buffer.active.baseY + top)?.getCell(0)
-    assert.equal(border?.getFgColor(), 0xabc2ec, 'frame uses the permission blue')
+    assert.equal(border?.getFgColor(), 0x6fb4ff, 'frame uses the permission blue')
   }
   try {
     assert(await settled(() => screen().includes('❯ ● 模型0') && screen().includes('○ 模型1') && screen().includes('╯')), screen())
