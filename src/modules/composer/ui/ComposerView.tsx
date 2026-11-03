@@ -98,6 +98,7 @@ export function useComposerView(view: Context): React.ReactNode {
 const { commandMaxRows, commandSnapshot, acceptCommandSuggestion, moveCommandSuggestion, onOpenSessions, composer, context, columns, foldBlock, value, cursor, hovered, selectionActive, cursorColor, boundImageSpans, selection, cursorGlyph, updateFoldBlock, hoverEnter, hoverLeave, toastSuppressed, suspended, suggestionsAbove, lastClickAtRef, lastClickColRef, lastClickRowRef, updateSelection, placeCaret, selectionRef, cursorRef, clearSelection, dragAnchorRef, setCursor, foldBlockRef, valueRef, dockSelected, dockCount, dockedPending, fileOverlayOpen, terminalRows, setInput, editDocked, sendDocked, fileMatches, fileSelected, mention, acceptFile, setFileSelected, setHovered, setHomeHovered, homeHovered } = view
 const homeButtonCols = onOpenSessions === undefined ? 0 : HOME_BUTTON_COLS
 const sessionAccent = sessionColorHex(context.sessions.getSnapshot().sessionColor ?? '')
+const working = context.sessions.getSnapshot().working
 const suggestionAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : 'promptBorder'
 const promptAccent = context.sessions.getSnapshot().mode.plan === true ? 'planMode' : (sessionAccent ?? 'promptBorder')
 // Reserve the prefix, a cursor cell at the wrap boundary, and the right rail.
@@ -482,7 +483,11 @@ React.useLayoutEffect(() => {
   }, [floatersOpen])
 if (suspended) return null
 return (
-    <Box flexDirection="column" marginTop={1}>
+    // While a turn runs, the working status line (Chat's bottom chrome) owns
+    // the row directly above the prompt. Dropping this margin then keeps the
+    // status line on the border and the prompt in place across turn
+    // start/end (status +1 row, margin -1 row).
+    <Box flexDirection="column" marginTop={working ? 0 : 1}>
       {/* 瞬态面板浮层（队列/补全）：零布局高度、向上覆盖转录尾部，
           帧高不随面板开关涨落——否则帧顶行会被滚进 scrollback 并在关闭
           重绘时二次写入（/model 切换多一份启动画的根因，见 OverlayAbove）。 */}
@@ -667,7 +672,7 @@ return (
           <EffortChargeGlyph
             effort={context.settings.getSnapshot().reasoningEffort}
             levels={context.settings.getSnapshot().effortLevels}
-            working={context.sessions.getSnapshot().working}
+            working={working}
           />
           <Box
             ref={valueBoxRef}

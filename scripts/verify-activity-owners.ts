@@ -50,7 +50,7 @@ const transcript: ActivityTranscriptTarget = { ingress: {
 let parent: ActivityProjectionHost = { id: 'parent-a', session: { id: 'parent-a' } }
 const parentA = parent
 const owner = createChannelOwner()
-const jobs = createJobProjection(activity, transcript, { owner, agent: () => parent, emit() {}, notify() {}, steer() {} })
+const jobs = createJobProjection(activity, transcript, { owner, agent: () => parent, emit() {}, steer() {} })
 let roster: BackgroundJobSnapshot[] = [
   { id: 'job-a', kind: 'bash', label: 'first', status: 'running', startedAt: 10, output: { earliest: 5, total: 5 } },
   { id: 'job-b', kind: 'bash', label: 'second', status: 'running', startedAt: 11 },

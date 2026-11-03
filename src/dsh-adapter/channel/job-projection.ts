@@ -15,7 +15,6 @@ export function createJobProjection(
   transcript: ActivityTranscriptTarget,
   deps: {
     owner: Pick<ChannelOwner, 'current' | 'own'>
-    notify(text: string, options?: { color?: 'success' | 'error' | 'warning'; timeoutMs?: number }): unknown
     emit(): void
     agent(): ActivityProjectionHost
     steer(text: string): void
@@ -30,7 +29,6 @@ export function createJobProjection(
 
   const { store, dropRows, reset } = createJobPresentation(activity, transcript, {
     current: () => attachmentCurrent(),
-    notify: deps.notify,
     emit: deps.emit,
   })
 

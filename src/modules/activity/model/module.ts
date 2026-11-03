@@ -67,7 +67,6 @@ export function createActivityModule(launch: ModuleLaunch, publication: Publicat
       createJobs(events: BackgroundJobEvents) {
         const reducer = new BackgroundJobStore({
           onChanged: () => { if (!disposed) events.onChanged?.() },
-          onSettled: job => { if (!disposed) events.onSettled?.(job) },
         })
         jobReducers.add(reducer)
         return reducer

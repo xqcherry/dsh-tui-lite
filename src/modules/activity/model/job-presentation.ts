@@ -1,11 +1,8 @@
-import { t } from '../../../shared/i18n.js'
-import { formatJobDuration } from '../../../shared/platform/job-format.js'
 import type { ActivityJobTarget, ActivityTranscriptTarget } from '../contracts.js'
 
 /** Translate admitted task snapshots into activity facts and transcript presentation. */
 export function createJobPresentation(activity: ActivityJobTarget, transcript: ActivityTranscriptTarget, deps: {
   current(): boolean
-  notify(text: string, options?: { color?: 'success' | 'error' | 'warning'; timeoutMs?: number }): unknown
   emit(): void
 }) {
   const syncRows = (): void => activity.ingress.batch(() => {
@@ -29,17 +26,6 @@ export function createJobPresentation(activity: ActivityJobTarget, transcript: A
   })
 
   const store = activity.ingress.createJobs({
-    onSettled(job) {
-      deps.notify(
-        t(job.status === 'completed' ? 'jobs-toast-completed' : job.status === 'failed' ? 'jobs-toast-failed' : 'jobs-toast-killed', {
-          id: job.id,
-          label: job.label,
-          duration: formatJobDuration(job),
-          detail: job.detail ?? '',
-        }),
-        { color: job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : 'warning', timeoutMs: 6000 },
-      )
-    },
     onChanged() {
       if (!deps.current()) return
       syncRows()
