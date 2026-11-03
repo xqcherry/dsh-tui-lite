@@ -8,13 +8,17 @@ const TOOL_NAME_KEYS: Record<string, I18nKey> = {
   bash: 'tool-name-bash',
   powershell: 'tool-name-powershell',
   read: 'tool-name-read',
+  read_file: 'tool-name-read_file',
+  list_dir: 'tool-name-list_dir',
   glob: 'tool-name-glob',
   grep: 'tool-name-grep',
   write: 'tool-name-write',
+  write_file: 'tool-name-write_file',
   edit: 'tool-name-edit',
   todo_write: 'tool-name-todo_write',
   subagent: 'tool-name-subagent',
   web_search: 'tool-name-web_search',
+  web_fetch: 'tool-name-web_fetch',
   job_output: 'tool-name-job_output',
   job_list: 'tool-name-job_list',
   job_kill: 'tool-name-job_kill',
@@ -28,27 +32,4 @@ export function toolDisplayName(name: string, displayKey?: string): string {
   if (key !== undefined) return t(key)
   if (name.length === 0) return name
   return name[0]!.toUpperCase() + name.slice(1)
-}
-
-/** Shell and background-job control calls share the compact transcript
- *  treatment: their settled cards collapse to the header, and consecutive
- *  calls of the same tool fold into one summary line. */
-export const QUIET_TOOL_NAMES: ReadonlySet<string> = new Set([
-  'bash',
-  'bashpersistent',
-  'sh',
-  'shell',
-  'terminal',
-  'powershell',
-  'pwsh',
-  'job_output',
-  'job_list',
-  'job_kill',
-])
-
-export function isQuietTool(
-  tool: { readonly name: string },
-  view?: { readonly category?: 'mutate' | 'exec' | 'other' },
-): boolean {
-  return view?.category === 'exec' || QUIET_TOOL_NAMES.has(tool.name.toLowerCase())
 }
