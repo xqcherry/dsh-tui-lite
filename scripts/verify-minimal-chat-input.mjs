@@ -460,6 +460,35 @@ for (const columns of [40, 20]) {
   } finally { await colors.close() }
 }
 
+// A running turn's status line owns the row directly above the prompt border:
+// no blank line between them, and the prompt must not move when the turn
+// starts or ends (status +1 row, composer margin -1 row).
+for (const columns of [100, 40]) {
+  const live = await fixture({ columns })
+  try {
+    const promptTop = () => live.screen().split('\n').findIndex(line => line.trimStart().startsWith('╭'))
+    const idleTop = promptTop()
+    assert(idleTop > 0, `prompt border is visible at ${columns} columns:\n${live.screen()}`)
+    live.channel.working = true
+    live.channel.emit()
+    assert(await settled(() => {
+      const lines = live.screen().split('\n')
+      const top = lines.findIndex(line => line.trimStart().startsWith('╭'))
+      return top > 0 && (lines[top - 1] ?? '').trimStart().startsWith('●')
+    }), `working status line must sit directly on the prompt border at ${columns} columns:\n${live.screen()}`)
+    assert.equal(promptTop(), idleTop, 'the prompt must not move when a turn starts')
+    live.channel.working = false
+    live.channel.emit()
+    assert(await settled(() => {
+      const lines = live.screen().split('\n')
+      const top = lines.findIndex(line => line.trimStart().startsWith('╭'))
+      return top > 0 && (lines[top - 1] ?? '').trim() === ''
+    }), `idle composer keeps one blank row above the prompt at ${columns} columns:\n${live.screen()}`)
+    assert.equal(promptTop(), idleTop, 'the prompt must not move when a turn ends')
+    console.log(`PASS: working status line touches the prompt border without moving it at ${columns} TTY columns`)
+  } finally { await live.close() }
+}
+
 // A narrow permission menu keeps readable labels when some presets omit help.
 const narrowPermissions = await fixture({ columns: 40 })
 try {
