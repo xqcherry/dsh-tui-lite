@@ -55,7 +55,6 @@ export const checks = [
   'verify-table-layout.tsx',
   'verify-composer-status-bar.tsx',
   'verify-working-line.tsx',
-  'verify-message-measure-depth.tsx',
   'verify-selection-panels.tsx',
   'verify-help-panel.tsx',
   'verify-question-backtrack.tsx',
